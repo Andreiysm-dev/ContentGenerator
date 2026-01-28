@@ -1,5 +1,5 @@
 import express from "express";
-import {getContentCalendar} from "../controller/contentCalendarController"
+import {getContentCalendar} from "../controller/contentCalendarController.js"
 const router = express.Router();
 
 router.get("/getContentCalendar", getContentCalendar)
