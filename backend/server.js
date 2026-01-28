@@ -14,9 +14,9 @@ app.use(cors());
 app.use(express.json());
 
 // Note the leading slash in mount paths
-app.use("/api/company", companyRoutes);
-app.use("/api/companyCalendar", contentCalendar);
-app.use("/api/companyKb", companyKbRoutes);
+app.use("/api", companyRoutes);
+app.use("/api", contentCalendar);
+app.use("/api", companyKbRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
