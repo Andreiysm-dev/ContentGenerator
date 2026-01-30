@@ -127,7 +127,7 @@ export const getContentCalendarsByCompanyId = async (req, res) => {
             .from('contentCalendar')
             .select('*')
             .eq('companyId', companyId)
-            .order('date', { ascending: false });
+            .order('created_at', { ascending: true });
 
         if (contentCalendarError) {
             console.error('Error fetching content calendars:', contentCalendarError);

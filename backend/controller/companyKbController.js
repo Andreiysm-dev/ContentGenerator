@@ -7,8 +7,12 @@ export const createBrandKB = async (req, res) => {
             brandPack, 
             brandCapability, 
             writerAgent, 
+            reviewPrompt1,
             emojiRule, 
-            companyId 
+            companyId, 
+            systemInstruction,
+            imageSystemPrompt,
+            imageUserText
         } = req.body;
 
         // Validate required fields
@@ -25,8 +29,13 @@ export const createBrandKB = async (req, res) => {
                     brandPack,
                     brandCapability,
                     writerAgent,
+                    reviewPrompt1,
                     emojiRule,
                     companyId,
+                    systemInstruction,
+                    imageSystemPrompt,
+                    imageUserText,
+
                     created_at: new Date().toISOString()
                 }
             ])
@@ -152,8 +161,12 @@ export const updateBrandKB = async (req, res) => {
             brandPack, 
             brandCapability, 
             writerAgent, 
+            reviewPrompt1,
             emojiRule, 
-            companyId 
+            companyId,
+            systemInstruction,
+            imageSystemPrompt,
+            imageUserText
         } = req.body;
 
         // Build update object with only provided fields
@@ -161,8 +174,12 @@ export const updateBrandKB = async (req, res) => {
         if (brandPack !== undefined) updateData.brandPack = brandPack;
         if (brandCapability !== undefined) updateData.brandCapability = brandCapability;
         if (writerAgent !== undefined) updateData.writerAgent = writerAgent;
+        if (reviewPrompt1 !== undefined) updateData.reviewPrompt1 = reviewPrompt1;
         if (emojiRule !== undefined) updateData.emojiRule = emojiRule;
         if (companyId !== undefined) updateData.companyId = companyId;
+        if (systemInstruction !== undefined) updateData.systemInstruction = systemInstruction;
+        if (imageSystemPrompt !== undefined) updateData.imageSystemPrompt = imageSystemPrompt;
+        if (imageUserText !== undefined) updateData.imageUserText = imageUserText;
 
         if (Object.keys(updateData).length === 0) {
             return res.status(400).json({ 
