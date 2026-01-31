@@ -58,6 +58,7 @@ function App() {
   const [calendarRows, setCalendarRows] = useState<any[]>([]);
   const [isLoadingCalendar, setIsLoadingCalendar] = useState(false);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [isBackendWaking, setIsBackendWaking] = useState(false);
   const [calendarSearch, setCalendarSearch] = useState('');
   const [calendarStatusFilter, setCalendarStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
@@ -365,6 +366,7 @@ useEffect(() => {
       const list = (data && (data.companies || data)) as any;
       const rows = Array.isArray(list) ? list : [];
       setCompanies(rows);
+      setIsBackendWaking(false);
 
       if (!activeCompanyId) {
         const fallbackId = rows[0]?.companyId as string | undefined;
@@ -372,6 +374,8 @@ useEffect(() => {
       }
     } catch (err) {
       console.error('Error loading companies:', err);
+      setIsBackendWaking(true);
+      window.setTimeout(loadCompanies, 3000);
     }
   };
 
@@ -391,9 +395,11 @@ useEffect(() => {
         throw new Error(data.error || 'Failed to load content calendar');
       }
       setCalendarRows(data.contentCalendars || data);
+      setIsBackendWaking(false);
     } catch (err: any) {
       console.error('Error loading content calendar:', err);
       setCalendarError(err.message || 'Failed to load content calendar');
+      setIsBackendWaking(true);
     } finally {
       setIsLoadingCalendar(false);
     }
@@ -1346,7 +1352,14 @@ useEffect(() => {
               )}
             </div>
 
-            {calendarError && (
+            {isBackendWaking && (
+              <div className="empty-state" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="loading-spinner" aria-hidden="true"></span>
+                Waking backend... this may take up to 60 seconds on the free plan.
+              </div>
+            )}
+
+            {calendarError && !isBackendWaking && (
               <div className="empty-state" style={{ color: '#b91c1c' }}>
                 {calendarError}
               </div>
