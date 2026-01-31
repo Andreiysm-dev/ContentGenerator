@@ -4,6 +4,7 @@ import cors from "cors";
 import companyRoutes from "./routes/companyRoutes.js";
 import contentCalendar from "./routes/contentCalendar.js";
 import companyKbRoutes from "./routes/companyKbRoutes.js";
+import storageRoutes from "./routes/storageRoutes.js";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use("/api", companyRoutes);
 app.use("/api", contentCalendar);
 app.use("/api", companyKbRoutes);
+app.use("/api", storageRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
