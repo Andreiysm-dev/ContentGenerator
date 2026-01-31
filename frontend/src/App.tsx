@@ -88,9 +88,6 @@ function App() {
     const saved = localStorage.getItem('activeCompanyId');
     return saved || defaultCompanyId;
   });
-  const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
-  const [newCompanyName, setNewCompanyName] = useState('');
-  const [newCompanyDescription, setNewCompanyDescription] = useState('');
   const [brandKbId, setBrandKbId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('');
   const [companyDescription, setCompanyDescription] = useState('');
@@ -1001,16 +998,6 @@ useEffect(() => {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="rounded-lg text-blue-600"
-                onSelect={() => {
-                  setNewCompanyName('');
-                  setNewCompanyDescription('');
-                  setIsAddCompanyModalOpen(true);
-                }}
-              >
-                + Add company…
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <div className="header-actions">
@@ -2521,6 +2508,11 @@ useEffect(() => {
                       })()
                     ) : (
                       <div className="empty-state">No image yet. Generate an image to see the preview.</div>
+                    )}
+                    {imagePollError && (
+                      <div className="empty-state" style={{ color: '#b91c1c', marginTop: 8 }}>
+                        {imagePollError}
+                      </div>
                     )}
                   </div>
                 </div>
