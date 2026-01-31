@@ -1468,7 +1468,7 @@ body {
 .section-title {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-on-dark, #f8fafc);
   margin: 6px 0 10px;
 }
 
