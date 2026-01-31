@@ -108,7 +108,6 @@ function App() {
   const imageModalReopenTimeoutRef = useRef<number | null>(null);
   const [imagePollError, setImagePollError] = useState<string | null>(null);
   const [imagePreviewNonce, setImagePreviewNonce] = useState<number>(0);
-  const [isImageGeneratingOverlayOpen, setIsImageGeneratingOverlayOpen] = useState<boolean>(false);
   const [isEditingDmp, setIsEditingDmp] = useState<boolean>(false);
   const [dmpDraft, setDmpDraft] = useState<string>('');
   const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null);
@@ -551,10 +550,6 @@ useEffect(() => {
   setPage(1);
 }, [calendarSearch, calendarStatusFilter]);
 
-const totalPages = useMemo(
-  () => Math.max(1, Math.ceil(filteredCalendarRows.length / pageSize)),
-  [filteredCalendarRows.length],
-);
 const currentPageRows = useMemo(() => {
   const start = (page - 1) * pageSize;
   return filteredCalendarRows.slice(start, start + pageSize);
