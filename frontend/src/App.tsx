@@ -1566,6 +1566,48 @@ useEffect(() => {
                 </table>
               </div>
             )}
+            
+            {/* Pagination Navigation */}
+            {!isLoadingCalendar && !calendarError && filteredCalendarRows.length > pageSize && (
+              <div className="calendar-pagination">
+                <div className="pagination-info">
+                  Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, filteredCalendarRows.length)} of {filteredCalendarRows.length} results
+                </div>
+                <div className="pagination-controls">
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setPage(1)}
+                    disabled={page === 1}
+                  >
+                    First
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setPage(page - 1)}
+                    disabled={page === 1}
+                  >
+                    Previous
+                  </button>
+                  <span className="pagination-pages">
+                    Page {page} of {Math.ceil(filteredCalendarRows.length / pageSize)}
+                  </span>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setPage(page + 1)}
+                    disabled={page >= Math.ceil(filteredCalendarRows.length / pageSize)}
+                  >
+                    Next
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setPage(Math.ceil(filteredCalendarRows.length / pageSize))}
+                    disabled={page >= Math.ceil(filteredCalendarRows.length / pageSize)}
+                  >
+                    Last
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
 
           {isBulkModalOpen && (

@@ -1397,6 +1397,40 @@ body {
   vertical-align: middle;
 }
 
+/* Pagination Styles */
+.calendar-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface-soft);
+  margin-top: -1px;
+}
+
+.pagination-info {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-pages {
+  padding: 0 12px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.pagination-controls .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .details-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
