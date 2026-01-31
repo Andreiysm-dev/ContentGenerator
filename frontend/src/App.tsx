@@ -1027,7 +1027,7 @@ useEffect(() => {
           <section className="card dashboard-card">
             <div className="card-header card-header-compact">
               <div>
-                <h2 className="card-title">Company Snapshot</h2>
+                <h2 className="card-title">Company Dashboard</h2>
                 <p className="card-subtitle">Quick health check of your content pipeline.</p>
               </div>
               <button
