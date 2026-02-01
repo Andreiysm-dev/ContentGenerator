@@ -89,6 +89,9 @@ function App() {
     const saved = localStorage.getItem('activeCompanyId');
     return saved || defaultCompanyId;
   });
+  const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [newCompanyDescription, setNewCompanyDescription] = useState('');
   const [brandKbId, setBrandKbId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('');
   const [companyDescription, setCompanyDescription] = useState('');
@@ -360,6 +363,7 @@ function App() {
 useEffect(() => {
   const loadCompanies = async () => {
     try {
+      setIsBackendWaking(true);
       const res = await fetch(`${backendBaseUrl}/api/company`);
       if (!res.ok) return;
       const data = await res.json().catch(() => ({}));
@@ -389,6 +393,7 @@ useEffect(() => {
     setIsLoadingCalendar(true);
     setCalendarError(null);
     try {
+      setIsBackendWaking(true);
       const res = await fetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`);
       const data = await res.json();
       if (!res.ok) {
@@ -1004,6 +1009,16 @@ useEffect(() => {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="rounded-lg text-blue-600 company-dropdown-item add-company"
+                onSelect={() => {
+                  setNewCompanyName('');
+                  setNewCompanyDescription('');
+                  setIsAddCompanyModalOpen(true);
+                }}
+              >
+                + Add company…
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <div className="header-actions">
@@ -1023,6 +1038,12 @@ useEffect(() => {
       </header>
 
       <div className="app-root">
+        {isBackendWaking && (
+          <div className="empty-state" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span className="loading-spinner" aria-hidden="true"></span>
+            Loading system..
+          </div>
+        )}
         <main className="app-main">
           <section className="card dashboard-card">
             <div className="card-header card-header-compact">
@@ -1111,6 +1132,90 @@ useEffect(() => {
                 </div>
               </div>
             )}
+
+      {isAddCompanyModalOpen && (
+        <div className="modal-backdrop">
+          <div className="modal settings-modal">
+            <div className="modal-header settings-header">
+              <div>
+                <p className="modal-kicker">Company</p>
+                <h2 className="modal-title">Add Company</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setIsAddCompanyModalOpen(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body settings-body">
+              <div className="settings-section">
+                <div className="settings-grid">
+                  <div className="form-group">
+                    <label className="field-label">Company Name</label>
+                    <input
+                      type="text"
+                      className="field-input"
+                      value={newCompanyName}
+                      onChange={(e) => setNewCompanyName(e.target.value)}
+                      placeholder="e.g., Moonshot Studios"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="field-label">Company Description</label>
+                    <input
+                      type="text"
+                      className="field-input"
+                      value={newCompanyDescription}
+                      onChange={(e) => setNewCompanyDescription(e.target.value)}
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer settings-footer">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsAddCompanyModalOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={async () => {
+                  if (!newCompanyName.trim()) {
+                    notify('Company name is required.', 'error');
+                    return;
+                  }
+                  try {
+                    const res = await fetch(`${backendBaseUrl}/api/company`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        companyName: newCompanyName.trim(),
+                        companyDescription: newCompanyDescription.trim(),
+                      }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                      notify(data.error || 'Failed to create company.', 'error');
+                      return;
+                    }
+                    notify('Company created.', 'success');
+                    setIsAddCompanyModalOpen(false);
+                    await new Promise((r) => setTimeout(r, 200));
+                    setCompanies((prev) => [data.company, ...prev]);
+                    if (data.company?.companyId) {
+                      setActiveCompanyIdWithPersistence(data.company.companyId);
+                    }
+                  } catch (err) {
+                    console.error('Failed to create company', err);
+                    notify('Failed to create company. Check console for details.', 'error');
+                  }
+                }}
+              >
+                Create Company
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
           </section>
           <section className="card">
             <div className="card-header">
@@ -1355,7 +1460,7 @@ useEffect(() => {
             {isBackendWaking && (
               <div className="empty-state" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="loading-spinner" aria-hidden="true"></span>
-                Waking backend... this may take up to 60 seconds on the free plan.
+                Loading system..
               </div>
             )}
 
@@ -2172,7 +2277,17 @@ useEffect(() => {
                   </div>
                   <div className="kv-item">
                     <div className="kv-label">Image Generated</div>
-                    <div className="kv-value">{selectedRow.imageGenerated ? JSON.stringify(selectedRow.imageGenerated) : ''}</div>
+                    <div className="kv-value">
+                      {getImageGeneratedUrl(selectedRow) ? (
+                        <img
+                          src={getImageGeneratedUrl(selectedRow) as string}
+                          alt="Generated"
+                          style={{ maxWidth: '220px', borderRadius: 8 }}
+                        />
+                      ) : (
+                        <span>{selectedRow.imageGenerated ? JSON.stringify(selectedRow.imageGenerated) : ''}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="kv-item">
                     <div className="kv-label">Company ID</div>

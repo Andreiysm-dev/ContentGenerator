@@ -159,9 +159,12 @@ body {
 }
 
 .company-dropdown-item.add-company {
-  border-top: 1px solid #e5e7eb;
-  margin-top: 4px;
-  padding-top: 10px;
+  border-top: none;
+  margin-top: 0;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
   color: #2563eb;
   font-weight: 600;
 }
