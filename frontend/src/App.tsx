@@ -2697,6 +2697,12 @@ useEffect(() => {
                         brandKbId,
                         systemInstruction: systemInstruction ?? '',
                         finalPrompt: selectedRow.captionOutput ?? '',
+                        finalCaption: selectedRow.finalCaption ?? '',
+                        brandHighlight: selectedRow.brandHighlight ?? '',
+                        crossPromo: selectedRow.crossPromo ?? '',
+                        theme: selectedRow.theme ?? '',
+                        cta: selectedRow.cta ?? '',
+                        targetAudience: selectedRow.targetAudience ?? '',
                       }),
                     });
                     if (!response.ok) {
