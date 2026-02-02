@@ -123,6 +123,40 @@ export const createContentCalendar = async (req, res) => {
     }
 };
 
+// READ - Get all content calendar entries
+export const getAllContentCalendars = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { data: contentCalendars, error: contentCalendarError } = await db
+            .from('contentCalendar')
+            .select('*')
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
+            .order('date', { ascending: false });
+
+        if (contentCalendarError) {
+            console.error('Error fetching content calendars:', contentCalendarError);
+            return res.status(500).json({
+                error: 'Failed to fetch content calendar entries',
+                details: contentCalendarError.message
+            });
+        }
+
+        return res.status(200).json({
+            contentCalendars,
+            count: contentCalendars.length
+        });
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        return res.status(500).json({
+            error: 'Internal server error'
+        });
+    }
+};
+
 // READ - Get content calendar entries by company ID
 export const getContentCalendarsByCompanyId = async (req, res) => {
     try {
