@@ -105,7 +105,7 @@ export const getAllContentCalendars = async (req, res) => {
         const { data: contentCalendars, error: contentCalendarError } = await db
             .from('contentCalendar')
             .select('*')
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('date', { ascending: false });
 
         if (contentCalendarError) {
@@ -141,7 +141,7 @@ export const getContentCalendarsByCompanyId = async (req, res) => {
             .from('contentCalendar')
             .select('*')
             .eq('companyId', companyId)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('created_at', { ascending: true });
 
         if (contentCalendarError) {
@@ -177,7 +177,7 @@ export const getContentCalendarById = async (req, res) => {
             .from('contentCalendar')
             .select('*')
             .eq('contentCalendarId', id)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .single();
 
         if (contentCalendarError) {
@@ -222,7 +222,7 @@ export const getContentCalendarsByDateRange = async (req, res) => {
             .select('*')
             .gte('date', startDate)
             .lte('date', endDate)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('date', { ascending: true });
 
         // Optional: filter by company
@@ -268,7 +268,7 @@ export const getContentCalendarsByStatus = async (req, res) => {
             .from('contentCalendar')
             .select('*')
             .eq('status', status)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('date', { ascending: false });
 
         // Optional: filter by company
@@ -373,7 +373,7 @@ export const updateContentCalendar = async (req, res) => {
             .from('contentCalendar')
             .update(updateData)
             .eq('contentCalendarId', id)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (contentCalendarError) {
@@ -415,7 +415,7 @@ export const deleteContentCalendar = async (req, res) => {
             .from('contentCalendar')
             .delete()
             .eq('contentCalendarId', id)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (contentCalendarError) {

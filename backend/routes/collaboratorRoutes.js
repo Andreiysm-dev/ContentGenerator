@@ -12,10 +12,10 @@ export const getCollaboratorsByCompanyId = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Verify user is owner or collaborator
+    // Verify user is owner or collaborator via company.collaborator_ids
     const { data: company, error: companyError } = await db
       .from('company')
-      .select('user_id')
+      .select('user_id, collaborator_ids')
       .eq('companyId', companyId)
       .single();
 
@@ -23,44 +23,38 @@ export const getCollaboratorsByCompanyId = async (req, res) => {
       return res.status(404).json({ error: 'Company not found' });
     }
 
-    const { data: collab, error: collabError } = await db
-      .from('company_collaborators')
-      .select('user_id')
-      .eq('company_id', companyId)
-      .eq('user_id', userId)
-      .single();
-
-    if (company.user_id !== userId && collabError) {
+    if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Fetch owner + collaborators
-    const { data: owner, error: ownerError } = await db
-      .from('auth.users')
-      .select('id, email')
-      .eq('id', company.user_id)
+    // Fetch collaborators from company.collaborator_ids and resolve emails via admin API
+    const { data: companyRow, error: fetchError } = await db
+      .from('company')
+      .select('user_id, collaborator_ids')
+      .eq('companyId', companyId)
       .single();
 
-    const { data: collaborators, error: collaboratorsError } = await db
-      .from('company_collaborators')
-      .select('user_id')
-      .eq('company_id', companyId);
-
-    const result = [];
-    if (owner && !ownerError) {
-      result.push({ id: owner.id, email: owner.email, role: 'owner' });
+    if (fetchError || !companyRow) {
+      return res.status(500).json({ error: 'Failed to fetch company' });
     }
 
-    if (collaborators && !collaboratorsError) {
-      const userIds = collaborators.map(c => c.user_id);
-      const { data: users } = await db
-        .from('auth.users')
-        .select('id, email')
-        .in('id', userIds);
+    const { data: { users }, error: adminError } = await db.auth.admin.listUsers();
+    if (adminError) {
+      return res.status(500).json({ error: 'Failed to query users' });
+    }
 
-      if (users) {
-        users.forEach(u => result.push({ id: u.id, email: u.email, role: 'collaborator' }));
-      }
+    const result = [];
+    // Owner
+    const owner = users.find(u => u.id === companyRow.user_id);
+    if (owner) {
+      result.push({ id: owner.id, email: owner.email, role: 'owner' });
+    }
+    // Collaborators
+    if (companyRow.collaborator_ids?.length) {
+      companyRow.collaborator_ids.forEach(cid => {
+        const u = users.find(user => user.id === cid);
+        if (u) result.push({ id: u.id, email: u.email, role: 'collaborator' });
+      });
     }
 
     return res.json({ collaborators: result });
@@ -99,37 +93,67 @@ export const addCollaborator = async (req, res) => {
       return res.status(403).json({ error: 'Only the owner can add collaborators' });
     }
 
-    // Resolve email to uid
-    const { data: targetUser, error: userError } = await db
-      .from('auth.users')
-      .select('id')
-      .eq('email', email)
-      .single();
-
-    if (userError || !targetUser) {
+    // Resolve email to uid using Supabase admin API
+    console.log('addCollaborator: looking up email', email);
+    const { data: { users }, error: adminError } = await db.auth.admin.listUsers();
+    if (adminError) {
+      console.error('admin.listUsers error', adminError);
+      return res.status(500).json({ error: 'Failed to query users' });
+    }
+    const targetUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    console.log('addCollaborator: targetUser', targetUser);
+    if (!targetUser) {
       return res.status(404).json({ error: 'User with this email not found or not registered' });
     }
 
-    // Prevent duplicate
-    const { data: existing, error: existingError } = await db
-      .from('company_collaborators')
-      .select('user_id')
-      .eq('company_id', companyId)
-      .eq('user_id', targetUser.id)
+    // Prevent duplicate: check if already in collaborator_ids
+    const { data: companyRow, error: fetchError } = await db
+      .from('company')
+      .select('collaborator_ids')
+      .eq('companyId', companyId)
       .single();
 
-    if (!existingError) {
+    if (fetchError || !companyRow) {
+      return res.status(500).json({ error: 'Failed to fetch company' });
+    }
+
+    const currentIds = companyRow.collaborator_ids || [];
+    if (currentIds.includes(targetUser.id)) {
       return res.status(409).json({ error: 'User is already a collaborator' });
     }
 
-    // Insert collaborator
-    const { error: insertError } = await db
-      .from('company_collaborators')
-      .insert({ company_id: companyId, user_id: targetUser.id });
+    // Insert collaborator by adding to company.collaborator_ids array
+    const nextIds = [...currentIds, targetUser.id];
+    const { error: updateError } = await db
+      .from('company')
+      .update({
+        collaborator_ids: nextIds
+      })
+      .eq('companyId', companyId);
 
-    if (insertError) {
-      console.error('addCollaborator insert error', insertError);
+    if (updateError) {
+      console.error('addCollaborator update error', updateError);
       return res.status(500).json({ error: 'Failed to add collaborator' });
+    }
+
+    const { error: brandUpdateError } = await db
+      .from('brandKB')
+      .update({ collaborator_ids: nextIds })
+      .eq('companyId', companyId);
+
+    if (brandUpdateError) {
+      console.error('addCollaborator brandKB update error', brandUpdateError);
+      return res.status(500).json({ error: 'Failed to update brand settings collaborators' });
+    }
+
+    const { error: calendarUpdateError } = await db
+      .from('contentCalendar')
+      .update({ collaborator_ids: nextIds })
+      .eq('companyId', companyId);
+
+    if (calendarUpdateError) {
+      console.error('addCollaborator calendar update error', calendarUpdateError);
+      return res.status(500).json({ error: 'Failed to update content collaborators' });
     }
 
     return res.json({ message: 'Collaborator added' });
@@ -163,15 +187,49 @@ export const removeCollaborator = async (req, res) => {
       return res.status(403).json({ error: 'Only the owner can remove collaborators' });
     }
 
-    const { error: deleteError } = await db
-      .from('company_collaborators')
-      .delete()
-      .eq('company_id', companyId)
-      .eq('user_id', targetUserId);
+    // Remove collaborator by removing from company.collaborator_ids array
+    const { data: companyRow, error: fetchError } = await db
+      .from('company')
+      .select('collaborator_ids')
+      .eq('companyId', companyId)
+      .single();
 
-    if (deleteError) {
-      console.error('removeCollaborator delete error', deleteError);
+    if (fetchError || !companyRow) {
+      return res.status(500).json({ error: 'Failed to fetch company' });
+    }
+
+    const currentIds = companyRow.collaborator_ids || [];
+    const nextIds = currentIds.filter((id) => id !== targetUserId);
+    const { error: updateError } = await db
+      .from('company')
+      .update({
+        collaborator_ids: nextIds
+      })
+      .eq('companyId', companyId);
+
+    if (updateError) {
+      console.error('removeCollaborator update error', updateError);
       return res.status(500).json({ error: 'Failed to remove collaborator' });
+    }
+
+    const { error: brandUpdateError } = await db
+      .from('brandKB')
+      .update({ collaborator_ids: nextIds })
+      .eq('companyId', companyId);
+
+    if (brandUpdateError) {
+      console.error('removeCollaborator brandKB update error', brandUpdateError);
+      return res.status(500).json({ error: 'Failed to update brand settings collaborators' });
+    }
+
+    const { error: calendarUpdateError } = await db
+      .from('contentCalendar')
+      .update({ collaborator_ids: nextIds })
+      .eq('companyId', companyId);
+
+    if (calendarUpdateError) {
+      console.error('removeCollaborator calendar update error', calendarUpdateError);
+      return res.status(500).json({ error: 'Failed to update content collaborators' });
     }
 
     return res.json({ message: 'Collaborator removed' });

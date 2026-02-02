@@ -84,6 +84,20 @@ function App() {
   const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: 'owner' | 'collaborator' }>>([]);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
 
+  const fetchCollaborators = async (companyId: string) => {
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${companyId}`);
+      const data = await res.json();
+      if (!res.ok) {
+        notify(data.error || 'Failed to load collaborators.', 'error');
+        return;
+      }
+      setCollaborators(data.collaborators || []);
+    } catch (err) {
+      notify('Failed to load collaborators.', 'error');
+    }
+  };
+
   const handleAddCollaborator = async () => {
     if (!newCollaboratorEmail || !activeCompanyId) return;
     try {
@@ -105,7 +119,7 @@ function App() {
       }
       notify('Collaborator added.', 'success');
       setNewCollaboratorEmail('');
-      // TODO: refetch collaborators list
+      await fetchCollaborators(activeCompanyId);
     } catch (err) {
       notify('Failed to add collaborator.', 'error');
     }
@@ -123,7 +137,7 @@ function App() {
         return;
       }
       notify('Collaborator removed.', 'success');
-      // TODO: refetch collaborators list
+      await fetchCollaborators(activeCompanyId);
     } catch (err) {
       notify('Failed to remove collaborator.', 'error');
     }
@@ -173,6 +187,11 @@ function App() {
     const saved = localStorage.getItem('activeCompanyId');
     return saved || defaultCompanyId;
   });
+  useEffect(() => {
+    if (isSettingsModalOpen && activeCompanyId) {
+      fetchCollaborators(activeCompanyId);
+    }
+  }, [isSettingsModalOpen, activeCompanyId]);
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [newCompanyDescription, setNewCompanyDescription] = useState('');

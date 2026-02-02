@@ -76,7 +76,7 @@ export const getAllBrandKBs = async (req, res) => {
         const { data: brandKBs, error: brandKBError } = await db
             .from('brandKB')
             .select('*')
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('created_at', { ascending: false });
 
         if (brandKBError) {
@@ -112,7 +112,7 @@ export const getBrandKBsByCompanyId = async (req, res) => {
             .from('brandKB')
             .select('*')
             .eq('companyId', companyId)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('created_at', { ascending: false });
 
         if (brandKBError) {
@@ -148,7 +148,7 @@ export const getBrandKBById = async (req, res) => {
             .from('brandKB')
             .select('*')
             .eq('brandKbId', id)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .single();
 
         if (brandKBError) {
@@ -216,7 +216,7 @@ export const updateBrandKB = async (req, res) => {
             .from('brandKB')
             .update(updateData)
             .eq('brandKbId', id)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (brandKBError) {
@@ -258,7 +258,7 @@ export const deleteBrandKB = async (req, res) => {
             .from('brandKB')
             .delete()
             .eq('brandKbId', id)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (brandKBError) {

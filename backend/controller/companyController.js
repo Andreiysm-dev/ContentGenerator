@@ -58,7 +58,7 @@ export const getCompany = async (req, res) => {
         const { data: companies, error: companyError } = await db
             .from('company')
             .select('*')
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('created_at', { ascending: false });
 
         if (companyError) {
@@ -94,7 +94,7 @@ export const getCompanyById = async (req, res) => {
             .from('company')
             .select('*')
             .eq('companyId', id)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .single();
 
         if (companyError) {
@@ -144,7 +144,7 @@ export const updateCompany = async (req, res) => {
             .from('company')
             .update(updateData)
             .eq('companyId', id)
-            .eq('user_id', userId)
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (companyError) {
