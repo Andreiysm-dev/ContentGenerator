@@ -32,6 +32,7 @@ const supabase = supabaseBaseUrl && supabaseAnonKey
   ? createClient(supabaseBaseUrl, supabaseAnonKey)
   : null;
 const revisionWebhookUrl = (import.meta.env as any).VITE_MAKE_REVISION_WEBHOOK || '';
+const publishWebhookUrl = (import.meta.env as any).VITE_MAKE_PUBLISH_WEBHOOK || '';
 const imageFromExistingDmpWebhookUrl =
   (import.meta.env as any).VITE_MAKE_IMAGE_EXISTING_DMP_WEBHOOK ||
   'https://hook.eu2.make.com/ms8ivolxdradx79w0nh6x96yuejq0o6a';
@@ -74,12 +75,15 @@ function App() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isRevisingCaption, setIsRevisingCaption] = useState(false);
+  const [isUploadingDraftImage, setIsUploadingDraftImage] = useState(false);
+  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
 
   const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: 'owner' | 'collaborator' }>>([]);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
@@ -96,6 +100,42 @@ function App() {
     } catch (err) {
       notify('Failed to load collaborators.', 'error');
     }
+  };
+
+  const parseDraftImages = (value: any): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) return parsed.filter(Boolean);
+          if (typeof parsed === 'string') return [parsed];
+        } catch {
+          return [trimmed];
+        }
+      }
+      return [trimmed];
+    }
+    return [];
+  };
+
+  const serializeDraftImages = (images: string[]): string | null => {
+    const cleaned = images.filter(Boolean);
+    if (cleaned.length === 0) return null;
+    if (cleaned.length === 1) return cleaned[0];
+    return JSON.stringify(cleaned);
+  };
+
+  const channelOptions = ['facebook', 'linkedin', 'instagram'];
+  const toLocalInputValue = (value?: string | null) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
   const handleAddCollaborator = async () => {
@@ -150,6 +190,142 @@ function App() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     return fetch(input, { ...init, headers });
+  };
+
+  const handleDraftImageUpload = async (files: FileList | File[]) => {
+    if (!supabase) {
+      notify('Supabase is not configured.', 'error');
+      return;
+    }
+    if (!selectedRow) return;
+    const fileList = Array.from(files || []);
+    if (fileList.length === 0) return;
+    const localPreviewUrls = fileList.map((file) => URL.createObjectURL(file));
+    setDraftImagePreviewUrls((prev) => [...prev, ...localPreviewUrls]);
+    setIsDraftDirty(true);
+    setIsUploadingDraftImage(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (const file of fileList) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `drafts/${selectedRow.contentCalendarId}-${Date.now()}-${safeName}`;
+        const { error } = await supabase.storage
+          .from('generated-images')
+          .upload(path, file, { upsert: true });
+        if (error) {
+          notify('Failed to upload image.', 'error');
+          return;
+        }
+        const { data } = supabase.storage.from('generated-images').getPublicUrl(path);
+        if (data?.publicUrl) uploadedUrls.push(data.publicUrl);
+      }
+      const existing = parseDraftImages(selectedRow.draft_image_url);
+      const merged = [...existing, ...uploadedUrls];
+      const serialized = serializeDraftImages(merged);
+      setSelectedRow((prev: any) => (prev ? { ...prev, draft_image_url: serialized } : prev));
+      setDraftPreviewNonce(Date.now());
+      setCalendarRows((prev) =>
+        prev.map((r) =>
+          r.contentCalendarId === selectedRow.contentCalendarId
+            ? { ...r, draft_image_url: serialized }
+            : r,
+        ),
+      );
+      notify('Draft image(s) uploaded.', 'success');
+    } catch (err) {
+      console.error('Draft image upload failed', err);
+      notify('Failed to upload image.', 'error');
+    } finally {
+      setIsUploadingDraftImage(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!selectedRow) return;
+    try {
+      const computedDraftCaption =
+        selectedRow.draft_caption ??
+        `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`;
+      const mergedDraftImages = [
+        ...parseDraftImages(selectedRow.draft_image_url),
+        ...draftImagePreviewUrls,
+      ].filter(Boolean);
+      const serializedDraftImages = serializeDraftImages(mergedDraftImages);
+      const payload = {
+        draft_caption: computedDraftCaption,
+        draft_image_url: serializedDraftImages,
+        channels: selectedRow.channels ?? [],
+        post_status: selectedRow.post_status ?? 'draft',
+        scheduled_at: selectedRow.scheduled_at ?? null,
+      };
+      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        notify(`Failed to save draft. ${msg}`, 'error');
+        return;
+      }
+      setCalendarRows((prev) =>
+        prev.map((r) =>
+          r.contentCalendarId === selectedRow.contentCalendarId
+            ? { ...r, ...payload }
+            : r,
+        ),
+      );
+      setSelectedRow((prev: any) => (prev ? { ...prev, ...payload } : prev));
+      setDraftImagePreviewUrls([]);
+      setIsDraftDirty(false);
+      notify('Draft saved.', 'success');
+    } catch (err) {
+      notify('Failed to save draft.', 'error');
+    }
+  };
+
+  const handleCloseDraftModal = async () => {
+    if (isDraftDirty) {
+      await handleSaveDraft();
+    }
+    setIsDraftModalOpen(false);
+  };
+
+  const handlePublishNow = async () => {
+    if (!selectedRow) return;
+    if (!publishWebhookUrl) {
+      notify('Publish webhook is not configured. Set VITE_MAKE_PUBLISH_WEBHOOK.', 'error');
+      return;
+    }
+    try {
+      const res = await fetch(publishWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentCalendarId: selectedRow.contentCalendarId,
+          companyId: selectedRow.companyId ?? activeCompanyId ?? null,
+        }),
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        notify(`Publish webhook failed (${res.status}). ${msg}`, 'error');
+        return;
+      }
+      notify('Publish triggered.', 'success');
+    } catch (err) {
+      notify('Failed to trigger publish.', 'error');
+    }
+  };
+
+  const handleSchedulePublish = async () => {
+    if (!selectedRow) return;
+    const scheduledAt = selectedRow.scheduled_at;
+    if (!scheduledAt) {
+      notify('Please select a schedule time.', 'error');
+      return;
+    }
+    setSelectedRow((prev: any) => (prev ? { ...prev, post_status: 'scheduled' } : prev));
+    await handleSaveDraft();
   };
 
   useEffect(() => {
@@ -214,6 +390,10 @@ function App() {
   const [imagePreviewNonce, setImagePreviewNonce] = useState<number>(0);
   const [isEditingDmp, setIsEditingDmp] = useState<boolean>(false);
   const [dmpDraft, setDmpDraft] = useState<string>('');
+  const [draftImagePreviewUrls, setDraftImagePreviewUrls] = useState<string[]>([]);
+  const [draftPreviewNonce, setDraftPreviewNonce] = useState<number>(0);
+  const [isDraftPreviewExpanded, setIsDraftPreviewExpanded] = useState(false);
+  const [isDraftDirty, setIsDraftDirty] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState('');
@@ -438,6 +618,12 @@ function App() {
       setImagePreviewNonce(Date.now());
     })();
   }, [isImageModalOpen, selectedRow?.contentCalendarId]);
+
+  useEffect(() => {
+    if (!isImageModalOpen) return;
+    if (!selectedRow) return;
+    setImagePreviewNonce(Date.now());
+  }, [isImageModalOpen, selectedRow?.imageGenerated]);
 
   useEffect(() => {
     if (isImageModalOpen) return;
@@ -1176,6 +1362,13 @@ useEffect(() => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="company-menu">
                 <DropdownMenuItem
+                  onSelect={() => setIsUserSettingsModalOpen(true)}
+                  className="rounded-lg"
+                >
+                  User settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
                   onSelect={async () => {
                     await supabase?.auth.signOut();
                   }}
@@ -1293,6 +1486,10 @@ useEffect(() => {
                   </div>
                 </div>
               </div>
+
+              
+
+
             )}
 
       {isAddCompanyModalOpen && (
@@ -1373,6 +1570,243 @@ useEffect(() => {
                 }}
               >
                 Create Company
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isUserSettingsModalOpen && (
+        <div className="modal-backdrop">
+          <div className="modal settings-modal">
+            <div className="modal-header settings-header">
+              <div>
+                <p className="modal-kicker">User</p>
+                <h2 className="modal-title">User Settings</h2>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setIsUserSettingsModalOpen(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body settings-body">
+              <div className="settings-section">
+                <div className="section-title-row">
+                  <h3 className="section-title">Social Accounts</h3>
+                  <span className="section-hint">Connect social profiles for publishing.</span>
+                </div>
+                <div className="content-box" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontWeight: 600 }}>Facebook</div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => notify('Facebook connect flow coming next.', 'info')}
+                  >
+                    Connect Facebook
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDraftModalOpen && selectedRow && (
+        <div className="modal-backdrop modal-backdrop-top">
+          <div className="modal modal-wide content-modal">
+            <div className="modal-header content-modal-header">
+              <div className="content-modal-title">
+                <h2>Draft & Publish</h2>
+                <p>Edit draft content, upload image, and schedule or publish.</p>
+              </div>
+              <button type="button" className="modal-close" onClick={handleCloseDraftModal}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body content-modal-body draft-modal-body">
+              <div className="draft-modal-editor">
+                <div className="section content-section">
+                  <div className="section-title-row">
+                    <h3 className="section-title">Draft Caption</h3>
+                  </div>
+                  <textarea
+                    className="field-input field-textarea"
+                    rows={8}
+                    value={
+                      selectedRow.draft_caption ??
+                      `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`
+                    }
+                    onChange={(e) =>
+                      setSelectedRow((prev: any) => (prev ? { ...prev, draft_caption: e.target.value } : prev))
+                    }
+                    onBlur={() => setIsDraftDirty(true)}
+                  />
+                </div>
+
+                <div className="section content-section">
+                  <div className="section-title-row">
+                    <h3 className="section-title">Channels</h3>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {channelOptions.map((channel) => {
+                      const checked = Array.isArray(selectedRow.channels)
+                        ? selectedRow.channels.includes(channel)
+                        : false;
+                      return (
+                        <label key={channel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...(selectedRow.channels || []), channel]
+                                : (selectedRow.channels || []).filter((c: string) => c !== channel);
+                              setSelectedRow((prev: any) => (prev ? { ...prev, channels: next } : prev));
+                              setIsDraftDirty(true);
+                            }}
+                          />
+                          {channel}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="section content-section">
+                  <div className="section-title-row">
+                    <h3 className="section-title">Draft Image</h3>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    {(() => {
+                      const savedImages = parseDraftImages(selectedRow.draft_image_url);
+                      const allImages = [...draftImagePreviewUrls, ...savedImages].filter(Boolean);
+                      if (allImages.length === 0) return null;
+                      return (
+                        <div className="draft-image-grid">
+                          {allImages.map((url, idx) => (
+                            <img key={`${url}-${idx}`} src={url} alt={`Draft ${idx + 1}`} />
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    <label className="btn btn-secondary btn-sm">
+                      {isUploadingDraftImage ? 'Uploading…' : 'Upload Image'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const files = e.target.files;
+                          if (files && files.length > 0) handleDraftImageUpload(files);
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="section content-section">
+                  <div className="section-title-row">
+                    <h3 className="section-title">Schedule</h3>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    className="field-input"
+                    value={toLocalInputValue(selectedRow.scheduled_at)}
+                    onChange={(e) =>
+                      setSelectedRow((prev: any) =>
+                        prev ? { ...prev, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null } : prev,
+                      )
+                    }
+                    onBlur={() => setIsDraftDirty(true)}
+                  />
+                  <div className="content-box" style={{ marginTop: 8 }}>
+                    Status: {selectedRow.post_status ?? 'draft'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="draft-modal-preview">
+                <div className="draft-preview-shell">
+                  <div className="draft-preview-title">Preview</div>
+                  <div className="draft-preview-card">
+                    <div className="draft-preview-meta">
+                      <div className="draft-preview-avatar">W</div>
+                      <div className="draft-preview-meta-text">
+                        <div className="draft-preview-name">Page Name</div>
+                        <div className="draft-preview-subtitle">Just now · 🌍</div>
+                      </div>
+                      <div className="draft-preview-more">•••</div>
+                    </div>
+                    <div className="draft-preview-caption">
+                      {(() => {
+                        const captionText =
+                          selectedRow.draft_caption ??
+                          `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`;
+                        const lines = captionText.split('\n');
+                        const limit = 3;
+                        const shouldTruncate = lines.length > limit;
+                        const visibleLines = isDraftPreviewExpanded ? lines : lines.slice(0, limit);
+
+                        return (
+                          <>
+                            {visibleLines.map((line: string, idx: number) => (
+                              <p key={idx}>{line}</p>
+                            ))}
+                            {shouldTruncate && !isDraftPreviewExpanded && <span className="draft-preview-ellipsis">…</span>}
+                            {shouldTruncate && (
+                              <button
+                                type="button"
+                                className="draft-preview-more-btn"
+                                onClick={() => setIsDraftPreviewExpanded((prev) => !prev)}
+                              >
+                                {isDraftPreviewExpanded ? 'See less' : 'See more'}
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <div className="draft-preview-image">
+                      {(() => {
+                        const savedImages = parseDraftImages(selectedRow.draft_image_url);
+                        const allImages = [...draftImagePreviewUrls, ...savedImages].filter(Boolean);
+                        if (allImages.length === 0) {
+                          return <div className="draft-preview-placeholder">No image selected</div>;
+                        }
+                        return (
+                          <div className={`draft-preview-grid draft-preview-grid-${Math.min(allImages.length, 4)}`}>
+                            {allImages.slice(0, 4).map((url, idx) => (
+                              <img
+                                key={`${url}-${idx}`}
+                                src={(() => {
+                                  if (url.startsWith('blob:')) return url;
+                                  return `${url}${url.includes('?') ? '&' : '?'}v=${draftPreviewNonce}`;
+                                })()}
+                                alt={`Preview ${idx + 1}`}
+                              />
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div className="draft-preview-actions">
+                      <span>Like</span>
+                      <span>Comment</span>
+                      <span>Share</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleSaveDraft}>
+                Save Draft
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleSchedulePublish}>
+                Schedule
+              </button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={handlePublishNow}>
+                Publish Now
               </button>
             </div>
           </div>
@@ -2312,6 +2746,14 @@ useEffect(() => {
                 </span>
                 <button
                   type="button"
+                  className={`btn btn-sm ${getStatusValue(selectedRow?.status) === 'Approved' ? 'btn-primary' : 'btn-secondary'}`}
+                  disabled={getStatusValue(selectedRow?.status) !== 'Approved'}
+                  onClick={() => setIsDraftModalOpen(true)}
+                >
+                  Draft & Publish
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsViewModalOpen(false)}
                   className="modal-close"
                 >
@@ -2558,35 +3000,12 @@ useEffect(() => {
                   // Optimistically update status to 'Generate' in UI
                   setSelectedRow((prev: any) => (prev ? { ...prev, status: 'Generate' } : prev));
                   setCalendarRows((prev) =>
-                    prev.map((r) =>
-                      r.contentCalendarId === selectedRow.contentCalendarId
-                        ? { ...r, status: 'Generate' }
-                        : r,
+                    prev.map((row) =>
+                      row.contentCalendarId === selectedRow.contentCalendarId
+                        ? { ...row, status: 'Generate' }
+                        : row,
                     ),
                   );
-
-                  // Persist status change
-                  try {
-                    const putRes = await authedFetch(
-                      `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`,
-                      {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ status: 'Generate' }),
-                      },
-                    );
-                    if (!putRes.ok) {
-                      const txt = await putRes.text().catch(() => '');
-                      notify(`Failed to update status to Generate (${putRes.status}). ${txt}`, 'error');
-                      setIsGeneratingCaption(false);
-                      return;
-                    }
-                  } catch (err) {
-                    console.error('Failed to update status to Generate', err);
-                    notify('Failed to update status to Generate due to a network error.', 'error');
-                    setIsGeneratingCaption(false);
-                    return;
-                  }
 
                   // Trigger Make.com generation webhook
                   if (!selectedRow.companyId) {

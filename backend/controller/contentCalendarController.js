@@ -15,6 +15,11 @@ export const createContentCalendar = async (req, res) => {
             cta,
             promoType,
             status,
+            post_status,
+            scheduled_at,
+            draft_caption,
+            draft_image_url,
+            publish_result,
             captionOutput,
             ctaOuput,
             hastagsOutput,
@@ -41,6 +46,23 @@ export const createContentCalendar = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        const collaboratorIds = company.collaborator_ids || [];
+        if (company.user_id !== userId && !collaboratorIds.includes(userId)) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        const mergedCollaborators = Array.from(new Set([company.user_id, ...collaboratorIds]));
+
         const { data: contentCalendar, error: contentCalendarError } = await db
             .from('contentCalendar')
             .insert([
@@ -56,6 +78,11 @@ export const createContentCalendar = async (req, res) => {
                     cta,
                     promoType,
                     status,
+                    post_status,
+                    scheduled_at,
+                    draft_caption,
+                    draft_image_url,
+                    publish_result,
                     captionOutput,
                     ctaOuput,
                     hastagsOutput,
@@ -70,6 +97,7 @@ export const createContentCalendar = async (req, res) => {
                     imageGenerated,
                     companyId,
                     user_id: userId,
+                    collaborator_ids: mergedCollaborators,
                     created_at: new Date().toISOString()
                 }
             ])
@@ -95,39 +123,6 @@ export const createContentCalendar = async (req, res) => {
     }
 };
 
-// READ - Get all content calendar entries
-export const getAllContentCalendars = async (req, res) => {
-    try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-        const { data: contentCalendars, error: contentCalendarError } = await db
-            .from('contentCalendar')
-            .select('*')
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
-            .order('date', { ascending: false });
-
-        if (contentCalendarError) {
-            console.error('Error fetching content calendars:', contentCalendarError);
-            return res.status(500).json({ 
-                error: 'Failed to fetch content calendar entries',
-                details: contentCalendarError.message 
-            });
-        }
-
-        return res.status(200).json({ 
-            contentCalendars,
-            count: contentCalendars.length 
-        });
-    } catch (error) {
-        console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
-        });
-    }
-};
-
 // READ - Get content calendar entries by company ID
 export const getContentCalendarsByCompanyId = async (req, res) => {
     try {
@@ -137,11 +132,24 @@ export const getContentCalendarsByCompanyId = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const { data: contentCalendars, error: contentCalendarError } = await db
             .from('contentCalendar')
             .select('*')
             .eq('companyId', companyId)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('created_at', { ascending: true });
 
         if (contentCalendarError) {
@@ -320,6 +328,11 @@ export const updateContentCalendar = async (req, res) => {
             cta,
             promoType,
             status,
+            post_status,
+            scheduled_at,
+            draft_caption,
+            draft_image_url,
+            publish_result,
             captionOutput,
             ctaOuput,
             hastagsOutput,
@@ -349,6 +362,11 @@ export const updateContentCalendar = async (req, res) => {
         if (cta !== undefined) updateData.cta = cta;
         if (promoType !== undefined) updateData.promoType = promoType;
         if (status !== undefined) updateData.status = status;
+        if (post_status !== undefined) updateData.post_status = post_status;
+        if (scheduled_at !== undefined) updateData.scheduled_at = scheduled_at;
+        if (draft_caption !== undefined) updateData.draft_caption = draft_caption;
+        if (draft_image_url !== undefined) updateData.draft_image_url = draft_image_url;
+        if (publish_result !== undefined) updateData.publish_result = publish_result;
         if (captionOutput !== undefined) updateData.captionOutput = captionOutput;
         if (ctaOuput !== undefined) updateData.ctaOuput = ctaOuput;
         if (hastagsOutput !== undefined) updateData.hastagsOutput = hastagsOutput;
