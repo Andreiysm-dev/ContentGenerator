@@ -29,12 +29,16 @@ export const createContentCalendar = async (req, res) => {
             imageGenerated,
             companyId 
         } = req.body;
+        const userId = req.user?.id;
 
         // Validate required fields
         if (!companyId) {
             return res.status(400).json({ 
                 error: 'Company ID is required' 
             });
+        }
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
         }
 
         const { data: contentCalendar, error: contentCalendarError } = await db
@@ -65,6 +69,7 @@ export const createContentCalendar = async (req, res) => {
                     attachedDesign,
                     imageGenerated,
                     companyId,
+                    user_id: userId,
                     created_at: new Date().toISOString()
                 }
             ])
@@ -93,9 +98,14 @@ export const createContentCalendar = async (req, res) => {
 // READ - Get all content calendar entries
 export const getAllContentCalendars = async (req, res) => {
     try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
         const { data: contentCalendars, error: contentCalendarError } = await db
             .from('contentCalendar')
             .select('*')
+            .eq('user_id', userId)
             .order('date', { ascending: false });
 
         if (contentCalendarError) {
@@ -122,11 +132,16 @@ export const getAllContentCalendars = async (req, res) => {
 export const getContentCalendarsByCompanyId = async (req, res) => {
     try {
         const { companyId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: contentCalendars, error: contentCalendarError } = await db
             .from('contentCalendar')
             .select('*')
             .eq('companyId', companyId)
+            .eq('user_id', userId)
             .order('created_at', { ascending: true });
 
         if (contentCalendarError) {
@@ -153,11 +168,16 @@ export const getContentCalendarsByCompanyId = async (req, res) => {
 export const getContentCalendarById = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: contentCalendar, error: contentCalendarError } = await db
             .from('contentCalendar')
             .select('*')
             .eq('contentCalendarId', id)
+            .eq('user_id', userId)
             .single();
 
         if (contentCalendarError) {
@@ -186,6 +206,10 @@ export const getContentCalendarById = async (req, res) => {
 export const getContentCalendarsByDateRange = async (req, res) => {
     try {
         const { startDate, endDate, companyId } = req.query;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         if (!startDate || !endDate) {
             return res.status(400).json({ 
@@ -198,6 +222,7 @@ export const getContentCalendarsByDateRange = async (req, res) => {
             .select('*')
             .gte('date', startDate)
             .lte('date', endDate)
+            .eq('user_id', userId)
             .order('date', { ascending: true });
 
         // Optional: filter by company
@@ -234,11 +259,16 @@ export const getContentCalendarsByStatus = async (req, res) => {
     try {
         const { status } = req.params;
         const { companyId } = req.query;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         let query = db
             .from('contentCalendar')
             .select('*')
             .eq('status', status)
+            .eq('user_id', userId)
             .order('date', { ascending: false });
 
         // Optional: filter by company
@@ -273,6 +303,11 @@ export const getContentCalendarsByStatus = async (req, res) => {
 export const updateContentCalendar = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
         const { 
             date,
             brandHighlight,
@@ -338,6 +373,7 @@ export const updateContentCalendar = async (req, res) => {
             .from('contentCalendar')
             .update(updateData)
             .eq('contentCalendarId', id)
+            .eq('user_id', userId)
             .select();
 
         if (contentCalendarError) {
@@ -370,11 +406,16 @@ export const updateContentCalendar = async (req, res) => {
 export const deleteContentCalendar = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: contentCalendar, error: contentCalendarError } = await db
             .from('contentCalendar')
             .delete()
             .eq('contentCalendarId', id)
+            .eq('user_id', userId)
             .select();
 
         if (contentCalendarError) {
@@ -407,11 +448,16 @@ export const deleteContentCalendar = async (req, res) => {
 export const deleteContentCalendarsByCompanyId = async (req, res) => {
     try {
         const { companyId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: contentCalendars, error: contentCalendarError } = await db
             .from('contentCalendar')
             .delete()
             .eq('companyId', companyId)
+            .eq('user_id', userId)
             .select();
 
         if (contentCalendarError) {

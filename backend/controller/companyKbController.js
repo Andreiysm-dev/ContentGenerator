@@ -14,12 +14,16 @@ export const createBrandKB = async (req, res) => {
             imageSystemPrompt,
             imageUserText
         } = req.body;
+        const userId = req.user?.id;
 
         // Validate required fields
         if (!companyId) {
             return res.status(400).json({ 
                 error: 'Company ID is required' 
             });
+        }
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
         }
 
         const { data: brandKB, error: brandKBError } = await db
@@ -35,6 +39,7 @@ export const createBrandKB = async (req, res) => {
                     systemInstruction,
                     imageSystemPrompt,
                     imageUserText,
+                    user_id: userId,
 
                     created_at: new Date().toISOString()
                 }
@@ -64,9 +69,14 @@ export const createBrandKB = async (req, res) => {
 // READ - Get all brand knowledge base entries
 export const getAllBrandKBs = async (req, res) => {
     try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
         const { data: brandKBs, error: brandKBError } = await db
             .from('brandKB')
             .select('*')
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
         if (brandKBError) {
@@ -93,11 +103,16 @@ export const getAllBrandKBs = async (req, res) => {
 export const getBrandKBsByCompanyId = async (req, res) => {
     try {
         const { companyId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: brandKBs, error: brandKBError } = await db
             .from('brandKB')
             .select('*')
             .eq('companyId', companyId)
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
         if (brandKBError) {
@@ -124,11 +139,16 @@ export const getBrandKBsByCompanyId = async (req, res) => {
 export const getBrandKBById = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: brandKB, error: brandKBError } = await db
             .from('brandKB')
             .select('*')
             .eq('brandKbId', id)
+            .eq('user_id', userId)
             .single();
 
         if (brandKBError) {
@@ -157,6 +177,11 @@ export const getBrandKBById = async (req, res) => {
 export const updateBrandKB = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
         const { 
             brandPack, 
             brandCapability, 
@@ -191,6 +216,7 @@ export const updateBrandKB = async (req, res) => {
             .from('brandKB')
             .update(updateData)
             .eq('brandKbId', id)
+            .eq('user_id', userId)
             .select();
 
         if (brandKBError) {
@@ -223,11 +249,16 @@ export const updateBrandKB = async (req, res) => {
 export const deleteBrandKB = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: brandKB, error: brandKBError } = await db
             .from('brandKB')
             .delete()
             .eq('brandKbId', id)
+            .eq('user_id', userId)
             .select();
 
         if (brandKBError) {
@@ -260,11 +291,16 @@ export const deleteBrandKB = async (req, res) => {
 export const deleteBrandKBsByCompanyId = async (req, res) => {
     try {
         const { companyId } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: brandKBs, error: brandKBError } = await db
             .from('brandKB')
             .delete()
             .eq('companyId', companyId)
+            .eq('user_id', userId)
             .select();
 
         if (brandKBError) {

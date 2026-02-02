@@ -4,12 +4,16 @@ import db from '../database/db.js';
 export const createCompany = async (req, res) => {
     try {
         const { companyName, companyDescription } = req.body;
+        const userId = req.user?.id;
 
         // Validate required fields
         if (!companyName) {
             return res.status(400).json({ 
                 error: 'Company name is required' 
             });
+        }
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
         }
 
         const { data: company, error: companyError } = await db
@@ -18,6 +22,7 @@ export const createCompany = async (req, res) => {
                 { 
                     companyName, 
                     companyDescription,
+                    user_id: userId,
                     created_at: new Date().toISOString()
                 }
             ])
@@ -46,9 +51,14 @@ export const createCompany = async (req, res) => {
 // READ - Get all companies
 export const getCompany = async (req, res) => {
     try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
         const { data: companies, error: companyError } = await db
             .from('company')
             .select('*')
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
         if (companyError) {
@@ -75,11 +85,16 @@ export const getCompany = async (req, res) => {
 export const getCompanyById = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: company, error: companyError } = await db
             .from('company')
             .select('*')
             .eq('companyId', id)
+            .eq('user_id', userId)
             .single();
 
         if (companyError) {
@@ -109,6 +124,10 @@ export const updateCompany = async (req, res) => {
     try {
         const { id } = req.params;
         const { companyName, companyDescription } = req.body;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         // Build update object with only provided fields
         const updateData = {};
@@ -125,6 +144,7 @@ export const updateCompany = async (req, res) => {
             .from('company')
             .update(updateData)
             .eq('companyId', id)
+            .eq('user_id', userId)
             .select();
 
         if (companyError) {
@@ -157,11 +177,16 @@ export const updateCompany = async (req, res) => {
 export const deleteCompany = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
 
         const { data: company, error: companyError } = await db
             .from('company')
             .delete()
             .eq('companyId', id)
+            .eq('user_id', userId)
             .select();
 
         if (companyError) {

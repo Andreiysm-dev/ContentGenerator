@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createClient, type Session } from '@supabase/supabase-js';
 import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +27,10 @@ type FormState = {
 const backendBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 const supabaseBaseUrl = (import.meta.env as any).VITE_SUPABASE_URL || '';
 const defaultCompanyId = import.meta.env.VITE_COMPANY_ID as string | undefined;
+const supabaseAnonKey = (import.meta.env as any).VITE_SUPABASE_ANON_KEY || '';
+const supabase = supabaseBaseUrl && supabaseAnonKey
+  ? createClient(supabaseBaseUrl, supabaseAnonKey)
+  : null;
 const revisionWebhookUrl = (import.meta.env as any).VITE_MAKE_REVISION_WEBHOOK || '';
 const imageFromExistingDmpWebhookUrl =
   (import.meta.env as any).VITE_MAKE_IMAGE_EXISTING_DMP_WEBHOOK ||
@@ -34,6 +39,8 @@ const VIEW_MODAL_POLL_MS = 1500;
 const CALENDAR_POLL_MS = 2500;
 
 function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [form, setForm] = useState<FormState>({
     date: '',
     brandHighlight: '',
@@ -73,6 +80,83 @@ function App() {
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isRevisingCaption, setIsRevisingCaption] = useState(false);
+
+  const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: 'owner' | 'collaborator' }>>([]);
+  const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
+
+  const handleAddCollaborator = async () => {
+    if (!newCollaboratorEmail || !activeCompanyId) return;
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newCollaboratorEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 404) {
+          notify('User with this email not found or not registered.', 'error');
+        } else if (res.status === 409) {
+          notify('User is already a collaborator.', 'error');
+        } else {
+          notify(data.error || 'Failed to add collaborator.', 'error');
+        }
+        return;
+      }
+      notify('Collaborator added.', 'success');
+      setNewCollaboratorEmail('');
+      // TODO: refetch collaborators list
+    } catch (err) {
+      notify('Failed to add collaborator.', 'error');
+    }
+  };
+
+  const handleRemoveCollaborator = async (id: string) => {
+    if (!activeCompanyId) return;
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        notify(data.error || 'Failed to remove collaborator.', 'error');
+        return;
+      }
+      notify('Collaborator removed.', 'success');
+      // TODO: refetch collaborators list
+    } catch (err) {
+      notify('Failed to remove collaborator.', 'error');
+    }
+  };
+
+  const authedFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const token = session?.access_token;
+    const headers = {
+      ...(init.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+    return fetch(input, { ...init, headers });
+  };
+
+  useEffect(() => {
+    if (!supabase) {
+      setAuthLoading(false);
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session ?? null);
+      setAuthLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession ?? null);
+    });
+
+    return () => {
+      listener?.subscription?.unsubscribe();
+    };
+  }, []);
   // Custom setter for activeCompanyId that persists to localStorage
   const setActiveCompanyIdWithPersistence = (companyId: string | undefined) => {
     setActiveCompanyId(companyId);
@@ -215,7 +299,7 @@ function App() {
 
   const fetchLatestContentRow = async (rowId: any): Promise<any | null> => {
     try {
-      const res = await fetch(`${backendBaseUrl}/api/content-calendar/${rowId}?t=${Date.now()}`, {
+      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${rowId}?t=${Date.now()}`, {
         cache: 'no-store' as RequestCache,
       });
       if (res.ok) {
@@ -230,7 +314,7 @@ function App() {
     // Fallback: fetch by company and find the row
     try {
       if (!activeCompanyId) return null;
-      const listRes = await fetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`, {
+      const listRes = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`, {
         cache: 'no-store' as RequestCache,
       });
       if (!listRes.ok) return null;
@@ -362,9 +446,10 @@ function App() {
 // Load companies for selector
 useEffect(() => {
   const loadCompanies = async () => {
+    if (!session) return;
     try {
       setIsBackendWaking(true);
-      const res = await fetch(`${backendBaseUrl}/api/company`);
+      const res = await authedFetch(`${backendBaseUrl}/api/company`);
       if (!res.ok) return;
       const data = await res.json().catch(() => ({}));
       const list = (data && (data.companies || data)) as any;
@@ -384,17 +469,18 @@ useEffect(() => {
   };
 
   loadCompanies();
-}, [activeCompanyId, defaultCompanyId]);
+}, [activeCompanyId, defaultCompanyId, session]);
 
 // Load existing content calendar entries for this company
 useEffect(() => {
   const loadCalendar = async () => {
+    if (!session) return;
     if (!activeCompanyId) return;
     setIsLoadingCalendar(true);
     setCalendarError(null);
     try {
       setIsBackendWaking(true);
-      const res = await fetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`);
+      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`);
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to load content calendar');
@@ -411,20 +497,20 @@ useEffect(() => {
   };
 
   loadCalendar();
-}, [activeCompanyId]);
+}, [activeCompanyId, session]);
 
 // Auto-refresh the content calendar table periodically
 useEffect(() => {
-  if (!activeCompanyId) return;
+  if (!activeCompanyId || !session) return;
   let canceled = false;
   const fetchList = async () => {
     try {
-      const res = await fetch(
+      const listRes = await authedFetch(
         `${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`,
         { cache: 'no-store' as RequestCache },
       );
-      if (!res.ok) return;
-      const data = await res.json().catch(() => ({}));
+      if (!listRes.ok) return;
+      const data = await listRes.json().catch(() => ({}));
       const unwrapped = (data && (data.contentCalendars || data)) as any;
       if (!canceled) {
         setCalendarRows(Array.isArray(unwrapped) ? unwrapped : []);
@@ -441,16 +527,17 @@ useEffect(() => {
     canceled = true;
     clearInterval(id);
   };
-}, [activeCompanyId]);
+}, [activeCompanyId, session]);
 
 // Load company profile details
 useEffect(() => {
   const loadCompany = async () => {
+    if (!session) return;
     if (!activeCompanyId) return;
     setCompanyName('');
     setCompanyDescription('');
     try {
-      const res = await fetch(`${backendBaseUrl}/api/company/${activeCompanyId}`);
+      const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`);
       if (!res.ok) return;
       const data = await res.json().catch(() => ({}));
       const company = (data && (data.company || data)) as any;
@@ -466,11 +553,12 @@ useEffect(() => {
   };
 
   loadCompany();
-}, [activeCompanyId]);
+}, [activeCompanyId, session]);
 
 // Load existing brand knowledge base (company settings) for this company
 useEffect(() => {
   const loadBrandKB = async () => {
+    if (!session) return;
     if (!activeCompanyId) return;
     setBrandKbId(null);
     setBrandPack('');
@@ -480,7 +568,7 @@ useEffect(() => {
     setAiWriterSystemPrompt('');
     setAiWriterUserPrompt('');
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `${backendBaseUrl}/api/brandkb/company/${activeCompanyId}`,
       );
       const data = await res.json();
@@ -515,7 +603,7 @@ useEffect(() => {
   };
 
   loadBrandKB();
-}, [activeCompanyId]);
+}, [activeCompanyId, session]);
 
 const filteredCalendarRows = useMemo(() => {
   const search = calendarSearch.trim().toLowerCase();
@@ -729,7 +817,7 @@ const handleDeleteSelected = async () => {
         if (filename) {
           try {
             // Delete the image from the bucket
-            const deleteRes = await fetch(`${backendBaseUrl}/api/storage/delete/${encodeURIComponent(filename)}`, {
+            const deleteRes = await authedFetch(`${backendBaseUrl}/api/storage/delete/${encodeURIComponent(filename)}`, {
               method: 'DELETE',
             });
             if (!deleteRes.ok) {
@@ -748,7 +836,7 @@ const handleDeleteSelected = async () => {
       }
 
       // Delete the row from Supabase
-      const res = await fetch(`${backendBaseUrl}/api/content-calendar/${id}`, {
+      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${id}`, {
         method: 'DELETE',
       });
       if (!res.ok) {
@@ -787,7 +875,7 @@ useEffect(() => {
   const fetchLatest = async () => {
     try {
       let latest: any | null = null;
-      const res = await fetch(
+      const res = await authedFetch(
         `${backendBaseUrl}/api/content-calendar/${rowId}?t=${Date.now()}`,
         { cache: 'no-store' as RequestCache },
       );
@@ -798,7 +886,7 @@ useEffect(() => {
       }
 
       if (!latest && activeCompanyId) {
-        const listRes = await fetch(
+        const listRes = await authedFetch(
           `${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`,
           { cache: 'no-store' as RequestCache },
         );
@@ -927,7 +1015,7 @@ useEffect(() => {
         companyId: activeCompanyId,
       } as any;
 
-      const res = await fetch(`${backendBaseUrl}/api/content-calendar`, {
+      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -974,6 +1062,44 @@ useEffect(() => {
       return cols.map((c) => c.trim());
     });
   };
+
+  if (authLoading) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <span className="loading-spinner" aria-hidden="true"></span>
+          <p>Loading system..</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <h1>Welcome back</h1>
+          <p>Sign in with Google to continue.</p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={async () => {
+              if (!supabase) {
+                notify('Supabase is not configured.', 'error');
+                return;
+              }
+              await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: window.location.origin },
+              });
+            }}
+          >
+            Sign in with Google
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -1022,17 +1148,23 @@ useEffect(() => {
             </DropdownMenuContent>
           </DropdownMenu>
           <div className="header-actions">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsSettingsModalOpen(true)}
-              disabled={!activeCompanyId}
-              aria-label="Company settings"
-              className="header-settings-btn"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="btn btn-secondary btn-sm">
+                  {session?.user?.user_metadata?.full_name || session?.user?.email || 'Profile'}
+                  <span className="company-trigger-caret">▾</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="company-menu">
+                <DropdownMenuItem
+                  onSelect={async () => {
+                    await supabase?.auth.signOut();
+                  }}
+                >
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -1051,13 +1183,24 @@ useEffect(() => {
                 <h2 className="card-title">Company Dashboard</h2>
                 <p className="card-subtitle">Quick health check of your content pipeline.</p>
               </div>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm dashboard-toggle"
-                onClick={() => setIsDashboardExpanded((prev) => !prev)}
-              >
-                {isDashboardExpanded ? 'Hide details' : 'View details'}
-              </button>
+              <div className="card-header-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setIsSettingsModalOpen(true)}
+                  disabled={!activeCompanyId}
+                >
+                  <Settings className="h-4 w-4" />
+                  Company settings
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm dashboard-toggle"
+                  onClick={() => setIsDashboardExpanded((prev) => !prev)}
+                >
+                  {isDashboardExpanded ? 'Hide details' : 'View details'}
+                </button>
+              </div>
             </div>
             <div className="dashboard-grid">
               <div className="metric-card">
@@ -1184,7 +1327,7 @@ useEffect(() => {
                     return;
                   }
                   try {
-                    const res = await fetch(`${backendBaseUrl}/api/company`, {
+                    const res = await authedFetch(`${backendBaseUrl}/api/company`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
@@ -1575,7 +1718,7 @@ useEffect(() => {
                                   );
 
                                   try {
-                                    const res = await fetch(
+                                    const res = await authedFetch(
                                       `${backendBaseUrl}/api/content-calendar/${row.contentCalendarId}`,
                                       {
                                         method: 'PUT',
@@ -1830,7 +1973,7 @@ useEffect(() => {
                             companyId: activeCompanyId,
                           };
 
-                          const res = await fetch(`${backendBaseUrl}/api/content-calendar`, {
+                          const res = await authedFetch(`${backendBaseUrl}/api/content-calendar`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload),
@@ -1974,6 +2117,56 @@ useEffect(() => {
                       </div>
                     </div>
                   </div>
+
+                  <div className="settings-section">
+                    <div className="settings-section-title">Collaborators</div>
+                    <div className="settings-grid">
+                      <div className="form-group settings-full-width">
+                        <label className="field-label">Add collaborator (email)</label>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            type="email"
+                            className="field-input"
+                            placeholder="user@example.com"
+                            value={newCollaboratorEmail}
+                            onChange={(e) => setNewCollaboratorEmail(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={handleAddCollaborator}
+                            disabled={!newCollaboratorEmail}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                      <div className="form-group settings-full-width">
+                        <label className="field-label">Current collaborators</label>
+                        <div className="collaborators-list">
+                          {collaborators.length === 0 ? (
+                            <p style={{ color: 'var(--ink-500)', fontSize: '0.875rem' }}>No collaborators added yet.</p>
+                          ) : (
+                            collaborators.map((c) => (
+                              <div key={c.id} className="collaborator-item">
+                                <span>{c.email}</span>
+                                <span className="collaborator-role">{c.role}</span>
+                                {c.role !== 'owner' && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost btn-xs"
+                                    onClick={() => handleRemoveCollaborator(c.id)}
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div className="settings-footer">
                   <button
@@ -1994,7 +2187,7 @@ useEffect(() => {
 
                       try {
                         setIsDeletingCompany(true);
-                        const res = await fetch(`${backendBaseUrl}/api/company/${activeCompanyId}`, {
+                        const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`, {
                           method: 'DELETE',
                         });
                         if (!res.ok) {
@@ -2024,28 +2217,51 @@ useEffect(() => {
                       if (!activeCompanyId) return;
                       try {
                         setIsSavingSettings(true);
-                        const res = await fetch(`${backendBaseUrl}/api/company/${activeCompanyId}`,
+                        const companyRes = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`,
                           {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                               companyName,
                               companyDescription,
-                              brandPack,
-                              brandCapability,
-                              emojiRule,
-                              systemInstruction,
-                              aiWriterSystemPrompt,
-                              aiWriterUserPrompt,
                             }),
                           },
                         );
-                        if (!res.ok) {
-                          const data = await res.json().catch(() => ({}));
-                          console.error('Save failed:', data);
+                        if (!companyRes.ok) {
+                          const data = await companyRes.json().catch(() => ({}));
+                          console.error('Company save failed:', data);
                           notify('Failed to save company settings. Check console for details.', 'error');
                           return;
                         }
+
+                        const brandPayload = {
+                          companyId: activeCompanyId,
+                          brandPack,
+                          brandCapability,
+                          emojiRule,
+                          systemInstruction,
+                          writerAgent: aiWriterSystemPrompt,
+                          reviewPrompt1: aiWriterUserPrompt,
+                        };
+                        const brandUrl = brandKbId
+                          ? `${backendBaseUrl}/api/brandkb/${brandKbId}`
+                          : `${backendBaseUrl}/api/brandkb`;
+                        const brandMethod = brandKbId ? 'PUT' : 'POST';
+                        const brandRes = await authedFetch(brandUrl, {
+                          method: brandMethod,
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(brandPayload),
+                        });
+                        const brandData = await brandRes.json().catch(() => ({}));
+                        if (!brandRes.ok) {
+                          console.error('BrandKB save failed:', brandData);
+                          notify('Failed to save brand settings. Check console for details.', 'error');
+                          return;
+                        }
+                        if (!brandKbId && brandData?.brandKB?.brandKbId) {
+                          setBrandKbId(brandData.brandKB.brandKbId);
+                        }
+
                         notify('Company settings saved.', 'success');
                         setIsSettingsModalOpen(false);
                       } catch (err) {
@@ -2279,11 +2495,17 @@ useEffect(() => {
                     <div className="kv-label">Image Generated</div>
                     <div className="kv-value">
                       {getImageGeneratedUrl(selectedRow) ? (
-                        <img
-                          src={getImageGeneratedUrl(selectedRow) as string}
-                          alt="Generated"
-                          style={{ maxWidth: '220px', borderRadius: 8 }}
-                        />
+                        (() => {
+                          const imageUrl = getImageGeneratedUrl(selectedRow);
+                          const separator = imageUrl?.includes('?') ? '&' : '?';
+                          return (
+                            <img
+                              src={`${imageUrl}${separator}v=${imagePreviewNonce}`}
+                              alt="Generated"
+                              style={{ maxWidth: '220px', borderRadius: 8 }}
+                            />
+                          );
+                        })()
                       ) : (
                         <span>{selectedRow.imageGenerated ? JSON.stringify(selectedRow.imageGenerated) : ''}</span>
                       )}
@@ -2326,7 +2548,7 @@ useEffect(() => {
 
                   // Persist status change
                   try {
-                    const putRes = await fetch(
+                    const putRes = await authedFetch(
                       `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`,
                       {
                         method: 'PUT',
@@ -2469,7 +2691,7 @@ useEffect(() => {
                   if (companyId) {
                     (async () => {
                       try {
-                        const res = await fetch(`${backendBaseUrl}/api/brandkb/company/${companyId}`);
+                        const res = await authedFetch(`${backendBaseUrl}/api/brandkb/company/${companyId}`);
                         const data = await res.json();
                         const list = Array.isArray(data.brandKBs) ? data.brandKBs : data;
                         const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
@@ -2547,10 +2769,12 @@ useEffect(() => {
                               setIsGeneratingImage(true);
                               try {
                                 // Save to backend first
-                                const res = await fetch(`${backendBaseUrl}/api/content-calendar/${rowId}`, {
+                                const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${rowId}`, {
                                   method: 'PUT',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ dmp: trimmedDmp }),
+                                  body: JSON.stringify({
+                                    dmp: trimmedDmp,
+                                  }),
                                 });
                                 const data = await res.json().catch(() => ({}));
                                 if (!res.ok) {
