@@ -1064,6 +1064,109 @@ const handleDeleteSelected = async () => {
   }
 };
 
+const handleGenerateSelected = async () => {
+  if (selectedIds.length === 0) return;
+  const proceed = await requestConfirm(`Generate captions for ${selectedIds.length} selected row(s)?`);
+  if (!proceed) return;
+
+  const rowsToGenerate = calendarRows.filter((row) => selectedIds.includes(row.contentCalendarId));
+  if (rowsToGenerate.length === 0) return;
+
+  for (const row of rowsToGenerate) {
+    if (!row.companyId) {
+      console.warn('Skipping row without companyId', row.contentCalendarId);
+      continue;
+    }
+
+    try {
+      const brandRes = await authedFetch(`${backendBaseUrl}/api/brandkb/company/${row.companyId}`);
+      const brandData = await brandRes.json().catch(() => ({}));
+      const brandList = Array.isArray(brandData.brandKBs) ? brandData.brandKBs : brandData;
+      const brandFirst = Array.isArray(brandList) && brandList.length > 0 ? brandList[0] : null;
+
+      const payload = {
+        contentCalendarId: row.contentCalendarId,
+        companyId: row.companyId,
+        brandKbId: typeof brandFirst?.brandKbId === 'string' ? brandFirst.brandKbId : brandKbId ?? null,
+        date: row.date ?? null,
+        brandHighlight: row.brandHighlight ?? null,
+        crossPromo: row.crossPromo ?? null,
+        theme: row.theme ?? null,
+        contentType: row.contentType ?? null,
+        channels: row.channels ?? null,
+        targetAudience: row.targetAudience ?? null,
+        primaryGoal: row.primaryGoal ?? null,
+        cta: row.cta ?? null,
+        promoType: row.promoType ?? null,
+        emojiRule: typeof brandFirst?.emojiRule === 'string' ? brandFirst.emojiRule : emojiRule ?? null,
+        brandPack: typeof brandFirst?.brandPack === 'string' ? brandFirst.brandPack : brandPack ?? null,
+        brandCapability:
+          typeof brandFirst?.brandCapability === 'string' ? brandFirst.brandCapability : brandCapability ?? null,
+      };
+
+      const whRes = await fetch('https://hook.eu2.make.com/09mj7o8vwfsp8ju11xmcn4riaace5teb', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!whRes.ok) {
+        const whText = await whRes.text().catch(() => '');
+        console.error('Batch generate webhook failed', row.contentCalendarId, whRes.status, whText);
+      } else {
+        setCalendarRows((prev) =>
+          prev.map((item) =>
+            item.contentCalendarId === row.contentCalendarId ? { ...item, status: 'Generate' } : item,
+          ),
+        );
+      }
+    } catch (err) {
+      console.error('Batch generate failed for row', row.contentCalendarId, err);
+    }
+  }
+
+  notify('Batch generation triggered.', 'success');
+};
+
+const handleReviseSelected = async () => {
+  if (selectedIds.length === 0) return;
+  if (!revisionWebhookUrl) {
+    notify('Revision webhook URL is not configured. Please set VITE_MAKE_REVISION_WEBHOOK in your .env.', 'error');
+    return;
+  }
+  if (!aiWriterUserPrompt || !aiWriterUserPrompt.trim()) {
+    notify('Review prompt is empty. Please fill in Review Prompt in Company Settings before revising.', 'error');
+    return;
+  }
+
+  const rowsToRevise = calendarRows.filter((row) => selectedIds.includes(row.contentCalendarId));
+  if (rowsToRevise.length === 0) return;
+
+  const proceed = await requestConfirm(`Send ${rowsToRevise.length} selected row(s) for revision?`);
+  if (!proceed) return;
+
+  for (const row of rowsToRevise) {
+    if (!row.captionOutput) {
+      console.warn('Skipping row without captionOutput', row.contentCalendarId);
+      continue;
+    }
+    try {
+      await fetch(revisionWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentCalendarId: row.contentCalendarId,
+          companyId: row.companyId ?? activeCompanyId ?? null,
+        }),
+      });
+    } catch (err) {
+      console.error('Batch revise failed for row', row.contentCalendarId, err);
+    }
+  }
+
+  notify('Batch revision triggered.', 'success');
+};
+
 // Auto-refresh currently viewed row while modal is open
 useEffect(() => {
   const rowId = selectedRow?.contentCalendarId;
@@ -2044,6 +2147,20 @@ useEffect(() => {
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                   <button
                     type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleGenerateSelected}
+                  >
+                    Generate Selected
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleReviseSelected}
+                  >
+                    Revise Selected
+                  </button>
+                  <button
+                    type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={handleDeleteSelected}
                   >
@@ -3019,13 +3136,54 @@ useEffect(() => {
                     return;
                   }
                   try {
+                    const companyIdForRow = selectedRow.companyId ?? activeCompanyId ?? null;
+                    let brandPayload = {
+                      brandKbId: brandKbId ?? null,
+                      brandPack: brandPack ?? null,
+                      brandCapability: brandCapability ?? null,
+                      emojiRule: emojiRule ?? null,
+                    };
+
+                    if (companyIdForRow) {
+                      try {
+                        const brandRes = await authedFetch(
+                          `${backendBaseUrl}/api/brandkb/company/${companyIdForRow}`,
+                        );
+                        const brandData = await brandRes.json().catch(() => ({}));
+                        const brandList = Array.isArray(brandData.brandKBs) ? brandData.brandKBs : brandData;
+                        const brandFirst = Array.isArray(brandList) && brandList.length > 0 ? brandList[0] : null;
+                        if (brandFirst) {
+                          brandPayload = {
+                            brandKbId:
+                              typeof brandFirst.brandKbId === 'string'
+                                ? brandFirst.brandKbId
+                                : brandPayload.brandKbId,
+                            brandPack:
+                              typeof brandFirst.brandPack === 'string'
+                                ? brandFirst.brandPack
+                                : brandPayload.brandPack,
+                            brandCapability:
+                              typeof brandFirst.brandCapability === 'string'
+                                ? brandFirst.brandCapability
+                                : brandPayload.brandCapability,
+                            emojiRule:
+                              typeof brandFirst.emojiRule === 'string'
+                                ? brandFirst.emojiRule
+                                : brandPayload.emojiRule,
+                          };
+                        }
+                      } catch (err) {
+                        console.error('Failed to load BrandKB for caption generation', err);
+                      }
+                    }
+
                     const whRes = await fetch('https://hook.eu2.make.com/09mj7o8vwfsp8ju11xmcn4riaace5teb', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         contentCalendarId: selectedRow.contentCalendarId,
                         companyId: selectedRow.companyId,
-                        brandKbId: brandKbId ?? null,
+                        brandKbId: brandPayload.brandKbId ?? null,
                         date: selectedRow.date ?? null,
                         brandHighlight: selectedRow.brandHighlight ?? null,
                         crossPromo: selectedRow.crossPromo ?? null,
@@ -3036,9 +3194,9 @@ useEffect(() => {
                         primaryGoal: selectedRow.primaryGoal ?? null,
                         cta: selectedRow.cta ?? null,
                         promoType: selectedRow.promoType ?? null,
-                        emojiRule: emojiRule ?? null,
-                        brandPack: brandPack ?? null,
-                        brandCapability: brandCapability ?? null,
+                        emojiRule: brandPayload.emojiRule ?? null,
+                        brandPack: brandPayload.brandPack ?? null,
+                        brandCapability: brandPayload.brandCapability ?? null,
                       }),
                     });
                     if (!whRes.ok) {
