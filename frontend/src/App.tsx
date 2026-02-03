@@ -177,7 +177,6 @@ function App() {
       return localPreviewUrl;
     });
     setSelectedRow((prev: any) => (prev ? { ...prev, draft_image_url: localPreviewUrl } : prev));
-    setIsUploadingDraftImage(true);
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const path = `drafts/${selectedRow.contentCalendarId}-${Date.now()}-${safeName}`;
@@ -204,7 +203,6 @@ function App() {
       console.error('Draft image upload failed', err);
       notify('Failed to upload image.', 'error');
     } finally {
-      setIsUploadingDraftImage(false);
     }
   };
 
