@@ -81,7 +81,6 @@ function App() {
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isRevisingCaption, setIsRevisingCaption] = useState(false);
-  const [isUploadingDraftImage, setIsUploadingDraftImage] = useState(false);
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [isBatchReviewing, setIsBatchReviewing] = useState(false);
@@ -1806,7 +1805,16 @@ useEffect(() => {
                         <h3 className="section-title">Draft Image</h3>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <input type="file" accept="image/*" onChange={handleDraftImageUpload} />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              void handleDraftImageUpload(file);
+                            }
+                          }}
+                        />
                         {draftImagePreviewUrl || selectedRow.draft_image_url ? (
                           <img
                             src={(() => {
