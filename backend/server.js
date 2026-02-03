@@ -6,7 +6,6 @@ import contentCalendar from "./routes/contentCalendar.js";
 import companyKbRoutes from "./routes/companyKbRoutes.js";
 import storageRoutes from "./routes/storageRoutes.js";
 import collaboratorRoutes from './routes/collaboratorRoutes.js';
-import socialRoutes from './routes/socialRoutes.js';
 import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
@@ -14,20 +13,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
 
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://www.facebook.com',
-    'https://web.facebook.com',
-  ],
-  credentials: true,
-}));
+app.use(cors());
 app.use(express.json());
 
 // Note the leading slash in mount paths
-app.use('/api/social', socialRoutes);
 app.use("/api", authMiddleware);
-
 app.use("/api", companyRoutes);
 app.use("/api", contentCalendar);
 app.use("/api", companyKbRoutes);
