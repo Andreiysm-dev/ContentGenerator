@@ -83,6 +83,8 @@ function App() {
   const [isRevisingCaption, setIsRevisingCaption] = useState(false);
   const [isUploadingDraftImage, setIsUploadingDraftImage] = useState(false);
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+  const [isBatchReviewing, setIsBatchReviewing] = useState(false);
 
   const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: 'owner' | 'collaborator' }>>([]);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
@@ -850,7 +852,11 @@ useEffect(() => {
   return () => window.clearTimeout(id);
 }, [toast]);
 
-const handleExportCsv = () => {
+const buildExportRows = async () => {
+  if (!activeCompanyId) {
+    notify('Please select a company first.', 'error');
+    return;
+  }
   const headers = [
     'Date',
     'Brand Highlight',
@@ -863,8 +869,36 @@ const handleExportCsv = () => {
     'CTA',
     'Promo Type',
     'Status',
+    'Framework Used',
+    'Caption Output',
+    'CTA Output',
+    'Hashtags Output',
+    'Review Decision',
+    'Review Notes',
+    'Final Caption',
+    'Final CTA',
+    'Final Hashtags',
   ];
-  const rows = filteredCalendarRows.map((row) => [
+  let exportRows: any[] = [];
+  try {
+    const res = await authedFetch(
+      `${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`,
+    );
+    if (!res.ok) {
+      const msg = await res.text().catch(() => '');
+      notify(`Failed to load rows for export (${res.status}). ${msg}`, 'error');
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    const unwrapped = (data && (data.contentCalendars || data)) as any;
+    exportRows = Array.isArray(unwrapped) ? unwrapped : [];
+  } catch (err) {
+    console.error('Failed to load export rows', err);
+    notify('Failed to load rows for export. Check console for details.', 'error');
+    return;
+  }
+
+  const rows = exportRows.map((row) => [
     row.date ?? '',
     row.brandHighlight ?? '',
     row.crossPromo ?? '',
@@ -876,7 +910,24 @@ const handleExportCsv = () => {
     row.cta ?? '',
     row.promoType ?? '',
     getStatusValue(row.status) ?? '',
+    row.frameworkUsed ?? '',
+    row.captionOutput ?? '',
+    row.ctaOuput ?? '',
+    row.hastagsOutput ?? '',
+    row.reviewDecision ?? '',
+    row.reviewNotes ?? '',
+    row.finalCaption ?? '',
+    row.finalCTA ?? '',
+    row.finalHashtags ?? '',
   ]);
+
+  return { headers, rows };
+};
+
+const handleExportCsv = async () => {
+  const exportData = await buildExportRows();
+  if (!exportData) return;
+  const { headers, rows } = exportData;
 
   const escapeCell = (value: string) => {
     const normalized = value?.toString() ?? '';
@@ -890,7 +941,8 @@ const handleExportCsv = () => {
     .map((row) => row.map((cell) => escapeCell(cell)).join(','))
     .join('\n');
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const bom = '\ufeff';
+  const blob = new Blob([bom, csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   const now = new Date();
@@ -901,6 +953,30 @@ const handleExportCsv = () => {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+};
+
+const handleCopySpreadsheet = async () => {
+  const exportData = await buildExportRows();
+  if (!exportData) return;
+  const { headers, rows } = exportData;
+  const tsv = [headers, ...rows]
+    .map((row) => row.map((cell) => (cell ?? '').toString().replace(/\r?\n/g, ' ')).join('\t'))
+    .join('\n');
+  try {
+    const bom = '\ufeff';
+    const payload = `${bom}${tsv}`;
+    if (navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'text/plain': new Blob([payload], { type: 'text/plain;charset=utf-8' }) }),
+      ]);
+    } else {
+      await navigator.clipboard.writeText(payload);
+    }
+    notify('Copied rows to clipboard. Paste into Excel or Sheets.', 'success');
+  } catch (err) {
+    console.error('Failed to copy export rows', err);
+    notify('Failed to copy rows. Check browser permissions.', 'error');
+  }
 };
 
 const toggleSelectOne = (id: string, checked: boolean) => {
@@ -1012,6 +1088,144 @@ const handleDeleteSelected = async () => {
       }
     }
   }
+};
+
+const buildGeneratePayload = (row: any) => ({
+  contentCalendarId: row.contentCalendarId,
+  companyId: row.companyId ?? activeCompanyId ?? null,
+  brandKbId: brandKbId ?? null,
+  brandHighlight: row.brandHighlight ?? '',
+  crossPromo: row.crossPromo ?? '',
+  theme: row.theme ?? '',
+  contentType: row.contentType ?? '',
+  channels: row.channels ?? '',
+  targetAudience: row.targetAudience ?? '',
+  primaryGoal: row.primaryGoal ?? '',
+  cta: row.cta ?? '',
+  promoType: row.promoType ?? '',
+  emojiRule,
+  brandPack,
+  brandCapability,
+  executionInstructions: [
+    'Adapt tone and length to the listed Channels',
+    'Speak directly to the selected Audience Segment',
+    'Deliver clear value before promotion',
+    'Ensure ecosystem framing (not single-offer isolation)',
+    'If CTA is missing, choose the most appropriate soft or primary CTA',
+    'Hashtags must be relevant, minimal, and professional',
+  ],
+  outputStructure: ['FRAMEWORK:', 'Caption', 'CTA:', 'Hashtags'],
+});
+
+const handleBatchGenerate = async () => {
+  if (selectedIds.length === 0) return;
+  const proceed = await requestConfirm(`Trigger caption generation for ${selectedIds.length} selected row(s)?`);
+  if (!proceed) return;
+  setIsBatchGenerating(true);
+
+  const rowsToProcess = calendarRows.filter((row) => selectedIds.includes(row.contentCalendarId));
+  const validRows = rowsToProcess.filter((row) => {
+    if (!row.companyId) return false;
+    if (activeCompanyId && row.companyId !== activeCompanyId) return false;
+    return true;
+  });
+
+  if (validRows.length === 0) {
+    notify('No selected rows are eligible for generation. Check company alignment.', 'error');
+    setIsBatchGenerating(false);
+    return;
+  }
+
+  setCalendarRows((prev) =>
+    prev.map((row) =>
+      validRows.some((selected) => selected.contentCalendarId === row.contentCalendarId)
+        ? { ...row, status: 'Generate' }
+        : row,
+    ),
+  );
+
+  let successCount = 0;
+  for (const row of validRows) {
+    try {
+      const whRes = await fetch('https://hook.eu2.make.com/09mj7o8vwfsp8ju11xmcn4riaace5teb', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildGeneratePayload(row)),
+      });
+      if (!whRes.ok) {
+        const whText = await whRes.text().catch(() => '');
+        notify(`Generation failed for ${row.theme || row.date || row.contentCalendarId}. ${whText}`, 'error');
+      } else {
+        successCount += 1;
+      }
+    } catch (err) {
+      console.error('Failed to call generation webhook', err);
+      notify(`Failed to trigger generation for ${row.theme || row.date || row.contentCalendarId}.`, 'error');
+    }
+  }
+
+  if (successCount > 0) {
+    notify(`Generation triggered for ${successCount} row(s).`, 'success');
+  }
+  setIsBatchGenerating(false);
+};
+
+const handleBatchReview = async () => {
+  if (selectedIds.length === 0) return;
+  const proceed = await requestConfirm(`Send ${selectedIds.length} selected row(s) for review?`);
+  if (!proceed) return;
+  setIsBatchReviewing(true);
+
+  if (!revisionWebhookUrl) {
+    notify('Revision webhook URL is not configured. Please set VITE_MAKE_REVISION_WEBHOOK.', 'error');
+    setIsBatchReviewing(false);
+    return;
+  }
+  if (!aiWriterUserPrompt || !aiWriterUserPrompt.trim()) {
+    notify('Review prompt is empty. Please fill in Review Prompt in Company Settings.', 'error');
+    setIsBatchReviewing(false);
+    return;
+  }
+
+  const rowsToProcess = calendarRows.filter((row) => selectedIds.includes(row.contentCalendarId));
+  const validRows = rowsToProcess.filter((row) => !!row.captionOutput);
+
+  if (validRows.length === 0) {
+    notify('No selected rows have captions ready for review.', 'error');
+    setIsBatchReviewing(false);
+    return;
+  }
+
+  setCalendarRows((prev) =>
+    prev.map((row) =>
+      validRows.some((selected) => selected.contentCalendarId === row.contentCalendarId)
+        ? { ...row, status: 'Review' }
+        : row,
+    ),
+  );
+
+  let successCount = 0;
+  for (const row of validRows) {
+    try {
+      await fetch(revisionWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentCalendarId: row.contentCalendarId,
+          companyId: row.companyId ?? activeCompanyId ?? null,
+        }),
+      });
+      successCount += 1;
+    } catch (err) {
+      console.error('Failed to call revision webhook', err);
+      notify(`Failed to trigger review for ${row.theme || row.date || row.contentCalendarId}.`, 'error');
+    }
+  }
+
+  if (successCount > 0) {
+    notify(`Sent ${successCount} row(s) for review.`, 'success');
+  }
+  setIsBatchReviewing(false);
 };
 
 // Auto-refresh currently viewed row while modal is open
@@ -1339,26 +1553,28 @@ useEffect(() => {
                 <p className="card-subtitle">Quick health check of your content pipeline.</p>
               </div>
               <div className="card-header-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setIsSettingsModalOpen(true)}
-                  disabled={!activeCompanyId}
-                >
-                  <Settings className="h-4 w-4" />
-                  Company settings
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm dashboard-toggle"
-                  onClick={() => setIsDashboardExpanded((prev) => !prev)}
-                >
-                  {isDashboardExpanded ? 'Hide details' : 'View details'}
-                </button>
+                <div className="card-header-actions-group">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setIsSettingsModalOpen(true)}
+                    disabled={!activeCompanyId}
+                  >
+                    <Settings className="h-4 w-4" />
+                    Company settings
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm dashboard-toggle"
+                    onClick={() => setIsDashboardExpanded((prev) => !prev)}
+                  >
+                    {isDashboardExpanded ? 'Hide details' : 'View details'}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="dashboard-grid">
-              <div className="metric-card">
+              <div className="metric-card metric-card--primary">
                 <div className="metric-label">Total Posts</div>
                 <div className="metric-value">{dashboardStats.total}</div>
                 <div className="metric-sub">Across all statuses</div>
@@ -1434,243 +1650,250 @@ useEffect(() => {
 
 
             )}
-
-      {isAddCompanyModalOpen && (
-        <div className="modal-backdrop">
-          <div className="modal settings-modal">
-            <div className="modal-header settings-header">
-              <div>
-                <p className="modal-kicker">Company</p>
-                <h2 className="modal-title">Add Company</h2>
-              </div>
-              <button type="button" className="modal-close" onClick={() => setIsAddCompanyModalOpen(false)}>
-                ×
-              </button>
-            </div>
-            <div className="modal-body settings-body">
-              <div className="settings-section">
-                <div className="settings-grid">
-                  <div className="form-group">
-                    <label className="field-label">Company Name</label>
-                    <input
-                      type="text"
-                      className="field-input"
-                      value={newCompanyName}
-                      onChange={(e) => setNewCompanyName(e.target.value)}
-                      placeholder="e.g., Moonshot Studios"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="field-label">Company Description</label>
-                    <input
-                      type="text"
-                      className="field-input"
-                      value={newCompanyDescription}
-                      onChange={(e) => setNewCompanyDescription(e.target.value)}
-                      placeholder="Optional"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer settings-footer">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsAddCompanyModalOpen(false)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={async () => {
-                  if (!newCompanyName.trim()) {
-                    notify('Company name is required.', 'error');
-                    return;
-                  }
-                  try {
-                    const res = await authedFetch(`${backendBaseUrl}/api/company`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        companyName: newCompanyName.trim(),
-                        companyDescription: newCompanyDescription.trim(),
-                      }),
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok) {
-                      notify(data.error || 'Failed to create company.', 'error');
-                      return;
-                    }
-                    notify('Company created.', 'success');
-                    setIsAddCompanyModalOpen(false);
-                    await new Promise((r) => setTimeout(r, 200));
-                    setCompanies((prev) => [data.company, ...prev]);
-                    if (data.company?.companyId) {
-                      setActiveCompanyIdWithPersistence(data.company.companyId);
-                    }
-                  } catch (err) {
-                    console.error('Failed to create company', err);
-                    notify('Failed to create company. Check console for details.', 'error');
-                  }
-                }}
-              >
-                Create Company
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isDraftModalOpen && selectedRow && (
-        <div className="modal-backdrop modal-backdrop-top">
-          <div className="modal modal-wide content-modal">
-            <div className="modal-header content-modal-header">
-              <div className="content-modal-title">
-                <h2>Draft & Publish</h2>
-                <p>Edit draft content, upload image, and schedule or publish.</p>
-              </div>
-              <button type="button" className="modal-close" onClick={() => setIsDraftModalOpen(false)}>
-                ×
-              </button>
-            </div>
-            <div className="modal-body content-modal-body draft-modal-body">
-              <div className="draft-modal-editor">
-                <div className="section content-section">
-                  <div className="section-title-row">
-                    <h3 className="section-title">Draft Caption</h3>
-                  </div>
-                  <textarea
-                    className="field-input field-textarea"
-                    rows={8}
-                    value={
-                      selectedRow.draft_caption ??
-                      `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`
-                    }
-                    onChange={(e) =>
-                      setSelectedRow((prev: any) => (prev ? { ...prev, draft_caption: e.target.value } : prev))
-                    }
-                  />
-                </div>
-
-                <div className="section content-section">
-                  <div className="section-title-row">
-                    <h3 className="section-title">Channels</h3>
-                  </div>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    {channelOptions.map((channel) => {
-                      const checked = Array.isArray(selectedRow.channels)
-                        ? selectedRow.channels.includes(channel)
-                        : false;
-                      return (
-                        <label key={channel} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              const next = e.target.checked
-                                ? [...(selectedRow.channels || []), channel]
-                                : (selectedRow.channels || []).filter((c: string) => c !== channel);
-                              setSelectedRow((prev: any) => (prev ? { ...prev, channels: next } : prev));
-                            }}
-                          />
-                          {channel}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="section content-section">
-                  <div className="section-title-row">
-                    <h3 className="section-title">Draft Image</h3>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    {(draftImagePreviewUrl || selectedRow.draft_image_url) && (
-                      <img
-                        src={draftImagePreviewUrl || selectedRow.draft_image_url}
-                        alt="Draft"
-                        style={{ maxWidth: 220, borderRadius: 8 }}
-                      />
-                    )}
-                    <label className="btn btn-secondary btn-sm">
-                      {isUploadingDraftImage ? 'Uploading…' : 'Upload Image'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleDraftImageUpload(file);
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="section content-section">
-                  <div className="section-title-row">
-                    <h3 className="section-title">Schedule</h3>
-                  </div>
-                  <input
-                    type="datetime-local"
-                    className="field-input"
-                    value={toLocalInputValue(selectedRow.scheduled_at)}
-                    onChange={(e) =>
-                      setSelectedRow((prev: any) =>
-                        prev ? { ...prev, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null } : prev,
-                      )
-                    }
-                  />
-                  <div className="content-box" style={{ marginTop: 8 }}>
-                    Status: {selectedRow.post_status ?? 'draft'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="draft-modal-preview">
-                <div className="draft-preview-card">
-                  <div className="draft-preview-header">Preview</div>
-                  <div className="draft-preview-body">
-                    <div className="draft-preview-image">
-                      {draftImagePreviewUrl || selectedRow.draft_image_url ? (
-                        <img
-                          src={(() => {
-                            const baseUrl = draftImagePreviewUrl || selectedRow.draft_image_url || '';
-                            if (baseUrl.startsWith('blob:')) return baseUrl;
-                            return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${draftPreviewNonce}`;
-                          })()}
-                          alt="Preview"
-                        />
-                      ) : (
-                        <div className="draft-preview-placeholder">No image selected</div>
-                      )}
-                    </div>
-                    <div className="draft-preview-caption">
-                      {(selectedRow.draft_caption ??
-                        `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`
-                      )
-                        .split('\n')
-                        .map((line: string, idx: number) => (
-                          <p key={idx}>{line}</p>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={handleSaveDraft}>
-                Save Draft
-              </button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={handleSchedulePublish}>
-                Schedule
-              </button>
-              <button type="button" className="btn btn-primary btn-sm" onClick={handlePublishNow}>
-                Publish Now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
           </section>
+
+          {isAddCompanyModalOpen && (
+            <div className="modal-backdrop">
+              <div className="modal settings-modal">
+                <div className="modal-header settings-header">
+                  <div>
+                    <p className="modal-kicker">Company</p>
+                    <h2 className="modal-title">Add Company</h2>
+                  </div>
+                  <button type="button" className="modal-close" onClick={() => setIsAddCompanyModalOpen(false)}>
+                    ×
+                  </button>
+                </div>
+                <div className="modal-body settings-body">
+                  <div className="settings-section">
+                    <div className="settings-grid">
+                      <div className="form-group">
+                        <label className="field-label">Company Name</label>
+                        <input
+                          type="text"
+                          className="field-input"
+                          value={newCompanyName}
+                          onChange={(e) => setNewCompanyName(e.target.value)}
+                          placeholder="e.g., Moonshot Studios"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="field-label">Company Description</label>
+                        <input
+                          type="text"
+                          className="field-input"
+                          value={newCompanyDescription}
+                          onChange={(e) => setNewCompanyDescription(e.target.value)}
+                          placeholder="Optional"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer settings-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setIsAddCompanyModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={async () => {
+                      if (!newCompanyName.trim()) {
+                        notify('Company name is required.', 'error');
+                        return;
+                      }
+                      try {
+                        const res = await authedFetch(`${backendBaseUrl}/api/company`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            companyName: newCompanyName.trim(),
+                            companyDescription: newCompanyDescription.trim(),
+                          }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          notify(data.error || 'Failed to create company.', 'error');
+                          return;
+                        }
+                        notify('Company created.', 'success');
+                        setIsAddCompanyModalOpen(false);
+                        await new Promise((r) => setTimeout(r, 200));
+                        setCompanies((prev) => [data.company, ...prev]);
+                        if (data.company?.companyId) {
+                          setActiveCompanyIdWithPersistence(data.company.companyId);
+                        }
+                      } catch (err) {
+                        console.error('Failed to create company', err);
+                        notify('Failed to create company. Check console for details.', 'error');
+                      }
+                    }}
+                  >
+                    Create Company
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isDraftModalOpen && selectedRow && (
+            <div className="modal-backdrop modal-backdrop-top">
+              <div className="modal modal-wide content-modal">
+                <div className="modal-header content-modal-header">
+                  <div className="content-modal-title">
+                    <h2>Draft & Publish</h2>
+                    <p>Edit draft content, upload image, and schedule or publish.</p>
+                  </div>
+                  <button type="button" className="modal-close" onClick={() => setIsDraftModalOpen(false)}>
+                    ×
+                  </button>
+                </div>
+                <div className="modal-body content-modal-body draft-modal-body">
+                  <div className="draft-modal-editor">
+                    <div className="section content-section">
+                      <div className="section-title-row">
+                        <h3 className="section-title">Draft Caption</h3>
+                      </div>
+                      <textarea
+                        className="field-input field-textarea"
+                        rows={8}
+                        value={
+                          selectedRow.draft_caption ??
+                          `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`
+                        }
+                        onChange={(e) =>
+                          setSelectedRow((prev: any) => (prev ? { ...prev, draft_caption: e.target.value } : prev))
+                        }
+                      />
+                    </div>
+
+                    <div className="section content-section">
+                      <div className="section-title-row">
+                        <h3 className="section-title">Channels</h3>
+                      </div>
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                        {channelOptions.map((channel) => {
+                          const checked = Array.isArray(selectedRow.channels)
+                            ? selectedRow.channels.includes(channel)
+                            : false;
+                          return (
+                            <label key={channel} className="channel-pill">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const next = e.target.checked
+                                    ? [...(Array.isArray(selectedRow.channels) ? selectedRow.channels : []), channel]
+                                    : (Array.isArray(selectedRow.channels) ? selectedRow.channels : []).filter(
+                                        (c: string) => c !== channel,
+                                      );
+                                  setSelectedRow((prev: any) => (prev ? { ...prev, channels: next } : prev));
+                                }}
+                              />
+                              {channel}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="section content-section">
+                      <div className="section-title-row">
+                        <h3 className="section-title">Draft Image</h3>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <input type="file" accept="image/*" onChange={handleDraftImageUpload} />
+                        {draftImagePreviewUrl || selectedRow.draft_image_url ? (
+                          <img
+                            src={(() => {
+                              const baseUrl = draftImagePreviewUrl || selectedRow.draft_image_url || '';
+                              if (baseUrl.startsWith('blob:')) return baseUrl;
+                              return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${draftPreviewNonce}`;
+                            })()}
+                            alt="Draft"
+                            style={{ maxWidth: '100%', borderRadius: 12 }}
+                          />
+                        ) : (
+                          <div className="field-caption">Upload an image to preview</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="section content-section">
+                      <div className="section-title-row">
+                        <h3 className="section-title">Schedule</h3>
+                      </div>
+                      <input
+                        type="datetime-local"
+                        className="field-input"
+                        value={toLocalInputValue(selectedRow.scheduled_at)}
+                        onChange={(e) =>
+                          setSelectedRow((prev: any) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null,
+                                }
+                              : prev,
+                          )
+                        }
+                      />
+                      <div className="content-box" style={{ marginTop: 8 }}>
+                        Status: {selectedRow.post_status ?? 'draft'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="draft-modal-preview">
+                    <div className="draft-preview-card">
+                      <div className="draft-preview-header">Preview</div>
+                      <div className="draft-preview-body">
+                        <div className="draft-preview-image">
+                          {draftImagePreviewUrl || selectedRow.draft_image_url ? (
+                            <img
+                              src={(() => {
+                                const baseUrl = draftImagePreviewUrl || selectedRow.draft_image_url || '';
+                                if (baseUrl.startsWith('blob:')) return baseUrl;
+                                return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${draftPreviewNonce}`;
+                              })()}
+                              alt="Preview"
+                            />
+                          ) : (
+                            <div className="draft-preview-placeholder">No image selected</div>
+                          )}
+                        </div>
+                        <div className="draft-preview-caption">
+                          {(selectedRow.draft_caption ??
+                            `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`
+                          )
+                            .split('\n')
+                            .map((line: string, idx: number) => (
+                              <p key={idx}>{line}</p>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleSaveDraft}>
+                    Save Draft
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleSchedulePublish}>
+                    Schedule
+                  </button>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handlePublishNow}>
+                    Publish Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <section className="card">
             <div className="card-header">
               <div>
@@ -1873,7 +2096,7 @@ useEffect(() => {
           <section className="card card-secondary calendar-card">
             <div className="card-header card-header-compact" style={{ alignItems: 'center' }}>
               <h2 className="card-title">Content Calendar</h2>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div className="calendar-controls" style={{ marginLeft: 'auto', display: 'flex', gap: 10, alignItems: 'center' }}>
                 <input
                   type="search"
                   className="field-input"
@@ -1897,14 +2120,29 @@ useEffect(() => {
                 <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCsv}>
                   Export CSV
                 </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopySpreadsheet}>
+                  Copy for Sheets
+                </button>
               </div>
               {selectedIds.length > 0 && (
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={handleDeleteSelected}
+                    onClick={handleBatchGenerate}
+                    disabled={isBatchGenerating}
                   >
+                    {isBatchGenerating ? 'Generating…' : 'Generate'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleBatchReview}
+                    disabled={isBatchReviewing}
+                  >
+                    {isBatchReviewing ? 'Reviewing…' : 'Review'}
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleDeleteSelected}>
                     Delete Selected
                   </button>
                 </div>
@@ -1950,15 +2188,10 @@ useEffect(() => {
                         />
                       </th>
                       <th className="calendar-col calendar-col--primary">Date</th>
-                      <th className="calendar-col calendar-col--primary">Brand Highlight</th>
-                      <th className="calendar-col calendar-col--muted">Cross Promo</th>
-                      <th className="calendar-col calendar-col--primary">Theme</th>
-                      <th className="calendar-col">Content Type</th>
-                      <th className="calendar-col calendar-col--muted">Channels</th>
-                      <th className="calendar-col calendar-col--muted">Target Audience</th>
-                      <th className="calendar-col">Primary Goal</th>
-                      <th className="calendar-col calendar-col--muted">CTA</th>
-                      <th className="calendar-col calendar-col--muted">Promo Type</th>
+                      <th className="calendar-col calendar-col--primary calendar-col--theme">Theme / Content</th>
+                      <th className="calendar-col calendar-col--muted">Brand / Promo</th>
+                      <th className="calendar-col">Channel / Target</th>
+                      <th className="calendar-col">Primary / CTA</th>
                       <th className="calendar-col calendar-col--status">Status</th>
                       <th className="calendar-col calendar-col--actions">Actions</th>
                     </tr>
@@ -1974,15 +2207,32 @@ useEffect(() => {
                           />
                         </td>
                         <td className="calendar-cell calendar-cell--primary">{row.date ?? ''}</td>
-                        <td className="calendar-cell calendar-cell--primary">{row.brandHighlight ?? ''}</td>
-                        <td className="calendar-cell calendar-cell--muted">{row.crossPromo ?? ''}</td>
-                        <td className="calendar-cell calendar-cell--primary">{row.theme ?? ''}</td>
-                        <td className="calendar-cell">{row.contentType ?? ''}</td>
-                        <td className="calendar-cell calendar-cell--muted">{row.channels ?? ''}</td>
-                        <td className="calendar-cell calendar-cell--muted">{row.targetAudience ?? ''}</td>
-                        <td className="calendar-cell">{row.primaryGoal ?? ''}</td>
-                        <td className="calendar-cell calendar-cell--muted">{row.cta ?? ''}</td>
-                        <td className="calendar-cell calendar-cell--muted">{row.promoType ?? ''}</td>
+                        <td className="calendar-cell calendar-cell--theme">
+                          <div className="calendar-cell-stack">
+                            <span className="calendar-cell-title">{row.theme ?? ''}</span>
+                            <span className="calendar-cell-meta">{row.contentType ?? ''}</span>
+                          </div>
+                        </td>
+                        <td className="calendar-cell">
+                          <div className="calendar-cell-stack calendar-cell-stack--muted">
+                            <span className="calendar-cell-meta">{row.brandHighlight ?? ''}</span>
+                            <span className="calendar-cell-meta">
+                              {[row.crossPromo, row.promoType].filter(Boolean).join(' • ')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="calendar-cell">
+                          <div className="calendar-cell-stack">
+                            <span className="calendar-cell-title">{row.channels ?? ''}</span>
+                            <span className="calendar-cell-meta">{row.targetAudience ?? ''}</span>
+                          </div>
+                        </td>
+                        <td className="calendar-cell">
+                          <div className="calendar-cell-stack">
+                            <span className="calendar-cell-title">{row.primaryGoal ?? ''}</span>
+                            <span className="calendar-cell-meta">{row.cta ?? ''}</span>
+                          </div>
+                        </td>
                         <td className="calendar-cell calendar-cell--status">
                           {(() => {
                             const currentStatus = getStatusValue(row.status);
@@ -2071,11 +2321,7 @@ useEffect(() => {
                                           {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                              contentCalendarId: row.contentCalendarId,
-                                              companyId: row.companyId,
-                                              brandKbId: brandKbId ?? null,
-                                            }),
+                                            body: JSON.stringify(buildGeneratePayload(row)),
                                           },
                                         );
                                         if (!whRes.ok) {
@@ -2105,7 +2351,7 @@ useEffect(() => {
                         <td className="calendar-cell calendar-cell--actions">
                           <button
                             type="button"
-                            className="btn btn-secondary btn-sm"
+                            className="btn btn-secondary btn-sm calendar-action-btn"
                             onClick={() => {
                               setSelectedRow(row);
                               setIsViewModalOpen(true);
@@ -2599,7 +2845,7 @@ useEffect(() => {
                 <p>Review inputs, generated outputs, and final approvals.</p>
               </div>
               <div className="content-modal-actions">
-                <span className="status-pill">
+                <span className="status-pill status-pill--muted">
                   {getStatusValue(selectedRow.status) || 'Draft'}
                 </span>
                 <button
@@ -2622,8 +2868,10 @@ useEffect(() => {
             <div className="modal-body content-modal-body">
               <div className="section content-section">
                 <div className="section-title-row">
-                  <h3 className="section-title">Overview</h3>
-                  <span className="section-hint">Core inputs captured for this row.</span>
+                  <div>
+                    <h3 className="section-title">Inputs</h3>
+                    <p className="section-subtitle">What was provided for generation.</p>
+                  </div>
                 </div>
                 <div className="kv-grid">
                   <div className="kv-item">
@@ -2679,11 +2927,13 @@ useEffect(() => {
 
               <div className="section content-section">
                 <div className="section-title-row">
-                  <h3 className="section-title">Generated Outputs</h3>
-                  <span className="section-hint">AI-generated drafts ready for review.</span>
+                  <div>
+                    <h3 className="section-title">AI-Generated Outputs</h3>
+                    <p className="section-subtitle">What the system generated for review.</p>
+                  </div>
                 </div>
                 <div className="content-grid">
-                  <div className="content-card">
+                  <div className="content-card content-card--primary">
                     <div className="content-card-header">
                       <div className="content-card-title">Caption Output</div>
                       <button
@@ -2694,10 +2944,10 @@ useEffect(() => {
                         {copiedField === 'captionOutput' ? 'Copied' : 'Copy'}
                       </button>
                     </div>
-                    <div className="content-box">{selectedRow.captionOutput ?? ''}</div>
+                    <div className="content-box content-box--scroll">{selectedRow.captionOutput ?? ''}</div>
                   </div>
 
-                  <div className="content-card">
+                  <div className="content-card content-card--secondary">
                     <div className="content-card-header">
                       <div className="content-card-title">CTA Output</div>
                       <button
@@ -2708,10 +2958,10 @@ useEffect(() => {
                         {copiedField === 'ctaOuput' ? 'Copied' : 'Copy'}
                       </button>
                     </div>
-                    <div className="content-box">{selectedRow.ctaOuput ?? ''}</div>
+                    <div className="content-box content-box--scroll">{selectedRow.ctaOuput ?? ''}</div>
                   </div>
 
-                  <div className="content-card">
+                  <div className="content-card content-card--secondary">
                     <div className="content-card-header">
                       <div className="content-card-title">Hashtags Output</div>
                       <button
@@ -2722,31 +2972,33 @@ useEffect(() => {
                         {copiedField === 'hastagsOutput' ? 'Copied' : 'Copy'}
                       </button>
                     </div>
-                    <div className="content-box">{selectedRow.hastagsOutput ?? ''}</div>
+                    <div className="content-box content-box--scroll">{selectedRow.hastagsOutput ?? ''}</div>
                   </div>
                 </div>
               </div>
 
-              <div className="section content-section">
+              <div className="section content-section section-final">
                 <div className="section-title-row">
-                  <h3 className="section-title">Review & Final</h3>
-                  <span className="section-hint">Approval notes and final outputs.</span>
+                  <div>
+                    <h3 className="section-title">Review & Final Approval</h3>
+                    <p className="section-subtitle">What will ship after human approval.</p>
+                  </div>
                 </div>
                 <div className="content-grid">
-                  <div className="content-card">
+                  <div className="content-card content-card--secondary">
                     <div className="content-card-header">
                       <div className="content-card-title">Review Decision</div>
                     </div>
-                    <div className="content-box">{selectedRow.reviewDecision ?? ''}</div>
+                    <div className="content-box content-box--scroll">{selectedRow.reviewDecision ?? ''}</div>
                   </div>
-                  <div className="content-card">
+                  <div className="content-card content-card--secondary">
                     <div className="content-card-header">
                       <div className="content-card-title">Review Notes</div>
                     </div>
-                    <div className="content-box">{selectedRow.reviewNotes ?? ''}</div>
+                    <div className="content-box content-box--scroll">{selectedRow.reviewNotes ?? ''}</div>
                   </div>
 
-                  <div className="content-card">
+                  <div className="content-card content-card--final">
                     <div className="content-card-header">
                       <div className="content-card-title">Final Caption</div>
                       <button
@@ -2757,9 +3009,9 @@ useEffect(() => {
                         {copiedField === 'finalCaption' ? 'Copied' : 'Copy'}
                       </button>
                     </div>
-                    <div className="content-box">{selectedRow.finalCaption ?? ''}</div>
+                    <div className="content-box content-box--final">{selectedRow.finalCaption ?? ''}</div>
                   </div>
-                  <div className="content-card">
+                  <div className="content-card content-card--final">
                     <div className="content-card-header">
                       <div className="content-card-title">Final CTA</div>
                       <button
@@ -2770,9 +3022,9 @@ useEffect(() => {
                         {copiedField === 'finalCTA' ? 'Copied' : 'Copy'}
                       </button>
                     </div>
-                    <div className="content-box">{selectedRow.finalCTA ?? ''}</div>
+                    <div className="content-box content-box--final">{selectedRow.finalCTA ?? ''}</div>
                   </div>
-                  <div className="content-card">
+                  <div className="content-card content-card--final">
                     <div className="content-card-header">
                       <div className="content-card-title">Final Hashtags</div>
                       <button
@@ -2783,16 +3035,18 @@ useEffect(() => {
                         {copiedField === 'finalHashtags' ? 'Copied' : 'Copy'}
                       </button>
                     </div>
-                    <div className="content-box">{selectedRow.finalHashtags ?? ''}</div>
+                    <div className="content-box content-box--final">{selectedRow.finalHashtags ?? ''}</div>
                   </div>
                 </div>
               </div>
 
-              <div className="section content-section">
-                <div className="section-title-row">
-                  <h3 className="section-title">System</h3>
-                  <span className="section-hint">Metadata and internal references.</span>
-                </div>
+              <details className="section content-section section-system" open={false}>
+                <summary className="section-title-row">
+                  <div>
+                    <h3 className="section-title section-title--muted">System / Internal</h3>
+                    <p className="section-subtitle section-subtitle--muted">Internal references and metadata.</p>
+                  </div>
+                </summary>
                 <div className="kv-grid">
                   <div className="kv-item">
                     <div className="kv-label">DMP</div>
@@ -2843,7 +3097,7 @@ useEffect(() => {
                     <div className="kv-value">{selectedRow.created_at ?? ''}</div>
                   </div>
                 </div>
-              </div>
+              </details>
             </div>
             <div className="modal-footer">
               <button
@@ -2880,11 +3134,7 @@ useEffect(() => {
                     const whRes = await fetch('https://hook.eu2.make.com/09mj7o8vwfsp8ju11xmcn4riaace5teb', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        contentCalendarId: selectedRow.contentCalendarId,
-                        companyId: selectedRow.companyId,
-                        brandKbId: brandKbId ?? null,
-                      }),
+                      body: JSON.stringify(buildGeneratePayload(selectedRow)),
                     });
                     if (!whRes.ok) {
                       const whText = await whRes.text().catch(() => '');
