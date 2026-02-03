@@ -76,6 +76,8 @@ function App() {
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isUserSettingsModalOpen, setIsUserSettingsModalOpen] = useState(false);
+  const [facebookConnection, setFacebookConnection] = useState<any>(null);
+  const [isFacebookLoading, setIsFacebookLoading] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -676,6 +678,28 @@ useEffect(() => {
   loadCompanies();
 }, [activeCompanyId, defaultCompanyId, session]);
 
+useEffect(() => {
+  const loadFacebookStatus = async () => {
+    if (!session || !isUserSettingsModalOpen) return;
+    setIsFacebookLoading(true);
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/social/facebook/status`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setFacebookConnection(data.connection ?? null);
+      } else {
+        console.error('Failed to load Facebook status', data);
+      }
+    } catch (err) {
+      console.error('Failed to load Facebook status', err);
+    } finally {
+      setIsFacebookLoading(false);
+    }
+  };
+
+  loadFacebookStatus();
+}, [session, isUserSettingsModalOpen]);
+
 // Load existing content calendar entries for this company
 useEffect(() => {
   const loadCalendar = async () => {
@@ -876,6 +900,40 @@ const toggleSelectAllOnPage = (checked: boolean) => {
 
 const notify = (message: string, tone: 'success' | 'error' | 'info' = 'info') => {
   setToast({ message, tone });
+};
+
+const handleFacebookConnect = () => {
+  if (!backendBaseUrl) {
+    notify('Backend base URL is not configured.', 'error');
+    return;
+  }
+  const token = session?.access_token;
+  if (!token) {
+    notify('Missing auth session. Please sign in again.', 'error');
+    return;
+  }
+  const connectUrl = `${backendBaseUrl}/api/social/facebook/connect?token=${encodeURIComponent(token)}`;
+  const popup = window.open(connectUrl, 'facebook-connect', 'width=700,height=800');
+  if (!popup) {
+    notify('Popup blocked. Please allow popups and try again.', 'error');
+    return;
+  }
+  const checkInterval = window.setInterval(async () => {
+    if (popup.closed) {
+      window.clearInterval(checkInterval);
+      if (session) {
+        try {
+          const res = await authedFetch(`${backendBaseUrl}/api/social/facebook/status`);
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            setFacebookConnection(data.connection ?? null);
+          }
+        } catch (err) {
+          console.error('Failed to refresh Facebook status', err);
+        }
+      }
+    }
+  }, 1000);
 };
 
 const requestConfirm = (message: string): Promise<boolean> => {
@@ -1699,12 +1757,20 @@ useEffect(() => {
                 </div>
                 <div className="content-box" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ fontWeight: 600 }}>Facebook</div>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--ink-500)' }}>
+                    {isFacebookLoading
+                      ? 'Checking…'
+                      : facebookConnection
+                        ? 'Connected'
+                        : 'Not connected'}
+                  </span>
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
-                    onClick={() => notify('Facebook connect flow coming next.', 'info')}
+                    onClick={handleFacebookConnect}
+                    disabled={isFacebookLoading}
                   >
-                    Connect Facebook
+                    {facebookConnection ? 'Reconnect Facebook' : 'Connect Facebook'}
                   </button>
                 </div>
               </div>
