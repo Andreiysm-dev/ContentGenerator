@@ -3693,14 +3693,25 @@ useEffect(() => {
               <button
                 type="button"
                 className={`btn btn-${
-                  getStatusValue(selectedRow.status).trim().toLowerCase() === 'approved'
+                  ['approved', 'design completed'].includes(
+                    getStatusValue(selectedRow.status).trim().toLowerCase(),
+                  )
                     ? 'primary'
                     : 'secondary'
                 } btn-sm`}
                 title="Generate image (coming soon)"
-                disabled={getStatusValue(selectedRow.status).trim().toLowerCase() !== 'approved'}
+                disabled={
+                  !['approved', 'design completed'].includes(
+                    getStatusValue(selectedRow.status).trim().toLowerCase(),
+                  )
+                }
                 onClick={() => {
-                  if (getStatusValue(selectedRow.status).trim().toLowerCase() !== 'approved') return;
+                  if (
+                    !['approved', 'design completed'].includes(
+                      getStatusValue(selectedRow.status).trim().toLowerCase(),
+                    )
+                  )
+                    return;
                   setIsImageModalOpen(true);
                   setIsViewModalOpen(false);
                   // Prefill from BrandKB for this company
@@ -3756,7 +3767,14 @@ useEffect(() => {
                     <h3>Design Mega Prompt</h3>
                     <div className="panel-actions">
                       {!isEditingDmp ? (
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsEditingDmp(true)}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setDmpDraft(selectedRow.dmp ?? '');
+                            setIsEditingDmp(true);
+                          }}
+                        >
                           Custom
                         </button>
                       ) : (
