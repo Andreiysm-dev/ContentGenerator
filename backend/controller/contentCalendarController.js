@@ -1,5 +1,9 @@
 import db from '../database/db.js';
 
+const IMAGE_WEBHOOK_URL =
+    process.env.MAKE_IMAGE_EXISTING_DMP_WEBHOOK ||
+    'https://hook.eu2.make.com/ms8ivolxdradx79w0nh6x96yuejq0o6a';
+
 // CREATE - Add a new content calendar entry
 export const createContentCalendar = async (req, res) => {
     try {
@@ -44,6 +48,20 @@ export const createContentCalendar = async (req, res) => {
         }
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
         }
 
         const { data: contentCalendar, error: contentCalendarError } = await db
@@ -112,10 +130,28 @@ export const getAllContentCalendars = async (req, res) => {
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
+        const { data: companies, error: companyError } = await db
+            .from('company')
+            .select('companyId')
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`);
+
+        if (companyError) {
+            console.error('Error fetching companies:', companyError);
+            return res.status(500).json({
+                error: 'Failed to fetch content calendar entries',
+                details: companyError.message,
+            });
+        }
+
+        const companyIds = (companies || []).map((company) => company.companyId);
+        if (companyIds.length === 0) {
+            return res.status(200).json({ contentCalendars: [], count: 0 });
+        }
+
         const { data: contentCalendars, error: contentCalendarError } = await db
             .from('contentCalendar')
             .select('*')
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
+            .in('companyId', companyIds)
             .order('date', { ascending: false });
 
         if (contentCalendarError) {
@@ -147,11 +183,24 @@ export const getContentCalendarsByCompanyId = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const { data: contentCalendars, error: contentCalendarError } = await db
             .from('contentCalendar')
             .select('*')
             .eq('companyId', companyId)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('created_at', { ascending: true });
 
         if (contentCalendarError) {
@@ -187,7 +236,6 @@ export const getContentCalendarById = async (req, res) => {
             .from('contentCalendar')
             .select('*')
             .eq('contentCalendarId', id)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .single();
 
         if (contentCalendarError) {
@@ -203,6 +251,20 @@ export const getContentCalendarById = async (req, res) => {
             });
         }
 
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', contentCalendar.companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         return res.status(200).json({ contentCalendar });
     } catch (error) {
         console.error('Unexpected error:', error);
@@ -210,9 +272,8 @@ export const getContentCalendarById = async (req, res) => {
             error: 'Internal server error' 
         });
     }
-};
+} 
 
-// READ - Get content calendar entries by date range
 export const getContentCalendarsByDateRange = async (req, res) => {
     try {
         const { startDate, endDate, companyId } = req.query;
@@ -227,17 +288,34 @@ export const getContentCalendarsByDateRange = async (req, res) => {
             });
         }
 
+        if (companyId) {
+            const { data: company, error: companyError } = await db
+                .from('company')
+                .select('user_id, collaborator_ids')
+                .eq('companyId', companyId)
+                .single();
+
+            if (companyError || !company) {
+                return res.status(404).json({ error: 'Company not found' });
+            }
+
+            if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        }
+
         let query = db
             .from('contentCalendar')
             .select('*')
             .gte('date', startDate)
             .lte('date', endDate)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('date', { ascending: true });
 
         // Optional: filter by company
         if (companyId) {
             query = query.eq('companyId', companyId);
+        } else {
+            query = query.or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`);
         }
 
         const { data: contentCalendars, error: contentCalendarError } = await query;
@@ -274,16 +352,33 @@ export const getContentCalendarsByStatus = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        if (companyId) {
+            const { data: company, error: companyError } = await db
+                .from('company')
+                .select('user_id, collaborator_ids')
+                .eq('companyId', companyId)
+                .single();
+
+            if (companyError || !company) {
+                return res.status(404).json({ error: 'Company not found' });
+            }
+
+            if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        }
+
         let query = db
             .from('contentCalendar')
             .select('*')
             .eq('status', status)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('date', { ascending: false });
 
         // Optional: filter by company
         if (companyId) {
             query = query.eq('companyId', companyId);
+        } else {
+            query = query.or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`);
         }
 
         const { data: contentCalendars, error: contentCalendarError } = await query;
@@ -316,6 +411,30 @@ export const updateContentCalendar = async (req, res) => {
         const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { data: existingRow, error: existingError } = await db
+            .from('contentCalendar')
+            .select('companyId')
+            .eq('contentCalendarId', id)
+            .single();
+
+        if (existingError || !existingRow) {
+            return res.status(404).json({ error: 'Content calendar entry not found' });
+        }
+
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', existingRow.companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
         }
 
         const { 
@@ -393,7 +512,6 @@ export const updateContentCalendar = async (req, res) => {
             .from('contentCalendar')
             .update(updateData)
             .eq('contentCalendarId', id)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (contentCalendarError) {
@@ -431,11 +549,34 @@ export const deleteContentCalendar = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: existingRow, error: existingError } = await db
+            .from('contentCalendar')
+            .select('companyId')
+            .eq('contentCalendarId', id)
+            .single();
+
+        if (existingError || !existingRow) {
+            return res.status(404).json({ error: 'Content calendar entry not found' });
+        }
+
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', existingRow.companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const { data: contentCalendar, error: contentCalendarError } = await db
             .from('contentCalendar')
             .delete()
             .eq('contentCalendarId', id)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (contentCalendarError) {
@@ -473,11 +614,24 @@ export const deleteContentCalendarsByCompanyId = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const { data: contentCalendars, error: contentCalendarError } = await db
             .from('contentCalendar')
             .delete()
             .eq('companyId', companyId)
-            .eq('user_id', userId)
             .select();
 
         if (contentCalendarError) {
@@ -498,5 +652,100 @@ export const deleteContentCalendarsByCompanyId = async (req, res) => {
         return res.status(500).json({ 
             error: 'Internal server error' 
         });
+    }
+};
+
+// POST - Trigger batch image generation for selected rows
+export const batchGenerateImages = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { rowIds, brandKbId, systemInstruction } = req.body || {};
+        if (!Array.isArray(rowIds) || rowIds.length === 0) {
+            return res.status(400).json({ error: 'rowIds must be a non-empty array.' });
+        }
+        if (!brandKbId) {
+            return res.status(400).json({ error: 'brandKbId is required.' });
+        }
+
+        const { data: rows, error } = await db
+            .from('contentCalendar')
+            .select('*')
+            .in('contentCalendarId', rowIds);
+
+        if (error) {
+            console.error('Error fetching rows for image generation:', error);
+            return res.status(500).json({ error: 'Failed to load rows for image generation.' });
+        }
+
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ error: 'No rows found for the provided IDs.' });
+        }
+
+        const companyIds = Array.from(new Set(rows.map((row) => row.companyId).filter(Boolean)));
+        const { data: companies, error: companyError } = await db
+            .from('company')
+            .select('companyId, user_id, collaborator_ids')
+            .in('companyId', companyIds);
+
+        if (companyError) {
+            console.error('Error fetching companies for image generation:', companyError);
+            return res.status(500).json({ error: 'Failed to authorize image generation.' });
+        }
+
+        const allowedCompanyIds = new Set(
+            (companies || [])
+                .filter((company) => company.user_id === userId || company.collaborator_ids?.includes(userId))
+                .map((company) => company.companyId),
+        );
+        const allowedRows = rows.filter((row) => allowedCompanyIds.has(row.companyId));
+
+        if (allowedRows.length === 0) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        let successCount = 0;
+        for (const row of allowedRows) {
+            if (!row.companyId) continue;
+            try {
+                const response = await fetch(IMAGE_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contentCalendarId: row.contentCalendarId,
+                        companyId: row.companyId,
+                        brandKbId,
+                        systemInstruction: systemInstruction ?? '',
+                        finalPrompt: row.captionOutput ?? '',
+                        finalCaption: row.finalCaption ?? '',
+                        brandHighlight: row.brandHighlight ?? '',
+                        crossPromo: row.crossPromo ?? '',
+                        theme: row.theme ?? '',
+                        cta: row.cta ?? '',
+                        targetAudience: row.targetAudience ?? '',
+                    }),
+                });
+
+                if (response.ok) {
+                    successCount += 1;
+                } else {
+                    const text = await response.text().catch(() => '');
+                    console.error('Image webhook failed:', row.contentCalendarId, response.status, text);
+                }
+            } catch (err) {
+                console.error('Image webhook error:', row.contentCalendarId, err);
+            }
+        }
+
+        return res.status(200).json({
+            message: 'Image generation triggered.',
+            successCount,
+        });
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };

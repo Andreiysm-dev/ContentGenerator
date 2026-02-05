@@ -8,7 +8,8 @@ import {
     getContentCalendarsByStatus,
     updateContentCalendar, 
     deleteContentCalendar,
-    deleteContentCalendarsByCompanyId
+    deleteContentCalendarsByCompanyId,
+    batchGenerateImages
 } from '../controller/contentCalendarController.js';
 
 const router = express.Router();
@@ -32,6 +33,9 @@ router.get('/content-calendar/:id', getContentCalendarById);
 
 // READ - GET /api/content-calendar/company/:companyId (get all by company)
 router.get('/content-calendar/company/:companyId', getContentCalendarsByCompanyId);
+
+// POST - /api/content-calendar/batch-generate-image
+router.post('/content-calendar/batch-generate-image', batchGenerateImages);
 
 // UPDATE - PUT /api/content-calendar/:id
 router.put('/content-calendar/:id', updateContentCalendar);

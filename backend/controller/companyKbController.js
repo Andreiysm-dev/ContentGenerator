@@ -26,6 +26,20 @@ export const createBrandKB = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const { data: brandKB, error: brandKBError } = await db
             .from('brandKB')
             .insert([
@@ -73,10 +87,28 @@ export const getAllBrandKBs = async (req, res) => {
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
+        const { data: companies, error: companyError } = await db
+            .from('company')
+            .select('companyId')
+            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`);
+
+        if (companyError) {
+            console.error('Error fetching companies:', companyError);
+            return res.status(500).json({
+                error: 'Failed to fetch brand knowledge base entries',
+                details: companyError.message,
+            });
+        }
+
+        const companyIds = (companies || []).map((company) => company.companyId);
+        if (companyIds.length === 0) {
+            return res.status(200).json({ brandKBs: [], count: 0 });
+        }
+
         const { data: brandKBs, error: brandKBError } = await db
             .from('brandKB')
             .select('*')
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
+            .in('companyId', companyIds)
             .order('created_at', { ascending: false });
 
         if (brandKBError) {
@@ -108,11 +140,24 @@ export const getBrandKBsByCompanyId = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const { data: brandKBs, error: brandKBError } = await db
             .from('brandKB')
             .select('*')
             .eq('companyId', companyId)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('created_at', { ascending: false });
 
         if (brandKBError) {
@@ -148,7 +193,6 @@ export const getBrandKBById = async (req, res) => {
             .from('brandKB')
             .select('*')
             .eq('brandKbId', id)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .single();
 
         if (brandKBError) {
@@ -162,6 +206,20 @@ export const getBrandKBById = async (req, res) => {
                 error: 'Failed to fetch brand knowledge base entry',
                 details: brandKBError.message 
             });
+        }
+
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', brandKB.companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
         }
 
         return res.status(200).json({ brandKB });
@@ -180,6 +238,30 @@ export const updateBrandKB = async (req, res) => {
         const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { data: existingRow, error: existingError } = await db
+            .from('brandKB')
+            .select('companyId')
+            .eq('brandKbId', id)
+            .single();
+
+        if (existingError || !existingRow) {
+            return res.status(404).json({ error: 'Brand knowledge base entry not found' });
+        }
+
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', existingRow.companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
         }
 
         const { 
@@ -216,7 +298,6 @@ export const updateBrandKB = async (req, res) => {
             .from('brandKB')
             .update(updateData)
             .eq('brandKbId', id)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (brandKBError) {
@@ -254,11 +335,34 @@ export const deleteBrandKB = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: existingRow, error: existingError } = await db
+            .from('brandKB')
+            .select('companyId')
+            .eq('brandKbId', id)
+            .single();
+
+        if (existingError || !existingRow) {
+            return res.status(404).json({ error: 'Brand knowledge base entry not found' });
+        }
+
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', existingRow.companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const { data: brandKB, error: brandKBError } = await db
             .from('brandKB')
             .delete()
             .eq('brandKbId', id)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (brandKBError) {
@@ -296,11 +400,24 @@ export const deleteBrandKBsByCompanyId = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const { data: brandKBs, error: brandKBError } = await db
             .from('brandKB')
             .delete()
             .eq('companyId', companyId)
-            .eq('user_id', userId)
             .select();
 
         if (brandKBError) {

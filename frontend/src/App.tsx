@@ -32,7 +32,6 @@ const supabase = supabaseBaseUrl && supabaseAnonKey
   ? createClient(supabaseBaseUrl, supabaseAnonKey)
   : null;
 const revisionWebhookUrl = (import.meta.env as any).VITE_MAKE_REVISION_WEBHOOK || '';
-const publishWebhookUrl = (import.meta.env as any).VITE_MAKE_PUBLISH_WEBHOOK || '';
 const imageFromExistingDmpWebhookUrl =
   (import.meta.env as any).VITE_MAKE_IMAGE_EXISTING_DMP_WEBHOOK ||
   'https://hook.eu2.make.com/ms8ivolxdradx79w0nh6x96yuejq0o6a';
@@ -70,7 +69,7 @@ function App() {
   const [calendarSearch, setCalendarSearch] = useState('');
   const [calendarStatusFilter, setCalendarStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState<number | 'all'>(10);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
@@ -82,8 +81,17 @@ function App() {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isRevisingCaption, setIsRevisingCaption] = useState(false);
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
+  const [draftPublishIntent, setDraftPublishIntent] = useState<'draft' | 'ready'>('draft');
+  const [isUploadingDesigns, setIsUploadingDesigns] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [isBatchReviewing, setIsBatchReviewing] = useState(false);
+  const [isBatchGeneratingImages, setIsBatchGeneratingImages] = useState(false);
+  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+  const [copyFieldSelection, setCopyFieldSelection] = useState<Record<string, boolean>>({});
+  const [copySuccessMessage, setCopySuccessMessage] = useState('');
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [csvFieldSelection, setCsvFieldSelection] = useState<Record<string, boolean>>({});
+  const [csvScope, setCsvScope] = useState<'selected' | 'all'>('selected');
 
   const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: 'owner' | 'collaborator' }>>([]);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
@@ -100,15 +108,6 @@ function App() {
     } catch (err) {
       notify('Failed to load collaborators.', 'error');
     }
-  };
-
-  const channelOptions = ['facebook', 'linkedin', 'instagram'];
-  const toLocalInputValue = (value?: string | null) => {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
   const handleAddCollaborator = async () => {
@@ -165,60 +164,48 @@ function App() {
     return fetch(input, { ...init, headers });
   };
 
-  const handleDraftImageUpload = async (file: File) => {
+  const getAttachedDesignUrls = (row: any): string[] => {
+    if (!row?.attachedDesign) return [];
+    const raw = row.attachedDesign;
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.urls)) return parsed.urls.filter(Boolean);
+      } catch {
+        return raw ? [raw] : [];
+      }
+    }
+    if (typeof raw === 'object' && Array.isArray((raw as any).urls)) return (raw as any).urls.filter(Boolean);
+    return [];
+  };
+
+  const handleUploadDesigns = async (files: FileList | null) => {
+    if (!files || !files.length) return;
     if (!supabase) {
       notify('Supabase is not configured.', 'error');
       return;
     }
     if (!selectedRow) return;
-    const localPreviewUrl = URL.createObjectURL(file);
-    setDraftImagePreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return localPreviewUrl;
-    });
-    setSelectedRow((prev: any) => (prev ? { ...prev, draft_image_url: localPreviewUrl } : prev));
+    setIsUploadingDesigns(true);
     try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `drafts/${selectedRow.contentCalendarId}-${Date.now()}-${safeName}`;
-      const { error } = await supabase.storage
-        .from('generated-images')
-        .upload(path, file, { upsert: true });
-      if (error) {
-        notify('Failed to upload image.', 'error');
-        return;
-      }
-      const { data } = supabase.storage.from('generated-images').getPublicUrl(path);
-      const draftUrl = data?.publicUrl || '';
-      setSelectedRow((prev: any) => (prev ? { ...prev, draft_image_url: draftUrl } : prev));
-      setDraftPreviewNonce(Date.now());
-      setCalendarRows((prev) =>
-        prev.map((r) =>
-          r.contentCalendarId === selectedRow.contentCalendarId
-            ? { ...r, draft_image_url: draftUrl }
-            : r,
-        ),
-      );
-      notify('Draft image uploaded.', 'success');
-    } catch (err) {
-      console.error('Draft image upload failed', err);
-      notify('Failed to upload image.', 'error');
-    } finally {
-    }
-  };
+      const uploads = Array.from(files).map(async (file) => {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `designs/${selectedRow.contentCalendarId}-${Date.now()}-${safeName}`;
+        const { error } = await supabase.storage
+          .from('generated-images')
+          .upload(path, file, { upsert: true });
+        if (error) throw error;
+        const { data } = supabase.storage.from('generated-images').getPublicUrl(path);
+        return data?.publicUrl || '';
+      });
 
-  const handleSaveDraft = async () => {
-    if (!selectedRow) return;
-    try {
-      const computedDraftCaption =
-        selectedRow.draft_caption ??
-        `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`;
-      const payload = {
-        draft_caption: computedDraftCaption,
-        draft_image_url: selectedRow.draft_image_url ?? null,
-        channels: selectedRow.channels ?? [],
-        post_status: selectedRow.post_status ?? 'draft',
-        scheduled_at: selectedRow.scheduled_at ?? null,
-      };
+      const uploadedUrls = (await Promise.all(uploads)).filter(Boolean);
+      const existing = getAttachedDesignUrls(selectedRow);
+      const nextDesigns = [...existing, ...uploadedUrls];
+
+      const payload = { attachedDesign: nextDesigns };
       const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -226,57 +213,59 @@ function App() {
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => '');
-        notify(`Failed to save draft. ${msg}`, 'error');
+        notify(`Failed to save designs. ${msg}`, 'error');
         return;
       }
+      setSelectedRow((prev: any) => (prev ? { ...prev, attachedDesign: nextDesigns } : prev));
       setCalendarRows((prev) =>
-        prev.map((r) =>
-          r.contentCalendarId === selectedRow.contentCalendarId
-            ? { ...r, ...payload }
-            : r,
+        prev.map((row) =>
+          row.contentCalendarId === selectedRow.contentCalendarId
+            ? { ...row, attachedDesign: nextDesigns }
+            : row,
         ),
       );
-      notify('Draft saved.', 'success');
+      notify('Designs uploaded.', 'success');
     } catch (err) {
-      notify('Failed to save draft.', 'error');
+      console.error('Design upload failed', err);
+      notify('Failed to upload designs.', 'error');
+    } finally {
+      setIsUploadingDesigns(false);
     }
   };
 
-  const handlePublishNow = async () => {
+  const handleDraftPublishIntent = async () => {
     if (!selectedRow) return;
-    if (!publishWebhookUrl) {
-      notify('Publish webhook is not configured. Set VITE_MAKE_PUBLISH_WEBHOOK.', 'error');
-      return;
-    }
+    const nextStatus = draftPublishIntent === 'ready' ? 'Approved' : selectedRow.status ?? '';
+    const nextPostStatus = draftPublishIntent === 'ready' ? 'ready' : 'draft';
+    const payload = {
+      status: nextStatus,
+      post_status: nextPostStatus,
+    };
     try {
-      const res = await fetch(publishWebhookUrl, {
-        method: 'POST',
+      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contentCalendarId: selectedRow.contentCalendarId,
-          companyId: selectedRow.companyId ?? activeCompanyId ?? null,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => '');
-        notify(`Publish webhook failed (${res.status}). ${msg}`, 'error');
+        notify(`Failed to update status. ${msg}`, 'error');
         return;
       }
-      notify('Publish triggered.', 'success');
+      setSelectedRow((prev: any) => (prev ? { ...prev, ...payload } : prev));
+      setCalendarRows((prev) =>
+        prev.map((row) =>
+          row.contentCalendarId === selectedRow.contentCalendarId ? { ...row, ...payload } : row,
+        ),
+      );
+      setIsDraftModalOpen(false);
+      notify(
+        draftPublishIntent === 'ready' ? 'Marked as ready to publish.' : 'Saved as draft.',
+        'success',
+      );
     } catch (err) {
-      notify('Failed to trigger publish.', 'error');
+      notify('Failed to update status.', 'error');
     }
-  };
-
-  const handleSchedulePublish = async () => {
-    if (!selectedRow) return;
-    const scheduledAt = selectedRow.scheduled_at;
-    if (!scheduledAt) {
-      notify('Please select a schedule time.', 'error');
-      return;
-    }
-    setSelectedRow((prev: any) => (prev ? { ...prev, post_status: 'scheduled' } : prev));
-    await handleSaveDraft();
   };
 
   useEffect(() => {
@@ -341,11 +330,15 @@ function App() {
   const [imagePreviewNonce, setImagePreviewNonce] = useState<number>(0);
   const [isEditingDmp, setIsEditingDmp] = useState<boolean>(false);
   const [dmpDraft, setDmpDraft] = useState<string>('');
-  const [draftImagePreviewUrl, setDraftImagePreviewUrl] = useState<string>('');
-  const [draftPreviewNonce, setDraftPreviewNonce] = useState<number>(0);
+
   const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+  } | null>(null);
   const confirmResolverRef = useRef<((value: boolean) => void) | null>(null);
 
   const statusOptions = [
@@ -792,18 +785,20 @@ const calendarStatusOptions = useMemo(() => {
 
 // Clamp current page if data length changes
 useEffect(() => {
-  const totalPages = Math.max(1, Math.ceil(filteredCalendarRows.length / pageSize));
+  const effectivePageSize = pageSize === 'all' ? filteredCalendarRows.length || 1 : pageSize;
+  const totalPages = Math.max(1, Math.ceil(filteredCalendarRows.length / effectivePageSize));
   if (page > totalPages) setPage(totalPages);
-}, [filteredCalendarRows.length]);
+}, [filteredCalendarRows.length, pageSize, page]);
 
 useEffect(() => {
   setPage(1);
 }, [calendarSearch, calendarStatusFilter]);
 
 const currentPageRows = useMemo(() => {
+  if (pageSize === 'all') return filteredCalendarRows;
   const start = (page - 1) * pageSize;
   return filteredCalendarRows.slice(start, start + pageSize);
-}, [filteredCalendarRows, page]);
+}, [filteredCalendarRows, page, pageSize]);
 
 const isPageFullySelected = useMemo(() => {
   const ids = currentPageRows.map((r) => r.contentCalendarId);
@@ -827,8 +822,13 @@ const notify = (message: string, tone: 'success' | 'error' | 'info' = 'info') =>
   setToast({ message, tone });
 };
 
-const requestConfirm = (message: string): Promise<boolean> => {
-  setConfirmMessage(message);
+const requestConfirm = (config: {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  cancelLabel: string;
+}): Promise<boolean> => {
+  setConfirmConfig(config);
   setIsConfirmOpen(true);
   return new Promise((resolve) => {
     confirmResolverRef.current = resolve;
@@ -841,6 +841,7 @@ const resolveConfirm = (value: boolean) => {
     confirmResolverRef.current = null;
   }
   setIsConfirmOpen(false);
+  setConfirmConfig(null);
 };
 
 useEffect(() => {
@@ -849,34 +850,45 @@ useEffect(() => {
   return () => window.clearTimeout(id);
 }, [toast]);
 
-const buildExportRows = async () => {
+const csvFieldDefinitions = [
+  { key: 'date', label: 'Date' },
+  { key: 'brandHighlight', label: 'Brand Highlight' },
+  { key: 'crossPromo', label: 'Cross Promo' },
+  { key: 'theme', label: 'Theme' },
+  { key: 'contentType', label: 'Content Type' },
+  { key: 'channels', label: 'Channels' },
+  { key: 'targetAudience', label: 'Target Audience' },
+  { key: 'primaryGoal', label: 'Primary Goal' },
+  { key: 'cta', label: 'CTA' },
+  { key: 'promoType', label: 'Promo Type' },
+  { key: 'status', label: 'Status' },
+  { key: 'frameworkUsed', label: 'Framework Used' },
+  { key: 'captionOutput', label: 'Caption Output' },
+  { key: 'ctaOuput', label: 'CTA Output' },
+  { key: 'hastagsOutput', label: 'Hashtags Output' },
+  { key: 'reviewDecision', label: 'Review Decision' },
+  { key: 'reviewNotes', label: 'Review Notes' },
+  { key: 'finalCaption', label: 'Final Caption' },
+  { key: 'finalCTA', label: 'Final CTA' },
+  { key: 'finalHashtags', label: 'Final Hashtags' },
+];
+
+const csvFieldDefaults: Record<string, boolean> = csvFieldDefinitions.reduce(
+  (acc, field) => ({ ...acc, [field.key]: true }),
+  {},
+);
+
+const openCsvModal = () => {
+  setCsvFieldSelection((prev) => (Object.keys(prev).length ? prev : { ...csvFieldDefaults }));
+  setCsvScope(selectedIds.length > 0 ? 'selected' : 'all');
+  setIsCsvModalOpen(true);
+};
+
+const fetchAllCsvRows = async () => {
   if (!activeCompanyId) {
     notify('Please select a company first.', 'error');
-    return;
+    return null;
   }
-  const headers = [
-    'Date',
-    'Brand Highlight',
-    'Cross Promo',
-    'Theme',
-    'Content Type',
-    'Channels',
-    'Target Audience',
-    'Primary Goal',
-    'CTA',
-    'Promo Type',
-    'Status',
-    'Framework Used',
-    'Caption Output',
-    'CTA Output',
-    'Hashtags Output',
-    'Review Decision',
-    'Review Notes',
-    'Final Caption',
-    'Final CTA',
-    'Final Hashtags',
-  ];
-  let exportRows: any[] = [];
   try {
     const res = await authedFetch(
       `${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`,
@@ -884,59 +896,67 @@ const buildExportRows = async () => {
     if (!res.ok) {
       const msg = await res.text().catch(() => '');
       notify(`Failed to load rows for export (${res.status}). ${msg}`, 'error');
-      return;
+      return null;
     }
     const data = await res.json().catch(() => ({}));
     const unwrapped = (data && (data.contentCalendars || data)) as any;
-    exportRows = Array.isArray(unwrapped) ? unwrapped : [];
+    return Array.isArray(unwrapped) ? unwrapped : [];
   } catch (err) {
     console.error('Failed to load export rows', err);
     notify('Failed to load rows for export. Check console for details.', 'error');
-    return;
+    return null;
   }
+};
 
-  const rows = exportRows.map((row) => [
-    row.date ?? '',
-    row.brandHighlight ?? '',
-    row.crossPromo ?? '',
-    row.theme ?? '',
-    row.contentType ?? '',
-    row.channels ?? '',
-    row.targetAudience ?? '',
-    row.primaryGoal ?? '',
-    row.cta ?? '',
-    row.promoType ?? '',
-    getStatusValue(row.status) ?? '',
-    row.frameworkUsed ?? '',
-    row.captionOutput ?? '',
-    row.ctaOuput ?? '',
-    row.hastagsOutput ?? '',
-    row.reviewDecision ?? '',
-    row.reviewNotes ?? '',
-    row.finalCaption ?? '',
-    row.finalCTA ?? '',
-    row.finalHashtags ?? '',
-  ]);
+const buildExportRows = async (scope: 'selected' | 'all') => {
+  let exportRows: any[] = [];
+  if (scope === 'selected') {
+    const selectedSet = new Set(selectedIds);
+    exportRows = calendarRows.filter((row) => selectedSet.has(row.contentCalendarId));
+  } else {
+    const fetched = await fetchAllCsvRows();
+    if (!fetched) return null;
+    exportRows = fetched;
+  }
+  if (!exportRows.length) return null;
+
+  const activeFields = csvFieldDefinitions.filter((field) => csvFieldSelection[field.key]);
+  const headers = activeFields.map((field) => field.label);
+  const rows = exportRows.map((row) =>
+    activeFields.map((field) => {
+      if (field.key === 'status') return getStatusValue(row.status) ?? '';
+      const value = (row as Record<string, any>)[field.key];
+      return value ?? '';
+    }),
+  );
 
   return { headers, rows };
 };
 
 const handleExportCsv = async () => {
-  const exportData = await buildExportRows();
-  if (!exportData) return;
+  if (!Object.values(csvFieldSelection).some(Boolean)) {
+    notify('Choose at least one field to export.', 'error');
+    return;
+  }
+  if (csvScope === 'selected' && selectedIds.length === 0) {
+    notify('Select at least one row to export, or choose all rows.', 'error');
+    return;
+  }
+  const exportData = await buildExportRows(csvScope);
+  if (!exportData) {
+    notify('No rows available to export.', 'error');
+    return;
+  }
   const { headers, rows } = exportData;
 
   const escapeCell = (value: string) => {
     const normalized = value?.toString() ?? '';
-    if (/[,"\n]/.test(normalized)) {
-      return `"${normalized.replace(/"/g, '""')}"`;
-    }
-    return normalized;
+    return `"${normalized.replace(/"/g, '""')}"`;
   };
 
   const csv = [headers, ...rows]
     .map((row) => row.map((cell) => escapeCell(cell)).join(','))
-    .join('\n');
+    .join('\r\n');
 
   const bom = '\ufeff';
   const blob = new Blob([bom, csv], { type: 'text/csv;charset=utf-8;' });
@@ -952,24 +972,135 @@ const handleExportCsv = async () => {
   URL.revokeObjectURL(url);
 };
 
+const copyFieldDefaults: Record<string, boolean> = {
+  companyName: true,
+  date: true,
+  finalCaption: true,
+  finalHashtags: true,
+  finalCTA: true,
+  status: true,
+  internalNotes: false,
+  captionOutput: false,
+  hastagsOutput: false,
+  dmp: false,
+  metadata: false,
+};
+
+const copyFieldDefinitions = [
+  { key: 'companyName', label: 'Company name' },
+  { key: 'date', label: 'Date' },
+  { key: 'finalCaption', label: 'Caption (final)' },
+  { key: 'finalHashtags', label: 'Hashtags' },
+  { key: 'finalCTA', label: 'CTA' },
+  { key: 'status', label: 'Status' },
+  { key: 'internalNotes', label: 'Internal notes' },
+  { key: 'captionOutput', label: 'Generated caption' },
+  { key: 'hastagsOutput', label: 'Generated hashtags' },
+  { key: 'dmp', label: 'Image prompt' },
+  { key: 'metadata', label: 'Metadata fields' },
+];
+
+const openCopyModal = () => {
+  if (selectedIds.length === 0) return;
+  setCopyFieldSelection((prev) => (Object.keys(prev).length ? prev : { ...copyFieldDefaults }));
+  setCopySuccessMessage('');
+  setIsCopyModalOpen(true);
+};
+
+const buildCopyRows = () => {
+  const selectedSet = new Set(selectedIds);
+  const rowsToCopy = calendarRows.filter((row) => selectedSet.has(row.contentCalendarId));
+  if (!rowsToCopy.length) return null;
+  const headers = copyFieldDefinitions
+    .filter((field) => copyFieldSelection[field.key])
+    .map((field) => field.label);
+
+  const rows = rowsToCopy.map((row) =>
+    copyFieldDefinitions
+      .filter((field) => copyFieldSelection[field.key])
+      .map((field) => {
+        switch (field.key) {
+          case 'companyName':
+            return activeCompany?.companyName ?? '';
+          case 'date':
+            return row.date ?? '';
+          case 'finalCaption':
+            return row.finalCaption ?? '';
+          case 'finalHashtags':
+            return row.finalHashtags ?? '';
+          case 'finalCTA':
+            return row.finalCTA ?? '';
+          case 'status':
+            return getStatusValue(row.status) ?? '';
+          case 'internalNotes':
+            return row.reviewNotes ?? '';
+          case 'captionOutput':
+            return row.captionOutput ?? '';
+          case 'hastagsOutput':
+            return row.hastagsOutput ?? '';
+          case 'dmp':
+            return row.dmp ?? '';
+          case 'metadata':
+            return [row.companyId, row.contentCalendarId, row.created_at].filter(Boolean).join(' | ');
+          default:
+            return '';
+        }
+      }),
+  );
+
+  return { headers, rows };
+};
+
 const handleCopySpreadsheet = async () => {
-  const exportData = await buildExportRows();
-  if (!exportData) return;
+  if (selectedIds.length === 0) {
+    notify('Select at least one row to copy.', 'error');
+    return;
+  }
+  if (!Object.values(copyFieldSelection).some(Boolean)) {
+    notify('Choose at least one field to copy.', 'error');
+    return;
+  }
+  const exportData = buildCopyRows();
+  if (!exportData) {
+    notify('No rows available to copy.', 'error');
+    return;
+  }
   const { headers, rows } = exportData;
   const tsv = [headers, ...rows]
-    .map((row) => row.map((cell) => (cell ?? '').toString().replace(/\r?\n/g, ' ')).join('\t'))
+    .map((row) => row.map((cell) => (cell ?? '').toString()).join('\t'))
     .join('\n');
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  const buildHtmlCell = (value: string) => escapeHtml(value).replace(/\r?\n/g, '<br/>');
+  const htmlTable = `
+    <table>
+      <thead>
+        <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map((row) => `<tr>${row.map((cell) => `<td>${buildHtmlCell((cell ?? '').toString())}</td>`).join('')}</tr>`)
+          .join('')}
+      </tbody>
+    </table>
+  `;
   try {
-    const bom = '\ufeff';
-    const payload = `${bom}${tsv}`;
     if (navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
       await navigator.clipboard.write([
-        new ClipboardItem({ 'text/plain': new Blob([payload], { type: 'text/plain;charset=utf-8' }) }),
+        new ClipboardItem({
+          'text/plain': new Blob([tsv], { type: 'text/plain;charset=utf-8' }),
+          'text/html': new Blob([htmlTable], { type: 'text/html;charset=utf-8' }),
+        }),
       ]);
     } else {
-      await navigator.clipboard.writeText(payload);
+      await navigator.clipboard.writeText(tsv);
     }
-    notify('Copied rows to clipboard. Paste into Excel or Sheets.', 'success');
+    setCopySuccessMessage('Copied. Paste directly into Excel or Google Sheets.');
   } catch (err) {
     console.error('Failed to copy export rows', err);
     notify('Failed to copy rows. Check browser permissions.', 'error');
@@ -1024,7 +1155,12 @@ const dashboardStats = useMemo(() => {
 
 const handleDeleteSelected = async () => {
   if (selectedIds.length === 0) return;
-  const proceed = await requestConfirm(`Delete ${selectedIds.length} selected row(s)? This cannot be undone.`);
+  const proceed = await requestConfirm({
+    title: 'Delete content items?',
+    description: `You're about to delete ${selectedIds.length} content items from your content calendar. This action is permanent and cannot be undone.`,
+    confirmLabel: `Delete ${selectedIds.length} items`,
+    cancelLabel: 'Keep items',
+  });
   if (!proceed) return;
 
   const idsToDelete = new Set(selectedIds);
@@ -1116,7 +1252,12 @@ const buildGeneratePayload = (row: any) => ({
 
 const handleBatchGenerate = async () => {
   if (selectedIds.length === 0) return;
-  const proceed = await requestConfirm(`Trigger caption generation for ${selectedIds.length} selected row(s)?`);
+  const proceed = await requestConfirm({
+    title: 'Generate captions for selected content?',
+    description: `You're about to trigger caption generation for ${selectedIds.length} content items.`,
+    confirmLabel: `Generate ${selectedIds.length} captions`,
+    cancelLabel: 'Go back',
+  });
   if (!proceed) return;
   setIsBatchGenerating(true);
 
@@ -1169,7 +1310,12 @@ const handleBatchGenerate = async () => {
 
 const handleBatchReview = async () => {
   if (selectedIds.length === 0) return;
-  const proceed = await requestConfirm(`Send ${selectedIds.length} selected row(s) for review?`);
+  const proceed = await requestConfirm({
+    title: 'Send selected content for review?',
+    description: `You're about to send ${selectedIds.length} content items for review.`,
+    confirmLabel: `Send ${selectedIds.length} items`,
+    cancelLabel: 'Go back',
+  });
   if (!proceed) return;
   setIsBatchReviewing(true);
 
@@ -1185,10 +1331,13 @@ const handleBatchReview = async () => {
   }
 
   const rowsToProcess = calendarRows.filter((row) => selectedIds.includes(row.contentCalendarId));
-  const validRows = rowsToProcess.filter((row) => !!row.captionOutput);
+  const reviewEligibleRows = rowsToProcess.filter(
+    (row) => getStatusValue(row.status).trim().toLowerCase() === 'review',
+  );
+  const validRows = reviewEligibleRows.filter((row) => !!row.captionOutput);
 
   if (validRows.length === 0) {
-    notify('No selected rows have captions ready for review.', 'error');
+    notify('Only items already in Review status can be sent for review.', 'error');
     setIsBatchReviewing(false);
     return;
   }
@@ -1223,6 +1372,64 @@ const handleBatchReview = async () => {
     notify(`Sent ${successCount} row(s) for review.`, 'success');
   }
   setIsBatchReviewing(false);
+};
+
+const handleBatchGenerateImages = async () => {
+  if (selectedIds.length === 0) return;
+  const proceed = await requestConfirm({
+    title: 'Generate images for selected content?',
+    description: `You're about to generate images for ${selectedIds.length} content items. Existing previews will be replaced once finished.`,
+    confirmLabel: `Generate ${selectedIds.length} images`,
+    cancelLabel: 'Keep items',
+  });
+  if (!proceed) return;
+  setIsBatchGeneratingImages(true);
+
+  if (!brandKbId) {
+    notify('BrandKB is not loaded yet. Please try again.', 'error');
+    setIsBatchGeneratingImages(false);
+    return;
+  }
+
+  const rowsToProcess = calendarRows.filter((row) => selectedIds.includes(row.contentCalendarId));
+  const validRows = rowsToProcess.filter((row) => {
+    if (!row.companyId) return false;
+    if (activeCompanyId && row.companyId !== activeCompanyId) return false;
+    if (getStatusValue(row.status).trim().toLowerCase() !== 'approved') return false;
+    return true;
+  });
+
+  if (validRows.length === 0) {
+    notify('Only Approved items can generate images.', 'error');
+    setIsBatchGeneratingImages(false);
+    return;
+  }
+
+  try {
+    const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/batch-generate-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rowIds: validRows.map((row) => row.contentCalendarId),
+        brandKbId,
+        systemInstruction: systemInstruction ?? '',
+      }),
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => '');
+      notify(`Image generation failed (${res.status}). ${msg}`, 'error');
+      setIsBatchGeneratingImages(false);
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    const successCount = data?.successCount ?? validRows.length;
+    notify(`Image generation triggered for ${successCount} row(s).`, 'success');
+  } catch (err) {
+    console.error('Failed to trigger batch image generation', err);
+    notify('Failed to trigger image generation. Check console for details.', 'error');
+  } finally {
+    setIsBatchGeneratingImages(false);
+  }
 };
 
 // Auto-refresh currently viewed row while modal is open
@@ -1546,7 +1753,7 @@ useEffect(() => {
           <section className="card dashboard-card">
             <div className="card-header card-header-compact">
               <div>
-                <h2 className="card-title">Company Dashboard</h2>
+                <h2 className="card-title">{activeCompany?.companyName ?? 'Company'} Dashboard</h2>
                 <p className="card-subtitle">Quick health check of your content pipeline.</p>
               </div>
               <div className="card-header-actions">
@@ -1733,163 +1940,326 @@ useEffect(() => {
             </div>
           )}
 
+          {isCsvModalOpen && (
+            <div className="modal-backdrop">
+              <div className="modal modal-copy">
+                <div className="modal-header">
+                  <div>
+                    <h2 className="modal-title">Export CSV</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCsvModalOpen(false)}
+                    className="modal-close"
+                  >
+                    ×
+                  </button>
+                </div>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleExportCsv();
+                  }}
+                >
+                  <div className="modal-body copy-modal-body">
+                    <p className="modal-description">
+                      Choose which rows and fields you want to export. Your CSV will match the order below.
+                    </p>
+                    <div className="csv-scope">
+                      <label className="copy-field">
+                        <input
+                          type="radio"
+                          name="csvScope"
+                          checked={csvScope === 'selected'}
+                          onChange={() => setCsvScope('selected')}
+                        />
+                        <span>Selected rows</span>
+                      </label>
+                      <label className="copy-field">
+                        <input
+                          type="radio"
+                          name="csvScope"
+                          checked={csvScope === 'all'}
+                          onChange={() => setCsvScope('all')}
+                        />
+                        <span>All rows</span>
+                      </label>
+                    </div>
+                    <div className="copy-fields">
+                      {csvFieldDefinitions.map((field) => (
+                        <label key={field.key} className="copy-field">
+                          <input
+                            type="checkbox"
+                            checked={!!csvFieldSelection[field.key]}
+                            onChange={(event) =>
+                              setCsvFieldSelection((prev) => ({
+                                ...prev,
+                                [field.key]: event.target.checked,
+                              }))
+                            }
+                          />
+                          <span>{field.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      onClick={() => setIsCsvModalOpen(false)}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary btn-sm">
+                      Export CSV
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {isCopyModalOpen && (
+            <div className="modal-backdrop">
+              <div
+                className="modal modal-copy"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleCopySpreadsheet();
+                  }
+                }}
+              >
+                <div className="modal-header">
+                  <div>
+                    <h2 className="modal-title">Copy content for spreadsheet</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCopyModalOpen(false);
+                      setCopySuccessMessage('');
+                    }}
+                    className="modal-close"
+                  >
+                    ×
+                  </button>
+                </div>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleCopySpreadsheet();
+                  }}
+                >
+                  <div className="modal-body copy-modal-body">
+                    <p className="modal-description">
+                      Copy your selected content in a spreadsheet-safe format. Emojis, line breaks, and formatting will
+                      be preserved.
+                    </p>
+                    <div className="copy-fields">
+                      {copyFieldDefinitions.map((field) => (
+                        <label key={field.key} className="copy-field">
+                          <input
+                            type="checkbox"
+                            checked={!!copyFieldSelection[field.key]}
+                            onChange={(event) =>
+                              setCopyFieldSelection((prev) => ({
+                                ...prev,
+                                [field.key]: event.target.checked,
+                              }))
+                            }
+                          />
+                          <span>{field.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {copySuccessMessage && <div className="copy-success">{copySuccessMessage}</div>}
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCopyModalOpen(false);
+                        setCopySuccessMessage('');
+                      }}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary btn-sm">
+                      Copy to clipboard
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {isDraftModalOpen && selectedRow && (
             <div className="modal-backdrop modal-backdrop-top">
-              <div className="modal modal-wide content-modal">
+              <div className="modal modal-wide content-modal draft-publish-modal">
                 <div className="modal-header content-modal-header">
                   <div className="content-modal-title">
-                    <h2>Draft & Publish</h2>
-                    <p>Edit draft content, upload image, and schedule or publish.</p>
+                    <h2>Draft & publish content</h2>
+                    <p>
+                      Review the final content and decide how you’d like to proceed. You can save this as a draft or mark
+                      it as ready for publishing.
+                    </p>
                   </div>
                   <button type="button" className="modal-close" onClick={() => setIsDraftModalOpen(false)}>
                     ×
                   </button>
                 </div>
-                <div className="modal-body content-modal-body draft-modal-body">
-                  <div className="draft-modal-editor">
-                    <div className="section content-section">
-                      <div className="section-title-row">
-                        <h3 className="section-title">Draft Caption</h3>
-                      </div>
-                      <textarea
-                        className="field-input field-textarea"
-                        rows={8}
-                        value={
-                          selectedRow.draft_caption ??
-                          `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`
-                        }
-                        onChange={(e) =>
-                          setSelectedRow((prev: any) => (prev ? { ...prev, draft_caption: e.target.value } : prev))
-                        }
-                      />
+                <div className="modal-body content-modal-body draft-publish-body">
+                  <section className="draft-section">
+                    <div className="section-title-row">
+                      <h3 className="section-title">Content summary</h3>
                     </div>
-
-                    <div className="section content-section">
-                      <div className="section-title-row">
-                        <h3 className="section-title">Channels</h3>
+                    <div className="draft-summary-grid">
+                      <div>
+                        <div className="draft-summary-label">Brand / Company</div>
+                        <div className="draft-summary-value">{activeCompany?.companyName ?? '—'}</div>
                       </div>
-                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                        {channelOptions.map((channel) => {
-                          const checked = Array.isArray(selectedRow.channels)
-                            ? selectedRow.channels.includes(channel)
-                            : false;
-                          return (
-                            <label key={channel} className="channel-pill">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) => {
-                                  const next = e.target.checked
-                                    ? [...(Array.isArray(selectedRow.channels) ? selectedRow.channels : []), channel]
-                                    : (Array.isArray(selectedRow.channels) ? selectedRow.channels : []).filter(
-                                        (c: string) => c !== channel,
-                                      );
-                                  setSelectedRow((prev: any) => (prev ? { ...prev, channels: next } : prev));
-                                }}
-                              />
-                              {channel}
-                            </label>
-                          );
-                        })}
+                      <div>
+                        <div className="draft-summary-label">Channels</div>
+                        <div className="draft-summary-value">
+                          {Array.isArray(selectedRow.channels) && selectedRow.channels.length
+                            ? selectedRow.channels.join(', ')
+                            : '—'}
+                        </div>
                       </div>
                     </div>
-
-                    <div className="section content-section">
-                      <div className="section-title-row">
-                        <h3 className="section-title">Draft Image</h3>
+                    <div className="draft-summary-block">
+                      <div className="draft-summary-header">
+                        <span>Final caption</span>
+                        <button type="button" className="copy-btn" onClick={() => handleCopy('finalCaption', selectedRow.finalCaption)}>
+                          {copiedField === 'finalCaption' ? 'Copied' : 'Copy'}
+                        </button>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              void handleDraftImageUpload(file);
-                            }
-                          }}
-                        />
-                        {draftImagePreviewUrl || selectedRow.draft_image_url ? (
-                          <img
-                            src={(() => {
-                              const baseUrl = draftImagePreviewUrl || selectedRow.draft_image_url || '';
-                              if (baseUrl.startsWith('blob:')) return baseUrl;
-                              return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${draftPreviewNonce}`;
-                            })()}
-                            alt="Draft"
-                            style={{ maxWidth: '100%', borderRadius: 12 }}
+                      <div className="content-box content-box--scroll">{selectedRow.finalCaption ?? ''}</div>
+                    </div>
+                    <div className="draft-summary-grid">
+                      <div>
+                        <div className="draft-summary-header">
+                          <span>Final hashtags</span>
+                          <button type="button" className="copy-btn" onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags)}>
+                            {copiedField === 'finalHashtags' ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                        <div className="content-box content-box--scroll">{selectedRow.finalHashtags ?? ''}</div>
+                      </div>
+                      <div>
+                        <div className="draft-summary-header">
+                          <span>Final CTA</span>
+                          <button type="button" className="copy-btn" onClick={() => handleCopy('finalCTA', selectedRow.finalCTA)}>
+                            {copiedField === 'finalCTA' ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                        <div className="content-box content-box--scroll">{selectedRow.finalCTA ?? ''}</div>
+                      </div>
+                    </div>
+                    <div className="draft-summary-block">
+                      <div className="draft-summary-header">
+                        <span>Attached images</span>
+                        <label className="btn btn-secondary btn-sm draft-upload-btn">
+                          {isUploadingDesigns ? 'Uploading…' : 'Upload images'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(event) => {
+                              void handleUploadDesigns(event.target.files);
+                              event.currentTarget.value = '';
+                            }}
+                            disabled={isUploadingDesigns}
+                            className="draft-upload-input"
                           />
-                        ) : (
-                          <div className="field-caption">Upload an image to preview</div>
-                        )}
+                        </label>
+                      </div>
+                      <div className="draft-image-preview">
+                        {(() => {
+                          const attached = getAttachedDesignUrls(selectedRow);
+                          if (attached.length) {
+                            return (
+                              <div className="draft-image-grid">
+                                {attached.map((url, index) => (
+                                  <img key={`${url}-${index}`} src={url} alt={`Design ${index + 1}`} />
+                                ))}
+                              </div>
+                            );
+                          }
+                          if (getImageGeneratedUrl(selectedRow)) {
+                            const imageUrl = getImageGeneratedUrl(selectedRow);
+                            const separator = imageUrl?.includes('?') ? '&' : '?';
+                            return <img src={`${imageUrl}${separator}v=${imagePreviewNonce}`} alt="Generated" />;
+                          }
+                          return <div className="draft-preview-placeholder">No images attached yet</div>;
+                        })()}
                       </div>
                     </div>
+                  </section>
 
-                    <div className="section content-section">
-                      <div className="section-title-row">
-                        <h3 className="section-title">Schedule</h3>
+                  <section className="draft-section">
+                    <div className="section-title-row">
+                      <h3 className="section-title">Platform readiness</h3>
+                    </div>
+                    <div className="draft-readiness">
+                      <div className="draft-summary-label">Selected platforms</div>
+                      <div className="draft-summary-value">
+                        {Array.isArray(selectedRow.channels) && selectedRow.channels.length
+                          ? selectedRow.channels.join(', ')
+                          : '—'}
                       </div>
-                      <input
-                        type="datetime-local"
-                        className="field-input"
-                        value={toLocalInputValue(selectedRow.scheduled_at)}
-                        onChange={(e) =>
-                          setSelectedRow((prev: any) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null,
-                                }
-                              : prev,
-                          )
-                        }
-                      />
-                      <div className="content-box" style={{ marginTop: 8 }}>
-                        Status: {selectedRow.post_status ?? 'draft'}
+                      <div className="draft-readiness-status">Posting not scheduled yet</div>
+                      <div className="draft-readiness-note">
+                        Publishing to connected social accounts will be available soon.
                       </div>
                     </div>
-                  </div>
+                  </section>
 
-                  <div className="draft-modal-preview">
-                    <div className="draft-preview-card">
-                      <div className="draft-preview-header">Preview</div>
-                      <div className="draft-preview-body">
-                        <div className="draft-preview-image">
-                          {draftImagePreviewUrl || selectedRow.draft_image_url ? (
-                            <img
-                              src={(() => {
-                                const baseUrl = draftImagePreviewUrl || selectedRow.draft_image_url || '';
-                                if (baseUrl.startsWith('blob:')) return baseUrl;
-                                return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${draftPreviewNonce}`;
-                              })()}
-                              alt="Preview"
-                            />
-                          ) : (
-                            <div className="draft-preview-placeholder">No image selected</div>
-                          )}
-                        </div>
-                        <div className="draft-preview-caption">
-                          {(selectedRow.draft_caption ??
-                            `${selectedRow.finalCaption ?? ''}${selectedRow.finalHashtags ? `\n\n${selectedRow.finalHashtags}` : ''}`
-                          )
-                            .split('\n')
-                            .map((line: string, idx: number) => (
-                              <p key={idx}>{line}</p>
-                            ))}
-                        </div>
-                      </div>
+                  <section className="draft-section">
+                    <div className="section-title-row">
+                      <h3 className="section-title">Publish intent</h3>
                     </div>
-                  </div>
+                    <div className="draft-intent-options">
+                      <label className={`draft-intent-card ${draftPublishIntent === 'draft' ? 'is-selected' : ''}`}>
+                        <input
+                          type="radio"
+                          name="draftIntent"
+                          checked={draftPublishIntent === 'draft'}
+                          onChange={() => setDraftPublishIntent('draft')}
+                        />
+                        <div>
+                          <div className="draft-intent-title">Save as draft</div>
+                          <div className="draft-intent-copy">
+                            Keep this content saved and editable. You can publish it later.
+                          </div>
+                        </div>
+                      </label>
+                      <label className={`draft-intent-card ${draftPublishIntent === 'ready' ? 'is-selected' : ''}`}>
+                        <input
+                          type="radio"
+                          name="draftIntent"
+                          checked={draftPublishIntent === 'ready'}
+                          onChange={() => setDraftPublishIntent('ready')}
+                        />
+                        <div>
+                          <div className="draft-intent-title">Mark as ready to publish</div>
+                          <div className="draft-intent-copy">
+                            This content will be marked as approved and ready for publishing. Publishing can be scheduled later.
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </section>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleSaveDraft}>
-                    Save Draft
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsDraftModalOpen(false)}>
+                    Cancel
                   </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleSchedulePublish}>
-                    Schedule
-                  </button>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={handlePublishNow}>
-                    Publish Now
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handleDraftPublishIntent}>
+                    {draftPublishIntent === 'ready' ? 'Mark as ready' : 'Save draft'}
                   </button>
                 </div>
               </div>
@@ -1899,9 +2269,7 @@ useEffect(() => {
           <section className="card">
             <div className="card-header">
               <div>
-                <h1 className="card-title">
-                  {activeCompany?.companyName ? `${activeCompany.companyName} Content Generator` : 'Content Generator'}
-                </h1>
+                <h1 className="card-title">Content Generator</h1>
                 <p className="card-subtitle">Plan, generate, and review content across your channels.</p>
               </div>
               <div className="card-header-actions">
@@ -2098,39 +2466,44 @@ useEffect(() => {
           <section className="card card-secondary calendar-card">
             <div className="card-header card-header-compact" style={{ alignItems: 'center' }}>
               <h2 className="card-title">Content Calendar</h2>
-              <div className="calendar-controls" style={{ marginLeft: 'auto', display: 'flex', gap: 10, alignItems: 'center' }}>
-                <input
-                  type="search"
-                  className="field-input"
-                  placeholder="Search rows..."
-                  value={calendarSearch}
-                  onChange={(e) => setCalendarSearch(e.target.value)}
-                  style={{ maxWidth: 220 }}
-                />
-                <select
-                  className="field-input select-input"
-                  value={calendarStatusFilter}
-                  onChange={(e) => setCalendarStatusFilter(e.target.value)}
-                  style={{ maxWidth: 160 }}
-                >
-                  {calendarStatusOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt === 'all' ? 'All statuses' : opt}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCsv}>
-                  Export CSV
-                </button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopySpreadsheet}>
-                  Copy for Sheets
-                </button>
+              <div className="calendar-controls">
+                <div className="calendar-search-group">
+                  <input
+                    type="search"
+                    className="field-input calendar-search-input"
+                    placeholder="Search..."
+                    value={calendarSearch}
+                    onChange={(e) => setCalendarSearch(e.target.value)}
+                  />
+                  <button type="button" className="btn btn-primary btn-sm">
+                    Search
+                  </button>
+                  <select
+                    className="field-input select-input calendar-filter-select"
+                    value={calendarStatusFilter}
+                    onChange={(e) => setCalendarStatusFilter(e.target.value)}
+                  >
+                    {calendarStatusOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt === 'all' ? 'All statuses' : opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              {selectedIds.length > 0 && (
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            </div>
+
+            {selectedIds.length > 0 && (
+              <div className="bulk-actions-bar">
+                <div className="bulk-actions-label">
+                  Selected actions
+                  <span className="bulk-actions-count">{selectedIds.length} selected</span>
+                </div>
+                <div className="bulk-actions-spacer" />
+                <div className="bulk-actions-group bulk-actions-group--workflow">
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
+                    className="btn btn-primary btn-sm bulk-action-primary"
                     onClick={handleBatchGenerate}
                     disabled={isBatchGenerating}
                   >
@@ -2138,18 +2511,48 @@ useEffect(() => {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-sm"
+                    className="btn btn-secondary btn-sm bulk-action-secondary"
                     onClick={handleBatchReview}
                     disabled={isBatchReviewing}
                   >
                     {isBatchReviewing ? 'Reviewing…' : 'Review'}
                   </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleDeleteSelected}>
-                    Delete Selected
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm bulk-action-secondary"
+                    onClick={handleBatchGenerateImages}
+                    disabled={isBatchGeneratingImages}
+                  >
+                    {isBatchGeneratingImages ? 'Generating…' : 'Generate Image'}
                   </button>
                 </div>
-              )}
-            </div>
+                <div className="bulk-actions-group bulk-actions-group--utilities">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm bulk-action-utility"
+                    onClick={openCsvModal}
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm bulk-action-utility"
+                    onClick={openCopyModal}
+                  >
+                    Copy for Sheets
+                  </button>
+                </div>
+                <div className="bulk-actions-group bulk-actions-group--destructive">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm bulk-action-destructive"
+                    onClick={handleDeleteSelected}
+                  >
+                    Delete ({selectedIds.length})
+                  </button>
+                </div>
+              </div>
+            )}
 
             {isBackendWaking && (
               <div className="empty-state" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2257,9 +2660,12 @@ useEffect(() => {
                                   const newStatus = e.target.value || null;
 
                                   if (newStatus === 'Generate' && previousStatus !== 'Generate') {
-                                    const proceed = await requestConfirm(
-                                      'Do you want to trigger caption generation for this row now?',
-                                    );
+                                    const proceed = await requestConfirm({
+                                      title: 'Generate caption for this item?',
+                                      description: "You're about to trigger caption generation for this content item.",
+                                      confirmLabel: 'Generate caption',
+                                      cancelLabel: 'Keep status',
+                                    });
                                     if (!proceed) {
                                       setCalendarRows((prev) =>
                                         prev.map((r) =>
@@ -2368,46 +2774,61 @@ useEffect(() => {
                 </table>
               </div>
             )}
-            
+
             {/* Pagination Navigation */}
-            {!isLoadingCalendar && !calendarError && filteredCalendarRows.length > pageSize && (
+            {!isLoadingCalendar && !calendarError && filteredCalendarRows.length > 0 && (
               <div className="calendar-pagination">
-                <div className="pagination-info">
-                  Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, filteredCalendarRows.length)} of {filteredCalendarRows.length} results
-                </div>
-                <div className="pagination-controls">
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setPage(1)}
-                    disabled={page === 1}
-                  >
-                    First
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setPage(page - 1)}
-                    disabled={page === 1}
-                  >
-                    Previous
-                  </button>
-                  <span className="pagination-pages">
-                    Page {page} of {Math.ceil(filteredCalendarRows.length / pageSize)}
-                  </span>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setPage(page + 1)}
-                    disabled={page >= Math.ceil(filteredCalendarRows.length / pageSize)}
-                  >
-                    Next
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setPage(Math.ceil(filteredCalendarRows.length / pageSize))}
-                    disabled={page >= Math.ceil(filteredCalendarRows.length / pageSize)}
-                  >
-                    Last
-                  </button>
-                </div>
+                {(() => {
+                  const effectivePageSize = pageSize === 'all' ? filteredCalendarRows.length || 1 : pageSize;
+                  const totalPages = Math.max(1, Math.ceil(filteredCalendarRows.length / effectivePageSize));
+                  return (
+                    <>
+                      <div className="pagination-info">
+                        {pageSize === 'all'
+                          ? `Showing all ${filteredCalendarRows.length} results`
+                          : `Showing ${((page - 1) * effectivePageSize) + 1} to ${Math.min(page * effectivePageSize, filteredCalendarRows.length)} of ${filteredCalendarRows.length} results`}
+                      </div>
+                      <div className="pagination-preferences">
+                        <label className="pagination-size">
+                          Rows:
+                          <select
+                            className="field-input select-input"
+                            value={pageSize}
+                            onChange={(e) => {
+                              const next = e.target.value === 'all' ? 'all' : Number(e.target.value);
+                              setPageSize(next);
+                              setPage(1);
+                            }}
+                          >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value="all">All</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="pagination-controls">
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setPage(page - 1)}
+                          disabled={page <= 1 || pageSize === 'all'}
+                        >
+                          Previous
+                        </button>
+                        <span className="pagination-pages">
+                          Page {page} of {pageSize === 'all' ? 1 : totalPages}
+                        </span>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setPage(page + 1)}
+                          disabled={pageSize === 'all' || page >= totalPages}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </section>
@@ -2429,40 +2850,43 @@ useEffect(() => {
                   </button>
                 </div>
                 <div className="modal-body bulk-modal-body">
-                  <div className="bulk-content">
-                    <p className="modal-description">
-                      Paste rows from your sheet. We’ll parse them into rows and let you preview before import.
-                    </p>
-                    <textarea
-                      rows={6}
-                      value={bulkText}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setBulkText(value);
-                      }}
-                      className="bulk-textarea"
-                      placeholder="Paste your table rows here (tab- or comma-separated)"
-                    />
-                    <div className="form-footer bulk-actions" style={{ justifyContent: 'flex-start', gap: 8 }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        disabled={!bulkText.trim()}
-                        onClick={() => {
-                          if (!showPreview) {
-                            setBulkPreview(parseBulkText(bulkText));
-                          }
-                          setShowPreview((prev) => !prev);
+                  <div className={`bulk-content ${showPreview ? 'bulk-content--preview' : 'bulk-content--paste'}`}>
+                    <div className="bulk-paste-panel">
+                      <p className="modal-description">
+                        Paste rows from your sheet below. We’ll format everything and show a preview before anything is
+                        imported.
+                      </p>
+                      <textarea
+                        rows={6}
+                        value={bulkText}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setBulkText(value);
                         }}
-                      >
-                        {showPreview ? 'Hide preview' : 'Preview'}
-                      </button>
+                        className="bulk-textarea"
+                        placeholder="Paste rows copied from Google Sheets or Excel"
+                        spellCheck={false}
+                      />
                     </div>
                     {showPreview && bulkPreview.length > 0 && (
                       <div className="bulk-preview">
-                        <div className="bulk-preview-title">Preview</div>
+                        <div className="bulk-preview-title">Here’s how your data will be imported</div>
                         <div className="bulk-preview-table-wrapper">
                           <table className="bulk-preview-table">
+                            <thead>
+                              <tr>
+                                <th>Date</th>
+                                <th>Brand highlight</th>
+                                <th>Cross promo</th>
+                                <th>Theme</th>
+                                <th>Content type</th>
+                                <th>Channels</th>
+                                <th>Target audience</th>
+                                <th>Primary goal</th>
+                                <th>CTA</th>
+                                <th>Promo type</th>
+                              </tr>
+                            </thead>
                             <tbody>
                               {bulkPreview.map((row, rowIndex) => (
                                 <tr key={rowIndex}>
@@ -2486,83 +2910,106 @@ useEffect(() => {
                   >
                     Cancel
                   </button>
-                  <button
-                    type="button"
-                    disabled={isImporting}
-                    onClick={async () => {
-                      if (!activeCompanyId) {
-                        notify('Please select a company first.', 'error');
-                        return;
-                      }
-
-                      const rows = parseBulkText(bulkText);
-                      if (!rows.length) {
-                        notify('No rows to import.', 'error');
-                        return;
-                      }
-
-                      setIsImporting(true);
-                      try {
-                        let successCount = 0;
-                        for (const row of rows) {
-                          const [
-                            date,
-                            brandHighlight,
-                            crossPromo,
-                            theme,
-                            contentType,
-                            channels,
-                            targetAudience,
-                            primaryGoal,
-                            cta,
-                            promoType,
-                          ] = row;
-
-                          const payload = {
-                            date: date || null,
-                            brandHighlight: brandHighlight || null,
-                            crossPromo: crossPromo || null,
-                            theme: theme || null,
-                            contentType: contentType || null,
-                            channels: channels || null,
-                            targetAudience: targetAudience || null,
-                            primaryGoal: primaryGoal || null,
-                            cta: cta || null,
-                            promoType: promoType || null,
-                            companyId: activeCompanyId,
-                          };
-
-                          const res = await authedFetch(`${backendBaseUrl}/api/content-calendar`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload),
-                          });
-
-                          if (res.ok) {
-                            successCount += 1;
-                          } else {
-                            const data = await res.json().catch(() => ({}));
-                            console.error('Import error for row', row, data);
+                  {showPreview ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowPreview(false)}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Back to paste
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isImporting}
+                        onClick={async () => {
+                          if (!activeCompanyId) {
+                            notify('Please select a company first.', 'error');
+                            return;
                           }
-                        }
 
-                        notify(`Imported ${successCount} of ${rows.length} rows.`, 'success');
-                        if (successCount > 0) {
-                          setBulkText('');
-                          setBulkPreview([]);
-                          setIsBulkModalOpen(false);
-                        }
-                      } catch (error) {
-                        console.error('Bulk import failed:', error);
-                        notify('Bulk import failed. Check console for details.', 'error');
-                      } finally {
-                        setIsImporting(false);
-                      }
-                    }}
-                    className="btn btn-primary btn-sm"
-                  >
-                    {isImporting ? 'Importing…' : 'Import'}
-                  </button>
+                          const rows = parseBulkText(bulkText);
+                          if (!rows.length) {
+                            notify('No rows to import.', 'error');
+                            return;
+                          }
+
+                          setIsImporting(true);
+                          try {
+                            let successCount = 0;
+                            for (const row of rows) {
+                              const [
+                                date,
+                                brandHighlight,
+                                crossPromo,
+                                theme,
+                                contentType,
+                                channels,
+                                targetAudience,
+                                primaryGoal,
+                                cta,
+                                promoType,
+                              ] = row;
+
+                              const payload = {
+                                date: date || null,
+                                brandHighlight: brandHighlight || null,
+                                crossPromo: crossPromo || null,
+                                theme: theme || null,
+                                contentType: contentType || null,
+                                channels: channels || null,
+                                targetAudience: targetAudience || null,
+                                primaryGoal: primaryGoal || null,
+                                cta: cta || null,
+                                promoType: promoType || null,
+                                companyId: activeCompanyId,
+                              };
+
+                              const res = await authedFetch(`${backendBaseUrl}/api/content-calendar`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload),
+                              });
+
+                              if (res.ok) {
+                                successCount += 1;
+                              } else {
+                                const data = await res.json().catch(() => ({}));
+                                console.error('Import error for row', row, data);
+                              }
+                            }
+
+                            notify(`Imported ${successCount} of ${rows.length} rows.`, 'success');
+                            if (successCount > 0) {
+                              setBulkText('');
+                              setBulkPreview([]);
+                              setIsBulkModalOpen(false);
+                            }
+                          } catch (error) {
+                            console.error('Bulk import failed:', error);
+                            notify('Bulk import failed. Check console for details.', 'error');
+                          } finally {
+                            setIsImporting(false);
+                          }
+                        }}
+                        className="btn btn-primary btn-sm"
+                      >
+                        {isImporting ? 'Importing…' : 'Import'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={!bulkText.trim()}
+                      onClick={() => {
+                        setBulkPreview(parseBulkText(bulkText));
+                        setShowPreview(true);
+                      }}
+                    >
+                      Preview import
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2741,7 +3188,13 @@ useEffect(() => {
                     disabled={isDeletingCompany}
                     onClick={async () => {
                       if (!activeCompanyId) return;
-                      const proceed = await requestConfirm('Delete this company? This action cannot be undone.');
+                      const proceed = await requestConfirm({
+                        title: 'Delete this company?',
+                        description:
+                          "You're about to delete this company and all associated content. This action is permanent and cannot be undone.",
+                        confirmLabel: 'Delete company',
+                        cancelLabel: 'Keep company',
+                      });
                       if (!proceed) return;
 
                       try {
@@ -2852,9 +3305,15 @@ useEffect(() => {
                 </span>
                 <button
                   type="button"
-                  className={`btn btn-sm ${getStatusValue(selectedRow?.status) === 'Approved' ? 'btn-primary' : 'btn-secondary'}`}
-                  disabled={getStatusValue(selectedRow?.status) !== 'Approved'}
-                  onClick={() => setIsDraftModalOpen(true)}
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    if (!selectedRow?.finalCaption) {
+                      notify('Add a final caption before preparing this content for publishing.', 'error');
+                      return;
+                    }
+                    setDraftPublishIntent('draft');
+                    setIsDraftModalOpen(true);
+                  }}
                 >
                   Draft & Publish
                 </button>
@@ -3107,7 +3566,12 @@ useEffect(() => {
                 className="btn btn-primary btn-sm"
                 onClick={async () => {
                   if (!selectedRow) return;
-                  const proceed = await requestConfirm('Trigger caption generation for this row now?');
+                  const proceed = await requestConfirm({
+                    title: 'Generate caption for this item?',
+                    description: "You're about to trigger caption generation for this content item.",
+                    confirmLabel: 'Generate caption',
+                    cancelLabel: 'Go back',
+                  });
                   if (!proceed) return;
 
                   setIsGeneratingCaption(true);
@@ -3177,7 +3641,12 @@ useEffect(() => {
                   if (!selectedRow) return;
                   if (getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review') return;
                   if (!selectedRow.captionOutput) return;
-                  const proceed = await requestConfirm('Send this row for AI revision?');
+                  const proceed = await requestConfirm({
+                    title: 'Send this item for revision?',
+                    description: "You're about to send this content item for AI revision.",
+                    confirmLabel: 'Send for revision',
+                    cancelLabel: 'Keep item',
+                  });
                   if (!proceed) return;
 
                   if (!revisionWebhookUrl) {
@@ -3436,9 +3905,13 @@ useEffect(() => {
                     return;
                   }
                   if (getImageGeneratedUrl(selectedRow)) {
-                    const proceed = await requestConfirm(
-                      'Generate a new image? This will replace the current preview once finished.',
-                    );
+                    const proceed = await requestConfirm({
+                      title: 'Replace this image?',
+                      description:
+                        "You're about to generate a new image for this content item. The current preview will be replaced once finished.",
+                      confirmLabel: 'Generate new image',
+                      cancelLabel: 'Keep current image',
+                    });
                     if (!proceed) return;
                   }
 
@@ -3519,21 +3992,21 @@ useEffect(() => {
         </div>
       )}
 
-      {isConfirmOpen && (
+      {isConfirmOpen && confirmConfig && (
         <div className="modal-backdrop confirm-backdrop">
           <div className="modal confirm-modal">
-            <div className="modal-header">
-              <h2 className="modal-title">Please confirm</h2>
+            <div className="modal-header confirm-header">
+              <h2 className="modal-title">{confirmConfig.title}</h2>
             </div>
-            <div className="modal-body">
-              <p className="modal-description">{confirmMessage}</p>
+            <div className="modal-body confirm-body">
+              <p className="modal-description">{confirmConfig.description}</p>
             </div>
             <div className="modal-footer confirm-footer">
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => resolveConfirm(false)}>
-                Cancel
+                {confirmConfig.cancelLabel}
               </button>
               <button type="button" className="btn btn-danger btn-sm" onClick={() => resolveConfirm(true)}>
-                Confirm
+                {confirmConfig.confirmLabel}
               </button>
             </div>
           </div>
