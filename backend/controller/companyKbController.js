@@ -12,7 +12,8 @@ export const createBrandKB = async (req, res) => {
             companyId, 
             systemInstruction,
             imageSystemPrompt,
-            imageUserText
+            imageUserText,
+            form_answer
         } = req.body;
         const userId = req.user?.id;
 
@@ -40,25 +41,40 @@ export const createBrandKB = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
-        const { data: brandKB, error: brandKBError } = await db
+        const { data: existingBrandKB, error: existingBrandKBError } = await db
             .from('brandKB')
-            .insert([
-                { 
-                    brandPack,
-                    brandCapability,
-                    writerAgent,
-                    reviewPrompt1,
-                    emojiRule,
-                    companyId,
-                    systemInstruction,
-                    imageSystemPrompt,
-                    imageUserText,
-                    user_id: userId,
+            .select('brandKbId')
+            .eq('companyId', companyId)
+            .limit(1)
+            .maybeSingle();
 
-                    created_at: new Date().toISOString()
-                }
-            ])
-            .select();
+        if (existingBrandKBError) {
+            console.error('Error checking existing brandKB:', existingBrandKBError);
+            return res.status(500).json({
+                error: 'Failed to check existing brand knowledge base entry',
+                details: existingBrandKBError.message,
+            });
+        }
+
+        const payload = {
+            brandPack,
+            brandCapability,
+            writerAgent,
+            reviewPrompt1,
+            emojiRule,
+            companyId,
+            systemInstruction,
+            imageSystemPrompt,
+            imageUserText,
+            form_answer,
+            user_id: userId,
+        };
+
+        const query = existingBrandKB?.brandKbId
+            ? db.from('brandKB').update(payload).eq('brandKbId', existingBrandKB.brandKbId).select()
+            : db.from('brandKB').insert([{ ...payload, created_at: new Date().toISOString() }]).select();
+
+        const { data: brandKB, error: brandKBError } = await query;
 
         if (brandKBError) {
             console.error('Error creating brandKB:', brandKBError);
@@ -273,7 +289,8 @@ export const updateBrandKB = async (req, res) => {
             companyId,
             systemInstruction,
             imageSystemPrompt,
-            imageUserText
+            imageUserText,
+            form_answer
         } = req.body;
 
         // Build update object with only provided fields
@@ -287,6 +304,7 @@ export const updateBrandKB = async (req, res) => {
         if (systemInstruction !== undefined) updateData.systemInstruction = systemInstruction;
         if (imageSystemPrompt !== undefined) updateData.imageSystemPrompt = imageSystemPrompt;
         if (imageUserText !== undefined) updateData.imageUserText = imageUserText;
+        if (form_answer !== undefined) updateData.form_answer = form_answer;
 
         if (Object.keys(updateData).length === 0) {
             return res.status(400).json({ 
