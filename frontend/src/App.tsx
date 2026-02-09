@@ -1258,6 +1258,12 @@ function App() {
 
   const authedFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
     const token = session?.access_token;
+
+    // Debug logging
+    if (!token) {
+      console.warn('[authedFetch] No access token available. Session:', session ? 'exists but no token' : 'null');
+    }
+
     const headers = {
       ...(init.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
