@@ -3,7 +3,7 @@ import { Wand2, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface DashboardProps {
     activeCompany: { companyId: string; companyName: string } | null;
-    activeCompanyId: string | null;
+    activeCompanyId: string | undefined;
     dashboardStats: {
         total: number;
         approved: number;
