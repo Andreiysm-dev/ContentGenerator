@@ -34,10 +34,10 @@ export type CompanySettingsShellProps = {
     setAiWriterSystemPrompt: (value: string) => void;
     aiWriterUserPrompt: string;
     setAiWriterUserPrompt: (value: string) => void;
-    activeBrandRuleEdit: 'pack' | 'capabilities' | 'writer' | 'reviewer' | null;
-    brandRuleDraft: { pack: string; capabilities: string; writer: string; reviewer: string };
-    setBrandRuleDraft: Dispatch<SetStateAction<{ pack: string; capabilities: string; writer: string; reviewer: string }>>;
-    startBrandRuleEdit: (key: 'pack' | 'capabilities' | 'writer' | 'reviewer') => void;
+    activeBrandRuleEdit: 'pack' | 'capabilities' | 'writer' | 'reviewer' | 'visual' | null;
+    brandRuleDraft: { pack: string; capabilities: string; writer: string; reviewer: string; visual: string };
+    setBrandRuleDraft: Dispatch<SetStateAction<{ pack: string; capabilities: string; writer: string; reviewer: string; visual: string }>>;
+    startBrandRuleEdit: (key: 'pack' | 'capabilities' | 'writer' | 'reviewer' | 'visual') => void;
     cancelBrandRuleEdit: () => void;
     saveBrandRuleEdit: () => Promise<void>;
     saveBrandSetup: () => Promise<boolean>;
@@ -546,6 +546,47 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                                         )}
                                                     </div>
                                                 </div>
+
+                                                <div className="settings-section-divider" style={{ margin: '32px 0 24px 0', borderTop: '1px solid var(--border-color)', opacity: 0.5 }}></div>
+
+                                                <div className="visual-rules-header" style={{ marginBottom: 16 }}>
+                                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Visual & Image Rules</h3>
+                                                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Controls how AI generates images for this company.</p>
+                                                </div>
+
+                                                <div className="brand-rules-grid">
+                                                    <div className="brand-rule-card" style={{ gridColumn: 'span 2' }}>
+                                                        <div className="brand-rule-card-header">
+                                                            <div>
+                                                                <div className="brand-rule-title">Visual Identity</div>
+                                                                <div className="brand-rule-subtitle">Describe the colors, lighting, and design guardrails for AI image generation.</div>
+                                                            </div>
+                                                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => startBrandRuleEdit('visual')}>
+                                                                Edit
+                                                            </button>
+                                                        </div>
+                                                        {activeBrandRuleEdit === 'visual' ? (
+                                                            <>
+                                                                <textarea
+                                                                    className="field-input field-textarea"
+                                                                    rows={8}
+                                                                    value={brandRuleDraft.visual}
+                                                                    onChange={(e) => setBrandRuleDraft((prev) => ({ ...prev, visual: e.target.value }))}
+                                                                />
+                                                                <div className="brand-rule-actions">
+                                                                    <button type="button" className="btn btn-secondary btn-sm" onClick={cancelBrandRuleEdit}>
+                                                                        Cancel
+                                                                    </button>
+                                                                    <button type="button" className="btn btn-primary btn-sm" onClick={saveBrandRuleEdit}>
+                                                                        Save
+                                                                    </button>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <div className="content-box content-box--scroll">{systemInstruction || '—'}</div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
 
@@ -746,7 +787,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                                         <div className="brand-step-header">
                                                             <div>
                                                                 <h3>Audience & outcomes</h3>
-                                                                <p>Step 2 of {brandSetupMode === 'advanced' ? 4 : 3} · Estimated time: ~2 minutes</p>
+                                                                <p>Step 2 of {brandSetupMode === 'advanced' ? 5 : 3} · Estimated time: ~2 minutes</p>
                                                             </div>
                                                             <span className="step-pill">{brandSetupMode === 'advanced' ? 'Advanced Setup' : 'Quick Setup'}</span>
                                                         </div>
@@ -809,7 +850,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                                             <div>
                                                                 <h3>Voice & guardrails</h3>
                                                                 <p>
-                                                                    Step {brandSetupMode === 'advanced' ? 3 : 3} of {brandSetupMode === 'advanced' ? 4 : 3} · Estimated time: ~3 minutes
+                                                                    Step {brandSetupMode === 'advanced' ? 3 : 3} of {brandSetupMode === 'advanced' ? 5 : 3} · Estimated time: ~3 minutes
                                                                 </p>
                                                             </div>
                                                             <span className="step-pill">{brandSetupMode === 'advanced' ? 'Advanced Setup' : 'Quick Setup'}</span>
@@ -915,7 +956,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                                         <div className="brand-step-header">
                                                             <div>
                                                                 <h3>Advanced positioning</h3>
-                                                                <p>Step 4 of 4 · Estimated time: ~4 minutes</p>
+                                                                <p>Step 4 of 5 · Estimated time: ~4 minutes</p>
                                                             </div>
                                                             <span className="step-pill">Advanced Setup</span>
                                                         </div>
@@ -945,6 +986,40 @@ export function SettingsPage(props: CompanySettingsShellProps) {
 
                                                         <div className="brand-step-footer">
                                                             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setBrandSetupStep(3)}>
+                                                                Back
+                                                            </button>
+                                                            <button type="button" className="btn btn-primary btn-sm" onClick={() => setBrandSetupStep(5)}>
+                                                                Continue
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {brandSetupMode === 'advanced' && brandSetupStep === 5 && (
+                                                    <div className="brand-step">
+                                                        <div className="brand-step-header">
+                                                            <div>
+                                                                <h3>Visual & image identity</h3>
+                                                                <p>Step 5 of 5 · Estimated time: ~2 minutes</p>
+                                                            </div>
+                                                            <span className="step-pill">Advanced Setup</span>
+                                                        </div>
+
+                                                        <div className="settings-grid">
+                                                            <div className="form-group settings-full-width">
+                                                                <label className="field-label">Visual Brand Identity (Image Guidelines)</label>
+                                                                <textarea
+                                                                    className="field-input field-textarea"
+                                                                    rows={8}
+                                                                    value={systemInstruction}
+                                                                    onChange={(e) => setSystemInstruction(e.target.value)}
+                                                                    placeholder="Describe the visual style, colors, lighting, and mood for your brand images. AI will use this to generate all photos/illustrations."
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="brand-step-footer">
+                                                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setBrandSetupStep(4)}>
                                                                 Back
                                                             </button>
                                                             <button
