@@ -14,7 +14,7 @@ import {
   XCircle,
   Info,
   FileText,
-  User, 
+  User,
   LogOut,
   SearchX,
   Plus,
@@ -52,6 +52,16 @@ import { ProfilePage } from '@/pages/ProfilePage';
 import { SettingsPage, type CompanySettingsTab } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
+import {
+  AddCompanyModal,
+  CsvExportModal,
+  CopyModal,
+  DraftPublishModal,
+  BulkImportModal,
+  ConfirmModal,
+  ViewContentModal,
+  ImageGenerationModal,
+} from '@/modals';
 import './App.css';
 import './polish.css';
 
@@ -2191,6 +2201,109 @@ function App() {
     }
   };
 
+  const handleAddCompany = async () => {
+    if (!newCompanyName.trim()) {
+      notify('Company name is required.', 'error');
+      return;
+    }
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/company`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: newCompanyName.trim(),
+          companyDescription: newCompanyDescription.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify(data.error || 'Failed to create company.', 'error');
+        return;
+      }
+      notify('Company created.', 'success');
+      setIsAddCompanyModalOpen(false);
+      await new Promise((r) => setTimeout(r, 200));
+      setCompanies((prev) => [data.company, ...prev]);
+      if (data.company?.companyId) {
+        setActiveCompanyIdWithPersistence(data.company.companyId);
+      }
+    } catch (err) {
+      console.error('Failed to create company', err);
+      notify('Failed to create company. Check console for details.', 'error');
+    }
+  };
+
+  const handleBulkImport = async () => {
+    if (!activeCompanyId) {
+      notify('Please select a company first.', 'error');
+      return;
+    }
+
+    const rows = parseBulkText(bulkText);
+    if (!rows.length) {
+      notify('No rows to import.', 'error');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      let successCount = 0;
+      for (const row of rows) {
+        const [
+          date,
+          brandHighlight,
+          crossPromo,
+          theme,
+          contentType,
+          channels,
+          targetAudience,
+          primaryGoal,
+          cta,
+          promoType,
+        ] = row;
+
+        const payload = {
+          date: date || null,
+          brandHighlight: brandHighlight || null,
+          crossPromo: crossPromo || null,
+          theme: theme || null,
+          contentType: contentType || null,
+          channels: channels || null,
+          targetAudience: targetAudience || null,
+          primaryGoal: primaryGoal || null,
+          cta: cta || null,
+          promoType: promoType || null,
+          companyId: activeCompanyId,
+        };
+
+        const res = await authedFetch(`${backendBaseUrl}/api/content-calendar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          successCount += 1;
+        } else {
+          const data = await res.json().catch(() => ({}));
+          console.error('Import error for row', row, data);
+        }
+      }
+
+      notify(`Imported ${successCount} of ${rows.length} rows.`, 'success');
+      if (successCount > 0) {
+        setBulkText('');
+        setBulkPreview([]);
+        setIsBulkModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Bulk import failed:', error);
+      notify('Bulk import failed. Check console for details.', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const parseBulkText = (text: string): string[][] => {
     if (!text.trim()) return [];
     const lines = text
@@ -2936,1288 +3049,127 @@ function App() {
           </div>
         </div>
 
-        {isAddCompanyModalOpen && (
-          <div className="modal-backdrop">
-            <div className="modal settings-modal">
-              <div className="modal-header settings-header">
-                <div>
-                  <p className="modal-kicker">Company</p>
-                  <h2 className="modal-title">Add Company</h2>
-                </div>
-                <button type="button" className="modal-close" onClick={() => setIsAddCompanyModalOpen(false)}>
-                  ×
-                </button>
-              </div>
-              <div className="modal-body settings-body">
-                <div className="settings-section">
-                  <div className="settings-grid">
-                    <div className="form-group">
-                      <label className="field-label">Company Name</label>
-                      <input
-                        type="text"
-                        className="field-input"
-                        value={newCompanyName}
-                        onChange={(e) => setNewCompanyName(e.target.value)}
-                        placeholder="e.g., Moonshot Studios"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="field-label">Company Description</label>
-                      <input
-                        type="text"
-                        className="field-input"
-                        value={newCompanyDescription}
-                        onChange={(e) => setNewCompanyDescription(e.target.value)}
-                        placeholder="Optional"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer settings-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setIsAddCompanyModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={async () => {
-                    if (!newCompanyName.trim()) {
-                      notify('Company name is required.', 'error');
-                      return;
-                    }
-                    try {
-                      const res = await authedFetch(`${backendBaseUrl}/api/company`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          companyName: newCompanyName.trim(),
-                          companyDescription: newCompanyDescription.trim(),
-                        }),
-                      });
-                      const data = await res.json().catch(() => ({}));
-                      if (!res.ok) {
-                        notify(data.error || 'Failed to create company.', 'error');
-                        return;
-                      }
-                      notify('Company created.', 'success');
-                      setIsAddCompanyModalOpen(false);
-                      await new Promise((r) => setTimeout(r, 200));
-                      setCompanies((prev) => [data.company, ...prev]);
-                      if (data.company?.companyId) {
-                        setActiveCompanyIdWithPersistence(data.company.companyId);
-                      }
-                    } catch (err) {
-                      console.error('Failed to create company', err);
-                      notify('Failed to create company. Check console for details.', 'error');
-                    }
-                  }}
-                >
-                  Create Company
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <AddCompanyModal
+          isOpen={isAddCompanyModalOpen}
+          onClose={() => setIsAddCompanyModalOpen(false)}
+          newCompanyName={newCompanyName}
+          setNewCompanyName={setNewCompanyName}
+          newCompanyDescription={newCompanyDescription}
+          setNewCompanyDescription={setNewCompanyDescription}
+          onSubmit={handleAddCompany}
+          notify={notify}
+        />
 
-        {isCsvModalOpen && (
-          <div className="modal-backdrop">
-            <div className="modal modal-copy">
-              <div className="modal-header">
-                <div>
-                  <h2 className="modal-title">Export CSV</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCsvModalOpen(false)}
-                  className="modal-close"
-                >
-                  ×
-                </button>
-              </div>
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  handleExportCsv();
-                }}
-              >
-                <div className="modal-body copy-modal-body">
-                  <p className="modal-description">
-                    Choose which rows and fields you want to export. Your CSV will match the order below.
-                  </p>
-                  <div className="csv-scope">
-                    <label className="copy-field">
-                      <input
-                        type="radio"
-                        name="csvScope"
-                        checked={csvScope === 'selected'}
-                        onChange={() => setCsvScope('selected')}
-                      />
-                      <span>Selected rows</span>
-                    </label>
-                    <label className="copy-field">
-                      <input
-                        type="radio"
-                        name="csvScope"
-                        checked={csvScope === 'all'}
-                        onChange={() => setCsvScope('all')}
-                      />
-                      <span>All rows</span>
-                    </label>
-                  </div>
-                  <div className="copy-fields">
-                    {csvFieldDefinitions.map((field) => (
-                      <label key={field.key} className="copy-field">
-                        <input
-                          type="checkbox"
-                          checked={!!csvFieldSelection[field.key]}
-                          onChange={(event) =>
-                            setCsvFieldSelection((prev) => ({
-                              ...prev,
-                              [field.key]: event.target.checked,
-                            }))
-                          }
-                        />
-                        <span>{field.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    onClick={() => setIsCsvModalOpen(false)}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary btn-sm">
-                    Export CSV
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        <CsvExportModal
+          isOpen={isCsvModalOpen}
+          onClose={() => setIsCsvModalOpen(false)}
+          csvScope={csvScope}
+          setCsvScope={setCsvScope}
+          csvFieldSelection={csvFieldSelection}
+          setCsvFieldSelection={setCsvFieldSelection}
+          csvFieldDefinitions={csvFieldDefinitions}
+          handleExportCsv={handleExportCsv}
+        />
 
-        {isCopyModalOpen && (
-          <div className="modal-backdrop">
-            <div
-              className="modal modal-copy"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  handleCopySpreadsheet();
-                }
-              }}
-            >
-              <div className="modal-header">
-                <div>
-                  <h2 className="modal-title">Copy content for spreadsheet</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCopyModalOpen(false);
-                    setCopySuccessMessage('');
-                  }}
-                  className="modal-close"
-                >
-                  ×
-                </button>
-              </div>
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  handleCopySpreadsheet();
-                }}
-              >
-                <div className="modal-body copy-modal-body">
-                  <p className="modal-description">
-                    Copy your selected content in a spreadsheet-safe format. Emojis, line breaks, and formatting will
-                    be preserved.
-                  </p>
-                  <div className="copy-fields">
-                    {copyFieldDefinitions.map((field) => (
-                      <label key={field.key} className="copy-field">
-                        <input
-                          type="checkbox"
-                          checked={!!copyFieldSelection[field.key]}
-                          onChange={(event) =>
-                            setCopyFieldSelection((prev) => ({
-                              ...prev,
-                              [field.key]: event.target.checked,
-                            }))
-                          }
-                        />
-                        <span>{field.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {copySuccessMessage && <div className="copy-success">{copySuccessMessage}</div>}
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCopyModalOpen(false);
-                      setCopySuccessMessage('');
-                    }}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary btn-sm">
-                    Copy to clipboard
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        <CopyModal
+          isOpen={isCopyModalOpen}
+          onClose={() => {
+            setIsCopyModalOpen(false);
+            setCopySuccessMessage('');
+          }}
+          copyFieldSelection={copyFieldSelection}
+          setCopyFieldSelection={setCopyFieldSelection}
+          copyFieldDefinitions={copyFieldDefinitions}
+          copySuccessMessage={copySuccessMessage}
+          handleCopySpreadsheet={handleCopySpreadsheet}
+        />
 
-        {isDraftModalOpen && selectedRow && (
-          <div className="modal-backdrop modal-backdrop-top">
-            <div className="modal modal-wide content-modal draft-publish-modal">
-              <div className="modal-header content-modal-header">
-                <div className="content-modal-title">
-                  <h2>Draft & publish content</h2>
-                  <p>
-                    Review the final content and decide how you’d like to proceed. You can save this as a draft or mark
-                    it as ready for publishing.
-                  </p>
-                </div>
-                <button type="button" className="modal-close" onClick={() => setIsDraftModalOpen(false)}>
-                  ×
-                </button>
-              </div>
-              <div className="modal-body content-modal-body draft-publish-body">
-                <section className="draft-section">
-                  <div className="section-title-row">
-                    <h3 className="section-title">Content summary</h3>
-                  </div>
-                  <div className="draft-summary-grid">
-                    <div>
-                      <div className="draft-summary-label">Brand / Company</div>
-                      <div className="draft-summary-value">{activeCompany?.companyName ?? '—'}</div>
-                    </div>
-                    <div>
-                      <div className="draft-summary-label">Channels</div>
-                      <div className="draft-summary-value">
-                        {Array.isArray(selectedRow.channels) && selectedRow.channels.length
-                          ? selectedRow.channels.join(', ')
-                          : '—'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="draft-summary-block">
-                    <div className="draft-summary-header">
-                      <span>Final caption</span>
-                      <button type="button" className="copy-btn" onClick={() => handleCopy('finalCaption', selectedRow.finalCaption)}>
-                        {copiedField === 'finalCaption' ? 'Copied' : 'Copy'}
-                      </button>
-                    </div>
-                    <div className="content-box content-box--scroll">{selectedRow.finalCaption ?? ''}</div>
-                  </div>
-                  <div className="draft-summary-grid">
-                    <div>
-                      <div className="draft-summary-header">
-                        <span>Final hashtags</span>
-                        <button type="button" className="copy-btn" onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags)}>
-                          {copiedField === 'finalHashtags' ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <div className="content-box content-box--scroll">{selectedRow.finalHashtags ?? ''}</div>
-                    </div>
-                    <div>
-                      <div className="draft-summary-header">
-                        <span>Final CTA</span>
-                        <button type="button" className="copy-btn" onClick={() => handleCopy('finalCTA', selectedRow.finalCTA)}>
-                          {copiedField === 'finalCTA' ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <div className="content-box content-box--scroll">{selectedRow.finalCTA ?? ''}</div>
-                    </div>
-                  </div>
-                  <div className="draft-summary-block">
-                    <div className="draft-summary-header">
-                      <span>Attached images</span>
-                      <label className="btn btn-secondary btn-sm draft-upload-btn">
-                        {isUploadingDesigns ? 'Uploading…' : 'Upload images'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(event) => {
-                            void handleUploadDesigns(event.target.files);
-                            event.currentTarget.value = '';
-                          }}
-                          disabled={isUploadingDesigns}
-                          className="draft-upload-input"
-                        />
-                      </label>
-                    </div>
-                    <div className="draft-image-preview">
-                      {(() => {
-                        const attached = getAttachedDesignUrls(selectedRow);
-                        if (attached.length) {
-                          return (
-                            <div className="draft-image-grid">
-                              {attached.map((url, index) => (
-                                <img key={`${url}-${index}`} src={url} alt={`Design ${index + 1}`} />
-                              ))}
-                            </div>
-                          );
-                        }
-                        if (getImageGeneratedUrl(selectedRow)) {
-                          const imageUrl = getImageGeneratedUrl(selectedRow);
-                          const separator = imageUrl?.includes('?') ? '&' : '?';
-                          return <img src={`${imageUrl}${separator}v=${imagePreviewNonce}`} alt="Generated" />;
-                        }
-                        return <div className="draft-preview-placeholder">No images attached yet</div>;
-                      })()}
-                    </div>
-                  </div>
-                </section>
+        <DraftPublishModal
+          isOpen={isDraftModalOpen}
+          onClose={() => setIsDraftModalOpen(false)}
+          selectedRow={selectedRow}
+          activeCompany={activeCompany}
+          draftPublishIntent={draftPublishIntent}
+          setDraftPublishIntent={setDraftPublishIntent}
+          handleDraftPublishIntent={handleDraftPublishIntent}
+          getAttachedDesignUrls={getAttachedDesignUrls}
+          getImageGeneratedUrl={getImageGeneratedUrl}
+          imagePreviewNonce={imagePreviewNonce}
+          handleCopy={handleCopy}
+          copiedField={copiedField}
+          handleUploadDesigns={handleUploadDesigns}
+          isUploadingDesigns={isUploadingDesigns}
+        />
 
-                <section className="draft-section">
-                  <div className="section-title-row">
-                    <h3 className="section-title">Platform readiness</h3>
-                  </div>
-                  <div className="draft-readiness">
-                    <div className="draft-summary-label">Selected platforms</div>
-                    <div className="draft-summary-value">
-                      {Array.isArray(selectedRow.channels) && selectedRow.channels.length
-                        ? selectedRow.channels.join(', ')
-                        : '—'}
-                    </div>
-                    <div className="draft-readiness-status">Posting not scheduled yet</div>
-                    <div className="draft-readiness-note">
-                      Publishing to connected social accounts will be available soon.
-                    </div>
-                  </div>
-                </section>
+        <BulkImportModal
+          isOpen={isBulkModalOpen}
+          onClose={() => setIsBulkModalOpen(false)}
+          bulkText={bulkText}
+          setBulkText={setBulkText}
+          bulkPreview={bulkPreview}
+          setBulkPreview={setBulkPreview}
+          showPreview={showPreview}
+          setShowPreview={setShowPreview}
+          isImporting={isImporting}
+          parseBulkText={parseBulkText}
+          handleBulkImport={handleBulkImport}
+        />
 
-                <section className="draft-section">
-                  <div className="section-title-row">
-                    <h3 className="section-title">Publish intent</h3>
-                  </div>
-                  <div className="draft-intent-options">
-                    <label className={`draft-intent-card ${draftPublishIntent === 'draft' ? 'is-selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="draftIntent"
-                        checked={draftPublishIntent === 'draft'}
-                        onChange={() => setDraftPublishIntent('draft')}
-                      />
-                      <div>
-                        <div className="draft-intent-title">Save as draft</div>
-                        <div className="draft-intent-copy">
-                          Keep this content saved and editable. You can publish it later.
-                        </div>
-                      </div>
-                    </label>
-                    <label className={`draft-intent-card ${draftPublishIntent === 'ready' ? 'is-selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="draftIntent"
-                        checked={draftPublishIntent === 'ready'}
-                        onChange={() => setDraftPublishIntent('ready')}
-                      />
-                      <div>
-                        <div className="draft-intent-title">Mark as ready to publish</div>
-                        <div className="draft-intent-copy">
-                          This content will be marked as approved and ready for publishing. Publishing can be scheduled later.
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                </section>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsDraftModalOpen(false)}>
-                  Cancel
-                </button>
-                <button type="button" className="btn btn-primary btn-sm" onClick={handleDraftPublishIntent}>
-                  {draftPublishIntent === 'ready' ? 'Mark as ready' : 'Save draft'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ViewContentModal
+          isOpen={isViewModalOpen}
+          onClose={() => setIsViewModalOpen(false)}
+          selectedRow={selectedRow}
+          getStatusValue={getStatusValue}
+          getImageGeneratedUrl={getImageGeneratedUrl}
+          imagePreviewNonce={imagePreviewNonce}
+          handleCopy={handleCopy}
+          copiedField={copiedField}
+          notify={notify}
+          setIsDraftModalOpen={setIsDraftModalOpen}
+          setDraftPublishIntent={setDraftPublishIntent}
+          requestConfirm={requestConfirm}
+          isGeneratingCaption={isGeneratingCaption}
+          setIsGeneratingCaption={setIsGeneratingCaption}
+          isRevisingCaption={isRevisingCaption}
+          setIsRevisingCaption={setIsRevisingCaption}
+          authedFetch={authedFetch}
+          backendBaseUrl={backendBaseUrl}
+          refreshCalendarRow={refreshCalendarRow}
+          setIsImageModalOpen={setIsImageModalOpen}
+          setIsViewModalOpen={setIsViewModalOpen}
+          activeCompanyId={activeCompanyId}
+          setBrandKbId={setBrandKbId}
+          setSystemInstruction={setSystemInstruction}
+        />
 
-        {isBulkModalOpen && (
-          <div className="modal-backdrop">
-            <div className="modal modal-bulk">
-              <div className="modal-header bulk-header">
-                <div>
-                  <p className="bulk-kicker">Bulk Import</p>
-                  <h2 className="modal-title">Paste from Sheet</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsBulkModalOpen(false)}
-                  className="modal-close"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="modal-body bulk-modal-body">
-                <div className={`bulk-content ${showPreview ? 'bulk-content--preview' : 'bulk-content--paste'}`}>
-                  <div className="bulk-paste-panel">
-                    <p className="modal-description">
-                      Paste rows from your sheet below. We’ll format everything and show a preview before anything is
-                      imported.
-                    </p>
-                    <textarea
-                      rows={6}
-                      value={bulkText}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setBulkText(value);
-                      }}
-                      className="bulk-textarea"
-                      placeholder="Paste rows copied from Google Sheets or Excel"
-                      spellCheck={false}
-                    />
-                  </div>
-                  {showPreview && bulkPreview.length > 0 && (
-                    <div className="bulk-preview">
-                      <div className="bulk-preview-title">Here’s how your data will be imported</div>
-                      <div className="bulk-preview-table-wrapper">
-                        <table className="bulk-preview-table">
-                          <thead>
-                            <tr>
-                              <th>Date</th>
-                              <th>Brand highlight</th>
-                              <th>Cross promo</th>
-                              <th>Theme</th>
-                              <th>Content type</th>
-                              <th>Channels</th>
-                              <th>Target audience</th>
-                              <th>Primary goal</th>
-                              <th>CTA</th>
-                              <th>Promo type</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {bulkPreview.map((row, rowIndex) => (
-                              <tr key={rowIndex}>
-                                {row.map((cell, cellIndex) => (
-                                  <td key={cellIndex}>{cell}</td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  onClick={() => setIsBulkModalOpen(false)}
-                  className="btn btn-secondary btn-sm"
-                >
-                  Cancel
-                </button>
-                {showPreview ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setShowPreview(false)}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      Back to paste
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isImporting}
-                      onClick={async () => {
-                        if (!activeCompanyId) {
-                          notify('Please select a company first.', 'error');
-                          return;
-                        }
-
-                        const rows = parseBulkText(bulkText);
-                        if (!rows.length) {
-                          notify('No rows to import.', 'error');
-                          return;
-                        }
-
-                        setIsImporting(true);
-                        try {
-                          let successCount = 0;
-                          for (const row of rows) {
-                            const [
-                              date,
-                              brandHighlight,
-                              crossPromo,
-                              theme,
-                              contentType,
-                              channels,
-                              targetAudience,
-                              primaryGoal,
-                              cta,
-                              promoType,
-                            ] = row;
-
-                            const payload = {
-                              date: date || null,
-                              brandHighlight: brandHighlight || null,
-                              crossPromo: crossPromo || null,
-                              theme: theme || null,
-                              contentType: contentType || null,
-                              channels: channels || null,
-                              targetAudience: targetAudience || null,
-                              primaryGoal: primaryGoal || null,
-                              cta: cta || null,
-                              promoType: promoType || null,
-                              companyId: activeCompanyId,
-                            };
-
-                            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(payload),
-                            });
-
-                            if (res.ok) {
-                              successCount += 1;
-                            } else {
-                              const data = await res.json().catch(() => ({}));
-                              console.error('Import error for row', row, data);
-                            }
-                          }
-
-                          notify(`Imported ${successCount} of ${rows.length} rows.`, 'success');
-                          if (successCount > 0) {
-                            setBulkText('');
-                            setBulkPreview([]);
-                            setIsBulkModalOpen(false);
-                          }
-                        } catch (error) {
-                          console.error('Bulk import failed:', error);
-                          notify('Bulk import failed. Check console for details.', 'error');
-                        } finally {
-                          setIsImporting(false);
-                        }
-                      }}
-                      className="btn btn-primary btn-sm"
-                    >
-                      {isImporting ? 'Importing…' : 'Import'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    disabled={!bulkText.trim()}
-                    onClick={() => {
-                      setBulkPreview(parseBulkText(bulkText));
-                      setShowPreview(true);
-                    }}
-                  >
-                    Preview import
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isViewModalOpen && selectedRow && (
-          <div className="modal-backdrop">
-            <div className="modal modal-wide content-modal">
-              <div className="modal-header content-modal-header">
-                <div className="content-modal-title">
-                  <h2>Content Details</h2>
-                  <p>Review inputs, generated outputs, and final approvals.</p>
-                </div>
-                <div className="content-modal-actions">
-                  <span className="status-pill status-pill--muted">
-                    {getStatusValue(selectedRow.status) || 'Draft'}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      if (!selectedRow?.finalCaption) {
-                        notify('Add a final caption before preparing this content for publishing.', 'error');
-                        return;
-                      }
-                      setDraftPublishIntent('draft');
-                      setIsDraftModalOpen(true);
-                    }}
-                  >
-                    Draft & Publish
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsViewModalOpen(false)}
-                    className="modal-close"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-              <div className="modal-body content-modal-body">
-                <div className="section content-section">
-                  <div className="section-title-row">
-                    <div>
-                      <h3 className="section-title">Inputs</h3>
-                      <p className="section-subtitle">What was provided for generation.</p>
-                    </div>
-                  </div>
-                  <div className="kv-grid">
-                    <div className="kv-item">
-                      <div className="kv-label">Date</div>
-                      <div className="kv-value">{selectedRow.date ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Brand Highlight</div>
-                      <div className="kv-value">{selectedRow.brandHighlight ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Cross Promo</div>
-                      <div className="kv-value">{selectedRow.crossPromo ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Theme</div>
-                      <div className="kv-value">{selectedRow.theme ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Content Type</div>
-                      <div className="kv-value">{selectedRow.contentType ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Channels</div>
-                      <div className="kv-value">{selectedRow.channels ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Target Audience</div>
-                      <div className="kv-value">{selectedRow.targetAudience ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Primary Goal</div>
-                      <div className="kv-value">{selectedRow.primaryGoal ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">CTA</div>
-                      <div className="kv-value">{selectedRow.cta ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Promo Type</div>
-                      <div className="kv-value">{selectedRow.promoType ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Framework Used</div>
-                      <div className="kv-value">{selectedRow.frameworkUsed ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Status</div>
-                      <div className="kv-value">{getStatusValue(selectedRow.status)}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="section content-section">
-                  <div className="section-title-row">
-                    <div>
-                      <h3 className="section-title">AI-Generated Outputs</h3>
-                      <p className="section-subtitle">What the system generated for review.</p>
-                    </div>
-                  </div>
-                  <div className="content-grid">
-                    <div className="content-card content-card--primary">
-                      <div className="content-card-header">
-                        <div className="content-card-title">Caption Output</div>
-                        <button
-                          type="button"
-                          className="copy-btn"
-                          onClick={() => handleCopy('captionOutput', selectedRow.captionOutput)}
-                        >
-                          {copiedField === 'captionOutput' ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <div className="content-box content-box--scroll">{selectedRow.captionOutput ?? ''}</div>
-                    </div>
-
-                    <div className="content-card content-card--secondary">
-                      <div className="content-card-header">
-                        <div className="content-card-title">CTA Output</div>
-                        <button
-                          type="button"
-                          className="copy-btn"
-                          onClick={() => handleCopy('ctaOuput', selectedRow.ctaOuput)}
-                        >
-                          {copiedField === 'ctaOuput' ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <div className="content-box content-box--scroll">{selectedRow.ctaOuput ?? ''}</div>
-                    </div>
-
-                    <div className="content-card content-card--secondary">
-                      <div className="content-card-header">
-                        <div className="content-card-title">Hashtags Output</div>
-                        <button
-                          type="button"
-                          className="copy-btn"
-                          onClick={() => handleCopy('hastagsOutput', selectedRow.hastagsOutput)}
-                        >
-                          {copiedField === 'hastagsOutput' ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <div className="content-box content-box--scroll">{selectedRow.hastagsOutput ?? ''}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="section content-section section-final">
-                  <div className="section-title-row">
-                    <div>
-                      <h3 className="section-title">Review & Final Approval</h3>
-                      <p className="section-subtitle">What will ship after human approval.</p>
-                    </div>
-                  </div>
-                  <div className="content-grid">
-                    <div className="content-card content-card--secondary">
-                      <div className="content-card-header">
-                        <div className="content-card-title">Review Decision</div>
-                      </div>
-                      <div className="content-box content-box--scroll">{selectedRow.reviewDecision ?? ''}</div>
-                    </div>
-                    <div className="content-card content-card--secondary">
-                      <div className="content-card-header">
-                        <div className="content-card-title">Review Notes</div>
-                      </div>
-                      <div className="content-box content-box--scroll">{selectedRow.reviewNotes ?? ''}</div>
-                    </div>
-
-                    <div className="content-card content-card--final">
-                      <div className="content-card-header">
-                        <div className="content-card-title">Final Caption</div>
-                        <button
-                          type="button"
-                          className="copy-btn"
-                          onClick={() => handleCopy('finalCaption', selectedRow.finalCaption)}
-                        >
-                          {copiedField === 'finalCaption' ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <div className="content-box content-box--final">{selectedRow.finalCaption ?? ''}</div>
-                    </div>
-                    <div className="content-card content-card--final">
-                      <div className="content-card-header">
-                        <div className="content-card-title">Final CTA</div>
-                        <button
-                          type="button"
-                          className="copy-btn"
-                          onClick={() => handleCopy('finalCTA', selectedRow.finalCTA)}
-                        >
-                          {copiedField === 'finalCTA' ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <div className="content-box content-box--final">{selectedRow.finalCTA ?? ''}</div>
-                    </div>
-                    <div className="content-card content-card--final">
-                      <div className="content-card-header">
-                        <div className="content-card-title">Final Hashtags</div>
-                        <button
-                          type="button"
-                          className="copy-btn"
-                          onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags)}
-                        >
-                          {copiedField === 'finalHashtags' ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <div className="content-box content-box--final">{selectedRow.finalHashtags ?? ''}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <details className="section content-section section-system" open={false}>
-                  <summary className="section-title-row">
-                    <div>
-                      <h3 className="section-title section-title--muted">System / Internal</h3>
-                      <p className="section-subtitle section-subtitle--muted">Internal references and metadata.</p>
-                    </div>
-                  </summary>
-                  <div className="kv-grid">
-                    <div className="kv-item">
-                      <div className="kv-label">DMP</div>
-                      <div className="kv-value">
-                        <textarea
-                          className="field-input field-textarea"
-                          rows={6}
-                          value={selectedRow.dmp ?? ''}
-                          readOnly
-                          style={{ resize: 'vertical', maxHeight: '200px', overflowY: 'auto' }}
-                        />
-                      </div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Attached Design</div>
-                      <div className="kv-value">{selectedRow.attachedDesign ? JSON.stringify(selectedRow.attachedDesign) : ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Image Generated</div>
-                      <div className="kv-value">
-                        {getImageGeneratedUrl(selectedRow) ? (
-                          (() => {
-                            const imageUrl = getImageGeneratedUrl(selectedRow);
-                            const separator = imageUrl?.includes('?') ? '&' : '?';
-                            return (
-                              <img
-                                src={`${imageUrl}${separator}v=${imagePreviewNonce}`}
-                                alt="Generated"
-                                style={{ maxWidth: '220px', borderRadius: 8 }}
-                              />
-                            );
-                          })()
-                        ) : (
-                          <span>{selectedRow.imageGenerated ? JSON.stringify(selectedRow.imageGenerated) : ''}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Company ID</div>
-                      <div className="kv-value">{selectedRow.companyId ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Content Calendar ID</div>
-                      <div className="kv-value">{selectedRow.contentCalendarId ?? ''}</div>
-                    </div>
-                    <div className="kv-item">
-                      <div className="kv-label">Created At</div>
-                      <div className="kv-value">{selectedRow.created_at ?? ''}</div>
-                    </div>
-                  </div>
-                </details>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={async () => {
-                    if (!selectedRow) return;
-                    const proceed = await requestConfirm({
-                      title: 'Generate caption for this item?',
-                      description: "You're about to trigger caption generation for this content item.",
-                      confirmLabel: 'Generate caption',
-                      cancelLabel: 'Go back',
-                    });
-                    if (!proceed) return;
-
-                    setIsGeneratingCaption(true);
-                    try {
-                      const genRes = await authedFetch(
-                        `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/generate-caption`,
-                        {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                        },
-                      );
-                      const genData = await genRes.json().catch(() => ({}));
-                      if (!genRes.ok) {
-                        if (genRes.status === 409) {
-                          notify(genData.error || 'Caption generation is already running or completed.', 'info');
-                        } else {
-                          notify(genData.error || 'Failed to generate caption.', 'error');
-                        }
-                      } else {
-                        notify('Caption generation started.', 'success');
-                      }
-                    } catch (err) {
-                      console.error('Failed to call generation endpoint', err);
-                      notify('Failed to trigger generation. Check console for details.', 'error');
-                    } finally {
-                      await refreshCalendarRow(selectedRow.contentCalendarId);
-                      setIsGeneratingCaption(false);
-                    }
-                  }}
-                >
-                  {isGeneratingCaption ? 'Generating…' : 'Generate Caption'}
-                  {isGeneratingCaption && <span className="loading-spinner"></span>}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-${['review', 'approved'].includes(
-                    getStatusValue(selectedRow.status).trim().toLowerCase(),
-                  )
-                    ? 'primary'
-                    : 'secondary'
-                    } btn-sm`}
-                  title="Send for revision again"
-                  disabled={
-                    getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review' ||
-                    !selectedRow.captionOutput
-                  }
-                  onClick={async () => {
-                    if (!selectedRow) return;
-                    if (getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review') return;
-                    if (!selectedRow.captionOutput) return;
-                    const proceed = await requestConfirm({
-                      title: 'Send this item for revision?',
-                      description: "You're about to send this content item for AI revision.",
-                      confirmLabel: 'Send for revision',
-                      cancelLabel: 'Keep item',
-                    });
-                    if (!proceed) return;
-
-                    setIsRevisingCaption(true);
-                    try {
-                      const res = await authedFetch(
-                        `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/review-content`,
-                        {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({}),
-                        },
-                      );
-                      const data = await res.json().catch(() => ({}));
-                      if (!res.ok) {
-                        if (res.status === 409) {
-                          notify(data.error || 'Review is not allowed for this status.', 'info');
-                        } else {
-                          notify(data.error || 'Failed to trigger revision.', 'error');
-                        }
-                        return;
-                      }
-                      notify('Sent for revision.', 'success');
-                    } catch (err) {
-                      console.error('Failed to call review endpoint', err);
-                      notify('Failed to trigger revision. Check console for details.', 'error');
-                      return;
-                    } finally {
-                      await refreshCalendarRow(selectedRow.contentCalendarId);
-                      setIsRevisingCaption(false);
-                    }
-                  }}
-                >
-                  {isRevisingCaption ? 'Revising…' : 'Revise caption'}
-                  {isRevisingCaption && <span className="loading-spinner"></span>}
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-${['approved', 'design completed'].includes(
-                    getStatusValue(selectedRow.status).trim().toLowerCase(),
-                  )
-                    ? 'primary'
-                    : 'secondary'
-                    } btn-sm`}
-                  title="Generate image (coming soon)"
-                  disabled={
-                    !['approved', 'design completed'].includes(
-                      getStatusValue(selectedRow.status).trim().toLowerCase(),
-                    )
-                  }
-                  onClick={() => {
-                    if (
-                      !['approved', 'design completed'].includes(
-                        getStatusValue(selectedRow.status).trim().toLowerCase(),
-                      )
-                    )
-                      return;
-                    setIsImageModalOpen(true);
-                    setIsViewModalOpen(false);
-                    // Prefill from BrandKB for this company
-                    const companyId = selectedRow?.companyId ?? activeCompanyId;
-                    if (companyId) {
-                      (async () => {
-                        try {
-                          const res = await authedFetch(`${backendBaseUrl}/api/brandkb/company/${companyId}`);
-                          const data = await res.json();
-                          const list = Array.isArray(data.brandKBs) ? data.brandKBs : data;
-                          const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
-                          if (first) {
-                            if (typeof first.brandKbId === 'string') setBrandKbId(first.brandKbId);
-                            if (typeof first.systemInstruction === 'string') setSystemInstruction(first.systemInstruction);
-                          }
-                        } catch (err) {
-                          console.error('Failed to load BrandKB for image generation', err);
-                        }
-                      })();
-                    }
-                  }}
-                >
-                  Generate Image
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setIsViewModalOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isImageModalOpen && selectedRow && (
-          <div className="modal-backdrop">
-            <div className="modal modal-wide image-modal">
-              <div className="modal-header">
-                <div>
-                  <p className="modal-kicker">Image Generation</p>
-                  <h2 className="modal-title">Generate Visual</h2>
-                </div>
-                <button type="button" className="modal-close" onClick={() => setIsImageModalOpen(false)}>
-                  ×
-                </button>
-              </div>
-              <div className="modal-body">
-                <div className="image-modal-grid">
-                  <div className="image-modal-panel">
-                    <div className="panel-header">
-                      <h3>Design Mega Prompt</h3>
-                      <div className="panel-actions">
-                        {!isEditingDmp ? (
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => {
-                              setDmpDraft(selectedRow.dmp ?? '');
-                              setIsEditingDmp(true);
-                            }}
-                          >
-                            Custom
-                          </button>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => {
-                                setIsEditingDmp(false);
-                                setDmpDraft(selectedRow.dmp ?? '');
-                              }}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary btn-sm"
-                              onClick={async () => {
-                                const rowId = selectedRow?.contentCalendarId;
-                                if (!rowId) return;
-                                const trimmedDmp = dmpDraft.trim();
-                                if (!trimmedDmp) {
-                                  notify('Design Mega Prompt cannot be empty.', 'error');
-                                  return;
-                                }
-                                // Disable generate button immediately to prevent double triggers
-                                setIsGeneratingImage(true);
-                                try {
-                                  // Save to backend first
-                                  const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${rowId}`, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      dmp: trimmedDmp,
-                                    }),
-                                  });
-                                  const data = await res.json().catch(() => ({}));
-                                  if (!res.ok) {
-                                    console.error('Failed to save Design Mega Prompt', data);
-                                    notify('Failed to save Design Mega Prompt. Check console for details.', 'error');
-                                    setIsGeneratingImage(false); // Re-enable on error
-                                    return;
-                                  }
-                                  setSelectedRow((prev: any) => (prev ? { ...prev, dmp: trimmedDmp } : prev));
-                                  setCalendarRows((prev) =>
-                                    prev.map((r) =>
-                                      r.contentCalendarId === rowId ? { ...r, dmp: trimmedDmp } : r,
-                                    ),
-                                  );
-                                  setIsEditingDmp(false);
-                                  notify('Design Mega Prompt saved.', 'success');
-
-                                  // Trigger image generation using the saved DMP (no OpenAI regeneration)
-                                  try {
-                                    const imageRes = await authedFetch(
-                                      `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/generate-image-from-dmp`,
-                                      {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                          dmp: trimmedDmp,
-                                        }),
-                                      }
-                                    );
-                                    if (!imageRes.ok) {
-                                      const errorData = await imageRes.json().catch(() => ({}));
-                                      notify(`Image generation failed: ${errorData.error || 'Unknown error'}`, 'error');
-                                      setIsGeneratingImage(false);
-                                      return;
-                                    }
-                                    notify('Image generation started using your saved prompt!', 'success');
-                                    // Auto close/reopen modal after 15 seconds
-                                    setTimeout(() => {
-                                      setIsImageModalOpen(false);
-                                      setTimeout(() => setIsImageModalOpen(true), 200);
-                                    }, 15000);
-                                  } catch (webhookErr) {
-                                    console.error('Failed to trigger DMP webhook', webhookErr);
-                                    // Silently ignore webhook failure; the DMP was saved
-                                  }
-
-                                  // Auto-stop loading after 15 seconds
-                                  setTimeout(() => {
-                                    setIsGeneratingImage(false);
-                                  }, 15000);
-                                } catch (err) {
-                                  console.error('Failed to save Design Mega Prompt', err);
-                                  notify('Failed to save Design Mega Prompt. Check console for details.', 'error');
-                                  setIsGeneratingImage(false); // Re-enable on error
-                                }
-                              }}
-                            >
-                              {isGeneratingImage ? 'Saving & Generating…' : 'Save & Generate'}
-                              {isGeneratingImage && <span className="loading-spinner"></span>}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <textarea
-                      className="field-input field-textarea"
-                      rows={10}
-                      value={isEditingDmp ? dmpDraft : selectedRow.dmp ?? ''}
-                      onChange={(e) => setDmpDraft(e.target.value)}
-                      readOnly={!isEditingDmp}
-                    />
-                  </div>
-                  <div className="image-modal-panel">
-                    <div className="panel-header">
-                      <h3>Preview</h3>
-                    </div>
-                    <div className="image-preview">
-                      {getImageGeneratedUrl(selectedRow) ? (
-                        (() => {
-                          const imageUrl = getImageGeneratedUrl(selectedRow);
-                          const separator = imageUrl?.includes('?') ? '&' : '?';
-                          return (
-                            <img
-                              src={`${imageUrl}${separator}v=${imagePreviewNonce}`}
-                              alt="Generated preview"
-                            />
-                          );
-                        })()
-                      ) : (
-                        <div className="empty-state">No image yet. Generate an image to see the preview.</div>
-                      )}
-                      {imagePollError && (
-                        <div className="empty-state" style={{ color: '#b91c1c', marginTop: 8 }}>
-                          {imagePollError}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer image-modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={async () => {
-                    if (!activeCompanyId) {
-                      notify('Please select a company first.', 'error');
-                      return;
-                    }
-                    if (!brandKbId) {
-                      notify('BrandKB is not loaded yet. Please try again.', 'error');
-                      return;
-                    }
-                    if (isEditingDmp) {
-                      notify('Please save or cancel your Design Mega Prompt edits before generating a new image.', 'error');
-                      return;
-                    }
-                    if (getImageGeneratedUrl(selectedRow)) {
-                      const proceed = await requestConfirm({
-                        title: 'Replace this image?',
-                        description:
-                          "You're about to generate a new image for this content item. The current preview will be replaced once finished.",
-                        confirmLabel: 'Generate new image',
-                        cancelLabel: 'Keep current image',
-                      });
-                      if (!proceed) return;
-                    }
-
-                    try {
-                      setIsGeneratingImage(true);
-                      reopenImageModalOnImageReadyRef.current = true;
-                      const baseSignature = getImageGeneratedSignature(selectedRow);
-                      if (imageModalReopenTimeoutRef.current) {
-                        clearTimeout(imageModalReopenTimeoutRef.current);
-                        imageModalReopenTimeoutRef.current = null;
-                      }
-                      imageModalReopenTimeoutRef.current = window.setTimeout(() => {
-                        if (!reopenImageModalOnImageReadyRef.current) return;
-                        setIsImageModalOpen(false);
-                        window.setTimeout(() => {
-                          if (reopenImageModalOnImageReadyRef.current) {
-                            setIsImageModalOpen(true);
-                          }
-                        }, 200);
-                      }, 30000);
-
-                      // Regenerate DMP via OpenAI, then generate image
-                      const response = await authedFetch(
-                        `${backendBaseUrl}/api/content-calendar/batch-generate-image`,
-                        {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            rowIds: [selectedRow.contentCalendarId],
-                            brandKbId,
-                            systemInstruction: systemInstruction ?? '',
-                          }),
-                        }
-                      );
-                      if (!response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        notify(`Image generation failed (${response.status}). ${data.error || ''}`, 'error');
-                        setIsGeneratingImage(false);
-                        reopenImageModalOnImageReadyRef.current = false;
-                        return;
-                      }
-                      const result = await response.json().catch(() => ({}));
-                      notify(
-                        `Generating fresh prompt and image. ${result.successCount || 0} queued. Waiting for preview…`,
-                        'success'
-                      );
-                      startWaitingForImageUpdate(baseSignature);
-                    } catch (err) {
-                      console.error('Failed to trigger image generation', err);
-                      notify('Failed to trigger image generation. Check console for details.', 'error');
-                      setIsGeneratingImage(false);
-                      reopenImageModalOnImageReadyRef.current = false;
-                    }
-
-                    // Auto-stop loading after 30 seconds
-                    setTimeout(() => {
-                      setIsGeneratingImage(false);
-                    }, 30000);
-                  }}
-                >
-                  {isGeneratingImage ? 'Generating…' : 'Generate Image'}
-                  {isGeneratingImage && <span className="loading-spinner"></span>}
-                </button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsImageModalOpen(false)}>
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ImageGenerationModal
+          isOpen={isImageModalOpen}
+          onClose={() => setIsImageModalOpen(false)}
+          selectedRow={selectedRow}
+          isEditingDmp={isEditingDmp}
+          setIsEditingDmp={setIsEditingDmp}
+          dmpDraft={dmpDraft}
+          setDmpDraft={setDmpDraft}
+          isGeneratingImage={isGeneratingImage}
+          setIsGeneratingImage={setIsGeneratingImage}
+          getImageGeneratedUrl={getImageGeneratedUrl}
+          imagePreviewNonce={imagePreviewNonce}
+          imagePollError={imagePollError}
+          notify={notify}
+          authedFetch={authedFetch}
+          backendBaseUrl={backendBaseUrl}
+          setSelectedRow={setSelectedRow}
+          setCalendarRows={setCalendarRows}
+          setIsImageModalOpen={setIsImageModalOpen}
+          activeCompanyId={activeCompanyId}
+          brandKbId={brandKbId}
+          systemInstruction={systemInstruction}
+          requestConfirm={requestConfirm}
+          reopenImageModalOnImageReadyRef={reopenImageModalOnImageReadyRef}
+          imageModalReopenTimeoutRef={imageModalReopenTimeoutRef}
+          getImageGeneratedSignature={getImageGeneratedSignature}
+          startWaitingForImageUpdate={startWaitingForImageUpdate}
+        />
 
       </div>
 
@@ -4235,30 +3187,11 @@ function App() {
         </div>
       )}
 
-      {isConfirmOpen && confirmConfig && (
-        <div className="modal-backdrop confirm-backdrop" role="presentation">
-          <div className="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-            <div className="modal-header confirm-header">
-              <h2 id="confirm-title" className="modal-title">{confirmConfig.title}</h2>
-            </div>
-            <div className="modal-body confirm-body">
-              <p className="modal-description">{confirmConfig.description}</p>
-            </div>
-            <div className="modal-footer confirm-footer">
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => resolveConfirm(false)}>
-                {confirmConfig.cancelLabel}
-              </button>
-              <button
-                type="button"
-                className={`btn btn-${confirmConfig.confirmVariant === 'danger' ? 'danger' : 'primary'} btn-sm`}
-                onClick={() => resolveConfirm(true)}
-              >
-                {confirmConfig.confirmLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        config={confirmConfig}
+        onResolve={resolveConfirm}
+      />
     </div>
   );
 }
