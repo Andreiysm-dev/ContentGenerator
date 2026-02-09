@@ -1,4 +1,5 @@
 import db from '../database/db.js';
+import { generateBrandRulesSystem } from '../services/brandRulesService.js';
 
 // CREATE - Add a new brand knowledge base entry
 export const createBrandKB = async (req, res) => {
@@ -341,6 +342,66 @@ export const updateBrandKB = async (req, res) => {
         return res.status(500).json({ 
             error: 'Internal server error' 
         });
+    }
+};
+
+// GENERATE - Generate brand rules (Brand Pack, Capabilities, Writer, Reviewer) for a brandKB entry
+export const generateBrandRulesForBrandKB = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { data: brandKB, error: brandKBError } = await db
+            .from('brandKB')
+            .select('brandKbId, companyId, form_answer')
+            .eq('brandKbId', id)
+            .single();
+
+        if (brandKBError || !brandKB) {
+            return res.status(404).json({ error: 'Brand knowledge base entry not found' });
+        }
+
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', brandKB.companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        const bodyFormAnswer = req.body?.formAnswer;
+        const formAnswer = bodyFormAnswer != null ? bodyFormAnswer : brandKB.form_answer;
+        if (formAnswer == null) {
+            return res.status(400).json({ error: 'Missing formAnswer' });
+        }
+
+        const result = await generateBrandRulesSystem({
+            companyId: brandKB.companyId,
+            brandKbId: brandKB.brandKbId,
+            formAnswer,
+        });
+
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error });
+        }
+
+        return res.status(200).json({
+            message: 'Brand rules generated successfully',
+            brandKB: result.brandKB,
+            outputs: result.outputs,
+        });
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 

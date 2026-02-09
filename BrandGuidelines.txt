@@ -1,0 +1,205 @@
+RIBO Brand Guidelines v1.0 (Text)
+1) Brand Overview
+
+Ribo is a CRM SaaS product designed for startups, small businesses, and sales teams.
+The platform helps teams manage relationships, workflows, and customer data in a clear and efficient way.
+
+Brand attributes:
+
+Innovation
+
+Reliability
+
+Ease of use
+
+Not overly corporate or rigid
+
+(From Brand Overview, page 3) 
+
+RIBO - Brand Guidelines
+
+2) Logo System
+Wordmark Logo
+
+Dark Logo Variant
+
+Intended for light backgrounds
+
+Focus: clarity + consistent brand presence
+
+(Logo System, page 5) 
+
+RIBO - Brand Guidelines
+
+Light Logo Variant
+
+Intended for dark / high-contrast backgrounds
+
+Ensures legibility and visual balance in digital environments
+
+(Logo System, page 6) 
+
+RIBO - Brand Guidelines
+
+3) Correct and Incorrect Logo Usage
+
+Use the Ribo logo consistently and correctly to maintain brand clarity, legibility, and trust across all applications.
+
+Always
+
+Use the logo in its original proportions
+
+Apply only approved light or dark variants
+
+Maintain sufficient contrast between logo and background
+
+Placement
+
+Place the logo on clean, uncluttered backgrounds
+
+Ensure adequate clear space around the logo
+
+Avoid competing elements near the logo
+
+Why it matters
+
+Builds strong brand recognition
+
+Preserves visual clarity
+
+Reinforces a professional brand presence
+
+(Correct Logo Usage, page 8) 
+
+RIBO - Brand Guidelines
+
+Don’t
+
+Stretch the logo
+
+Change the logo’s colors
+
+Rotate or skew the logo
+
+Place the logo on low contrast or busy backgrounds
+
+(Incorrect Logo Usage, page 9) 
+
+RIBO - Brand Guidelines
+
+4) Color System
+
+Ribo uses a clean and minimal color palette designed for modern SaaS applications.
+
+Palette (hex):
+
+#0b2641
+
+#1d3d5e
+
+#385980
+
+#3fa9f5
+
+#a78bfa
+
+#e5a4e6
+
+#81bad1
+
+#6fb6e8
+
+#ffffff
+
+#000000
+
+(Color System, page 11) 
+
+RIBO - Brand Guidelines
+
+5) Font System (Typography)
+
+Header font: Helvetica Now
+
+Body font: Poppins
+
+(Font System, page 13) 
+
+RIBO - Brand Guidelines
+
+6) Icon Style
+
+Icons used within the Ribo brand should:
+
+Follow a simple, geometric visual style
+
+Use consistent stroke weight across all iconography
+
+Prefer outline-style icons with rounded/subtle corners
+
+Stay functional and minimal
+
+Support content/usability (not decorative/illustrative)
+
+(Icon Style, page 15) 
+
+RIBO - Brand Guidelines
+
+7) Tone of Voice
+Clear & Confident
+
+Description: Clarity and assurance; expertise without arrogance
+
+Do: direct, plain language; decisive and informative
+
+Don’t: vague wording, filler, uncertainty
+
+Professional but Approachable
+
+Description: Polished and credible, friendly and easy to understand
+
+Do: respectful conversational tone; explain simply
+
+Don’t: cold, overly formal, or overly casual
+
+Helpful & Human
+
+Description: Prioritize user needs with empathy and understanding
+
+Do: acknowledge challenges; offer practical guidance
+
+Don’t: dismiss concerns; sound robotic
+
+Straightforward & Concise
+
+Description: Value users’ time; communicate efficiently
+
+Do: get to the point; short sentences; clear structure
+
+Don’t: over-explain; jargon without context; unnecessary detail
+
+Tech-Forward & Reliable
+
+Description: Innovation + trust via thoughtful, accurate communication
+
+Do: use precise terminology when needed; ensure accuracy
+
+Don’t: buzzwords/hype; promises you can’t support
+
+(Tone of Voice, page 17) 
+
+RIBO - Brand Guidelines
+
+8) Example Applications
+
+Shown as example mockups:
+
+Social media application
+
+Digital advertisement
+
+Website application
+
+(Example Applications, page 19) 
+
+RIBO - Brand Guidelines

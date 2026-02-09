@@ -1,16 +1,18 @@
 import express from 'express';
-import { 
-    createContentCalendar, 
-    getAllContentCalendars, 
-    getContentCalendarById, 
+import {
+    createContentCalendar,
+    getAllContentCalendars,
+    getContentCalendarById,
     getContentCalendarsByCompanyId,
     getContentCalendarsByDateRange,
     getContentCalendarsByStatus,
-    updateContentCalendar, 
+    updateContentCalendar,
     deleteContentCalendar,
     deleteContentCalendarsByCompanyId,
     batchGenerateImages
 } from '../controller/contentCalendarController.js';
+import { generateCaptionForContent, generateCaptionsBulk } from '../services/captionGenerationService.js';
+import { reviewContentForCalendarRow, reviewContentBulk } from '../services/contentReviewService.js';
 
 const router = express.Router();
 
@@ -36,6 +38,88 @@ router.get('/content-calendar/company/:companyId', getContentCalendarsByCompanyI
 
 // POST - /api/content-calendar/batch-generate-image
 router.post('/content-calendar/batch-generate-image', batchGenerateImages);
+
+// POST - /api/content-calendar/:contentCalendarId/generate-image-from-dmp
+router.post('/content-calendar/:contentCalendarId/generate-image-from-dmp', async (req, res) => {
+    try {
+        const { contentCalendarId } = req.params;
+        const { dmp } = req.body;
+        const userId = req.user?.id;
+        const { generateImageFromCustomDmp } = await import('../services/imageGenerationService.js');
+        const result = await generateImageFromCustomDmp(contentCalendarId, dmp, { userId });
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error });
+        }
+        return res.status(200).json({ result: result.result, contentCalendar: result.contentCalendar });
+    } catch (err) {
+        console.error('Generate image from DMP endpoint error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST - /api/content-calendar/:contentCalendarId/generate-caption
+router.post('/content-calendar/:contentCalendarId/generate-caption', async (req, res) => {
+    try {
+        const { contentCalendarId } = req.params;
+        const userId = req.user?.id;
+        const result = await generateCaptionForContent(contentCalendarId, { userId });
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error, code: result.code });
+        }
+        return res.status(200).json({ result: result.result, contentCalendar: result.contentCalendar });
+    } catch (err) {
+        console.error('Generate caption endpoint error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST - /api/content-calendar/generate-captions
+router.post('/content-calendar/generate-captions', async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { contentCalendarIds } = req.body || {};
+        const result = await generateCaptionsBulk(contentCalendarIds, { userId });
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error });
+        }
+        return res.status(200).json({ summary: result.summary });
+    } catch (err) {
+        console.error('Bulk generate captions endpoint error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST - /api/content-calendar/:contentCalendarId/review-content
+router.post('/content-calendar/:contentCalendarId/review-content', async (req, res) => {
+    try {
+        const { contentCalendarId } = req.params;
+        const userId = req.user?.id;
+        const result = await reviewContentForCalendarRow(contentCalendarId, { userId });
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error, code: result.code });
+        }
+        return res.status(200).json({ result: result.result, contentCalendar: result.contentCalendar });
+    } catch (err) {
+        console.error('Review content endpoint error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST - /api/content-calendar/review-content-bulk
+router.post('/content-calendar/review-content-bulk', async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { contentCalendarIds } = req.body || {};
+        const result = await reviewContentBulk(contentCalendarIds, { userId });
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error });
+        }
+        return res.status(200).json({ summary: result.summary });
+    } catch (err) {
+        console.error('Bulk review content endpoint error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 // UPDATE - PUT /api/content-calendar/:id
 router.put('/content-calendar/:id', updateContentCalendar);

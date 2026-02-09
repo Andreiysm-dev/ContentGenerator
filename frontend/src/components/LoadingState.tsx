@@ -1,48 +1,64 @@
-export const TableSkeleton = () => {
+/* Skeletons use Ribo brand colors: #0b2641, #385980, #81bad1 */
+
+export const CalendarTableSkeleton = () => {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead className="bg-slate-50 border-b border-slate-200">
+    <div className="calendar-table-wrapper calendar-skeleton-wrapper">
+      <table className="calendar-table">
+        <thead>
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Date</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Theme</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Type</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Channels</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Assets</th>
-            <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">Actions</th>
+            <th className="calendar-col calendar-col--checkbox">
+              <div className="skeleton-box skeleton-checkbox" />
+            </th>
+            <th className="calendar-col calendar-col--primary">Date</th>
+            <th className="calendar-col calendar-col--primary calendar-col--theme">Theme / Content</th>
+            <th className="calendar-col calendar-col--muted">Brand / Promo</th>
+            <th className="calendar-col">Channel / Target</th>
+            <th className="calendar-col">Primary / CTA</th>
+            <th className="calendar-col calendar-col--status">Status</th>
+            <th className="calendar-col calendar-col--actions">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200">
-          {[...Array(5)].map((_, i) => (
-            <tr key={i} className="animate-pulse">
-              <td className="px-4 py-3">
-                <div className="h-4 bg-slate-200 rounded w-24"></div>
+        <tbody>
+          {[...Array(8)].map((_, i) => (
+            <tr key={i} className="skeleton-row">
+              <td className="calendar-cell calendar-cell--checkbox">
+                <div className="skeleton-box skeleton-checkbox" />
               </td>
-              <td className="px-4 py-3">
-                <div className="h-4 bg-slate-200 rounded w-32 mb-2"></div>
-                <div className="h-3 bg-slate-100 rounded w-48"></div>
+              <td className="calendar-cell calendar-cell--primary">
+                <div className="skeleton-box skeleton-w-20" />
               </td>
-              <td className="px-4 py-3">
-                <div className="h-4 bg-slate-200 rounded w-20"></div>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex gap-1">
-                  <div className="h-6 bg-slate-200 rounded w-16"></div>
-                  <div className="h-6 bg-slate-200 rounded w-16"></div>
+              <td className="calendar-cell calendar-cell--theme">
+                <div className="skeleton-stack">
+                  <div className="skeleton-box skeleton-w-32" />
+                  <div className="skeleton-box skeleton-w-24 skeleton-thin" />
                 </div>
               </td>
-              <td className="px-4 py-3">
-                <div className="h-7 bg-slate-200 rounded-full w-24"></div>
+              <td className="calendar-cell">
+                <div className="skeleton-stack">
+                  <div className="skeleton-box skeleton-w-36 skeleton-thin" />
+                  <div className="skeleton-box skeleton-w-28 skeleton-thin" />
+                </div>
               </td>
-              <td className="px-4 py-3">
-                <div className="h-4 bg-slate-200 rounded w-16"></div>
+              <td className="calendar-cell">
+                <div className="skeleton-stack">
+                  <div className="skeleton-box skeleton-w-24" />
+                  <div className="skeleton-box skeleton-w-20 skeleton-thin" />
+                </div>
               </td>
-              <td className="px-4 py-3">
-                <div className="flex justify-end gap-1">
-                  <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
-                  <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
-                  <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
+              <td className="calendar-cell">
+                <div className="skeleton-stack">
+                  <div className="skeleton-box skeleton-w-28" />
+                  <div className="skeleton-box skeleton-w-16 skeleton-thin" />
+                </div>
+              </td>
+              <td className="calendar-cell calendar-cell--status">
+                <div className="skeleton-box skeleton-pill" />
+              </td>
+              <td className="calendar-cell calendar-cell--actions">
+                <div className="skeleton-actions">
+                  <div className="skeleton-box skeleton-btn" />
+                  <div className="skeleton-box skeleton-btn" />
+                  <div className="skeleton-box skeleton-btn" />
                 </div>
               </td>
             </tr>
@@ -53,22 +69,53 @@ export const TableSkeleton = () => {
   );
 };
 
+export const TableSkeleton = () => {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full calendar-table">
+        <thead className="skeleton-thead">
+          <tr>
+            <th>Date</th>
+            <th>Theme</th>
+            <th>Type</th>
+            <th>Channels</th>
+            <th>Status</th>
+            <th>Assets</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[...Array(5)].map((_, i) => (
+            <tr key={i} className="skeleton-row">
+              <td><div className="skeleton-box skeleton-w-24" /></td>
+              <td><div className="skeleton-box skeleton-w-32" /></td>
+              <td><div className="skeleton-box skeleton-w-20" /></td>
+              <td><div className="skeleton-box skeleton-w-16" /></td>
+              <td><div className="skeleton-box skeleton-pill" /></td>
+              <td><div className="skeleton-box skeleton-w-16" /></td>
+              <td><div className="skeleton-box skeleton-w-24" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 export const FormSkeleton = () => {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="form-skeleton animate-pulse">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 bg-slate-50">
-            <div className="h-5 bg-slate-200 rounded w-32"></div>
-          </div>
-          <div className="p-4 bg-white grid grid-cols-2 gap-4">
+        <div key={i} className="skeleton-form-section">
+          <div className="skeleton-section-header" />
+          <div className="skeleton-form-grid">
             <div>
-              <div className="h-3 bg-slate-200 rounded w-16 mb-2"></div>
-              <div className="h-10 bg-slate-100 rounded-lg"></div>
+              <div className="skeleton-label" />
+              <div className="skeleton-input" />
             </div>
             <div>
-              <div className="h-3 bg-slate-200 rounded w-20 mb-2"></div>
-              <div className="h-10 bg-slate-100 rounded-lg"></div>
+              <div className="skeleton-label" />
+              <div className="skeleton-input" />
             </div>
           </div>
         </div>
@@ -79,19 +126,34 @@ export const FormSkeleton = () => {
 
 export const CardSkeleton = () => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 animate-pulse">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-8 h-8 bg-slate-200 rounded-lg"></div>
-        <div className="flex-1">
-          <div className="h-5 bg-slate-200 rounded w-48 mb-2"></div>
-          <div className="h-3 bg-slate-100 rounded w-64"></div>
+    <div className="skeleton-card animate-pulse">
+      <div className="skeleton-card-header">
+        <div className="skeleton-box skeleton-icon" />
+        <div className="skeleton-card-title-group">
+          <div className="skeleton-box skeleton-w-48" />
+          <div className="skeleton-box skeleton-w-64 skeleton-thin" />
         </div>
       </div>
-      <div className="space-y-3">
-        <div className="h-10 bg-slate-100 rounded-lg"></div>
-        <div className="h-10 bg-slate-100 rounded-lg"></div>
-        <div className="h-10 bg-slate-100 rounded-lg"></div>
+      <div className="skeleton-card-body">
+        <div className="skeleton-input" />
+        <div className="skeleton-input" />
+        <div className="skeleton-input" />
       </div>
+    </div>
+  );
+};
+
+export const AuthLoadingSkeleton = () => {
+  return (
+    <div className="auth-card auth-loading-skeleton">
+      <div className="skeleton-spinner-wrap">
+        <span className="loading-spinner" aria-hidden="true" />
+      </div>
+      <div className="skeleton-auth-text">
+        <div className="skeleton-box skeleton-w-32" />
+        <div className="skeleton-box skeleton-w-48 skeleton-thin" />
+      </div>
+      <p className="skeleton-auth-hint">Authenticating…</p>
     </div>
   );
 };

@@ -4,6 +4,7 @@ import {
     getAllBrandKBs, 
     getBrandKBById, 
     getBrandKBsByCompanyId,
+    generateBrandRulesForBrandKB,
     updateBrandKB, 
     deleteBrandKB,
     deleteBrandKBsByCompanyId
@@ -25,6 +26,9 @@ router.get('/brandkb/company/:companyId', getBrandKBsByCompanyId);
 
 // UPDATE - PUT /api/brandkb/:id
 router.put('/brandkb/:id', updateBrandKB);
+
+// GENERATE - POST /api/brandkb/:id/generate-rules
+router.post('/brandkb/:id/generate-rules', generateBrandRulesForBrandKB);
 
 // DELETE - DELETE /api/brandkb/:id (delete one)
 router.delete('/brandkb/:id', deleteBrandKB);
