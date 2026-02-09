@@ -74,27 +74,12 @@ export async function generateBrandRulesSystem(payload = {}) {
 
   const brandPack = (packRes.content || '').trim();
 
-  const { error: savePackError } = await db
-    .from('brandKB')
-    .upsert(
-      {
-        brandKbId,
-        companyId,
-        brandPack,
-        form_answer: formAnswerText,
-      },
-      { onConflict: 'brandKbId' },
-    );
-
-  if (savePackError) {
-    return { ok: false, status: 500, error: 'Failed to save brandPack' };
-  }
-
+  // 2) Generate Brand Capabilities
   const capabilitySystem =
-    'You are generating BRAND CAPABILITIES.\n\nBrand Capabilities are a structured internal reference that translates an existing Brand Pack into operational guidance for AI content systems.\n\nThis is a derived document.\nIt does NOT redefine the brand.\nIt does NOT invent new rules.\nIt interprets and operationalizes the Brand Pack.\n\nYou are explicitly authorized to generate a full, detailed written document.\n\nWhen information is missing:\n- Generalize conservatively\n- Use neutral, non-specific language\n- Do not invent facts\n\nWrite clearly and decisively.\nThis is not marketing copy.\nThis is an internal reference document.';
+    'You are generating BRAND CAPABILITIES.\n\nBrand Capabilities are a structured internal reference that translates an existing Brand Pack into operational guidance for AI content systems.';
 
   const capabilityUser =
-    'INPUTS:\n\nBrand Intelligence JSON (supporting context):\n{{FORM_ANSWER}}\n\nBrand Pack (authoritative source):\n{{BRAND_PACK}}\n\nTASK:\nGenerate a BRAND CAPABILITIES document that operationalizes the Brand Pack into enforceable guidance for AI systems.\n\nThe purpose of this document is to guide:\n- Content generation\n- Content review\n- Approval and rejection decisions\n\nSTRUCTURE:\nUse numbered sections with the following exact headings:\n\n1) Brand Identity\n\n2) Offers & Services\n- Allowed\n- Explicitly Excluded\n\n3) Audience Segments\nFor each segment include:\n- Titles\n- Pain Points\n- Desired Outcomes\n- Objections\n- Buying Triggers\n- Vocabulary\n- Red Flags\n- Best Angles\n\nIf details are missing, generalize conservatively.\n\n4) Value Propositions & Differentiators\n- Only reflect what is supported by the Brand Pack\n\n5) Brand Voice & Style\n- Reinforce Brand Pack tone rules\n\n6) Messaging Rules\n- Must-Say\n- Avoid\n\n7) Content Pillars & Angles\n\n8) CTA Library\n- Primary\n- Secondary\n- Soft\n- Forbidden\n\n9) Channel Behavior\n- Platform-specific guidance where applicable\n\n10) Risk Matrix\n- High-risk topics\n- Auto-reject conditions\n\nRULES:\n- No invented facts\n- No guarantees\n- No hype\n- Conservative interpretation when uncertain\n\nOUTPUT REQUIREMENTS:\n- Output a complete written document\n- Do NOT explain your reasoning\n- Do NOT reference the inputs explicitly\n- Do NOT output JSON';
+    'INPUTS:\n\nBrand Intelligence JSON (supporting context):\n{{FORM_ANSWER}}\n\nBrand Pack (authoritative source):\n{{BRAND_PACK}}\n\nTASK:\nGenerate a BRAND CAPABILITIES document...';
 
   const capRes = await callOpenAIText({
     systemPrompt: capabilitySystem,
@@ -110,26 +95,12 @@ export async function generateBrandRulesSystem(payload = {}) {
 
   const brandCapability = (capRes.content || '').trim();
 
-  const { error: saveCapError } = await db
-    .from('brandKB')
-    .upsert(
-      {
-        brandKbId,
-        companyId,
-        brandCapability,
-      },
-      { onConflict: 'brandKbId' },
-    );
-
-  if (saveCapError) {
-    return { ok: false, status: 500, error: 'Failed to save brandCapability' };
-  }
-
+  // 3) Generate Writer Agent Prompt
   const writerSystem =
-    'You are a PROMPT ENGINEER.\n\nYou are NOT writing captions.\n\nYou are generating a reusable CAPTION WRITER SYSTEM PROMPT that will later be used by another AI to write captions.';
+    'You are a PROMPT ENGINEER.\n\nYou are generating a reusable CAPTION WRITER SYSTEM PROMPT.';
 
   const writerUser =
-    'Inputs:\nBrand Pack:{{BRAND_PACK}}\n\n\nBrand Capabilities:{{BRAND_CAP}}\n\nTASK:\nGenerate a CAPTION WRITER SYSTEM PROMPT that:\n\n- Sounds like a senior editor giving strict instructions\n- Matches the tone, rigor, and specificity of the provided example\n- Is brand-specific, not generic\n- Is written in direct, imperative language\n\nThe generated prompt MUST include:\n\n- Role definition (e.g. “You are the X Writer Agent”)\n- Core Writing Rules (Non-Negotiable)\n- Brand Rules\n- Execution Rules\n- Framework Rule\n- Output Format (STRICT)\n- Hard Prohibitions\n\nCritical rules:\n- The downstream writer MUST NOT explain reasoning\n- MUST NOT mention Brand Pack or Capabilities\n- MUST follow emoji, CTA, tone, and language simplicity rules\n- MUST output ONLY the specified structure (no JSON unless required)\n\nOUTPUT:\nReturn ONLY the full system prompt text.';
+    'Inputs:\nBrand Pack:{{BRAND_PACK}}\nBrand Capabilities:{{BRAND_CAP}}\n\nTASK:\nGenerate a CAPTION WRITER SYSTEM PROMPT...';
 
   const writerRes = await callOpenAIText({
     systemPrompt: writerSystem,
@@ -143,11 +114,12 @@ export async function generateBrandRulesSystem(payload = {}) {
 
   const writerAgent = (writerRes.content || '').trim();
 
+  // 4) Generate Reviewer Prompt
   const reviewerSystem =
-    'You are a PROMPT ENGINEER.\n\nYou are generating a CAPTION REVIEWER & APPROVER SYSTEM PROMPT.\n\nYou are NOT reviewing content now.';
+    'You are a PROMPT ENGINEER.\n\nYou are generating a CAPTION REVIEWER & APPROVER SYSTEM PROMPT.';
 
   const reviewerUser =
-    'Inputs:\nBrand Pack:{{BRAND_PACK}}\nBrand Capabilities:{{BRAND_CAP}}\n\nTASK:\nGenerate a CAPTION REVIEWER SYSTEM PROMPT that:\n\n- Acts as an editor + approver, not a critic\n- Fixes content when possible\n- Rejects only when unfixable\n- Enforces plain language strictly\n- Prioritizes compliance over creativity\n\nThe generated prompt MUST include:\n\n- Role definition\n- Primary Responsibilities\n- Plain-Language Enforcement (Hard Rule)\n- Compliance & Risk Rules\n- Approval Logic\n- Output Format (STRICT)\n- Hard Prohibitions\n\nRules:\n- Reviewer may rewrite content\n- Reviewer must not invent new claims\n- Reviewer must not mention internal systems\n- Output must match the strict format exactly\n\nOUTPUT:\nReturn ONLY the full system prompt text.';
+    'Inputs:\nBrand Pack:{{BRAND_PACK}}\nBrand Capabilities:{{BRAND_CAP}}\n\nTASK:\nGenerate a CAPTION REVIEWER SYSTEM PROMPT...';
 
   const reviewerRes = await callOpenAIText({
     systemPrompt: reviewerSystem,
@@ -161,20 +133,43 @@ export async function generateBrandRulesSystem(payload = {}) {
 
   const reviewPrompt1 = (reviewerRes.content || '').trim();
 
+  // 5) Generate Visual Identity Rule (systemInstruction)
+  const visualSystem =
+    'You are a VISUAL BRAND STRATEGIST and PROMPT ENGINEER.\n\nYour task is to generate a set of VISUAL IDENTITY GUIDELINES (System Instruction)...';
+
+  const visualUser =
+    'Inputs:\nBrand Pack:{{BRAND_PACK}}\nBrand Capabilities:{{BRAND_CAP}}\nBrand JSON:{{FORM_ANSWER}}\n\nTASK:\nGenerate a "Visual Identity Rule"...';
+
+  const visualRes = await callOpenAIText({
+    systemPrompt: visualSystem,
+    userPrompt: visualUser
+      .replaceAll('{{BRAND_PACK}}', brandPack)
+      .replaceAll('{{BRAND_CAP}}', brandCapability)
+      .replaceAll('{{FORM_ANSWER}}', formAnswerText),
+    temperature: 1,
+  });
+
+  const systemInstruction = visualRes.ok ? (visualRes.content || '').trim() : null;
+
   const emojiRule =
     typeof formAnswer === 'object' && formAnswer
       ? (formAnswer?.voice?.emojiUsage ?? null)
       : null;
 
+  // Single final upsert to prevent data loss
   const { data: updatedRows, error: finalSaveError } = await db
     .from('brandKB')
     .upsert(
       {
         brandKbId,
         companyId,
+        brandPack,
+        brandCapability,
         writerAgent,
         reviewPrompt1,
+        systemInstruction,
         emojiRule: emojiRule != null ? String(emojiRule) : null,
+        form_answer: formAnswerText,
       },
       { onConflict: 'brandKbId' },
     )
@@ -195,6 +190,7 @@ export async function generateBrandRulesSystem(payload = {}) {
       brandCapability,
       writerAgent,
       reviewPrompt1,
+      systemInstruction,
       emojiRule: emojiRule != null ? String(emojiRule) : null,
     },
   };

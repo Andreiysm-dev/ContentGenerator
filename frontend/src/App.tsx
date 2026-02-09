@@ -64,6 +64,11 @@ import {
   ImageGenerationModal,
 } from '@/modals';
 import './App.css';
+import './styles/dashboard.css';
+import './styles/create.css';
+import './styles/calendar.css';
+import './styles/drafts.css';
+import './styles/company-settings.css';
 import './polish.css';
 
 type FormState = {
@@ -525,17 +530,17 @@ function App() {
     },
   });
 
-  const saveBrandSetup = async () => {
-    if (!activeCompanyId) return false;
+  const saveBrandSetup = async (overrides: any = {}) => {
+    if (!activeCompanyId) return null;
     const formAnswer = buildFormAnswer();
     const brandPayload = {
       companyId: activeCompanyId,
-      brandPack,
-      brandCapability,
-      emojiRule,
-      systemInstruction,
-      writerAgent: aiWriterSystemPrompt,
-      reviewPrompt1: aiWriterUserPrompt,
+      brandPack: overrides.brandPack !== undefined ? overrides.brandPack : brandPack,
+      brandCapability: overrides.brandCapability !== undefined ? overrides.brandCapability : brandCapability,
+      emojiRule: overrides.emojiRule !== undefined ? overrides.emojiRule : emojiRule,
+      systemInstruction: overrides.systemInstruction !== undefined ? overrides.systemInstruction : systemInstruction,
+      writerAgent: overrides.writerAgent !== undefined ? overrides.writerAgent : aiWriterSystemPrompt,
+      reviewPrompt1: overrides.reviewPrompt1 !== undefined ? overrides.reviewPrompt1 : aiWriterUserPrompt,
       form_answer: formAnswer,
     };
     const brandUrl = brandKbId
@@ -551,13 +556,14 @@ function App() {
     if (!brandRes.ok) {
       console.error('BrandKB save failed:', brandData);
       notify('Failed to save brand settings. Check console for details.', 'error');
-      return false;
+      return null;
     }
+    const finalId = brandData?.brandKB?.brandKbId || brandKbId;
     if (brandData?.brandKB?.brandKbId) {
       setBrandKbId(brandData.brandKB.brandKbId);
     }
     setFormAnswerCache(formAnswer);
-    return true;
+    return finalId;
   };
 
   const applyFormAnswer = (formAnswer: any) => {
@@ -654,11 +660,11 @@ function App() {
     try {
       let effectiveBrandKbId = brandKbId;
       if (!effectiveBrandKbId) {
-        const saved = await saveBrandSetup();
-        if (!saved) {
+        const resultId = await saveBrandSetup();
+        if (!resultId) {
           throw new Error('Failed to save Brand Intelligence draft');
         }
-        effectiveBrandKbId = brandKbId;
+        effectiveBrandKbId = resultId;
       }
       if (!effectiveBrandKbId) {
         throw new Error('Missing brandKbId');
@@ -728,7 +734,13 @@ function App() {
     setAiWriterUserPrompt(nextReviewer);
     setSystemInstruction(nextVisual);
 
-    const saved = await saveBrandSetup();
+    const saved = await saveBrandSetup({
+      brandPack: nextPack,
+      brandCapability: nextCapabilities,
+      writerAgent: nextWriter,
+      reviewPrompt1: nextReviewer,
+      systemInstruction: nextVisual,
+    });
     if (saved) {
       notify('Brand rules saved.', 'success');
       setActiveBrandRuleEdit(null);
