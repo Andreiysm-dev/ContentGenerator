@@ -254,6 +254,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                     <div className="company-tab-panel" key={tab}>
                         {tab === 'overview' && (
                             <>
+                            <div className="settings-section brand-intel-section">
                                 <div className="company-page-header">
                                     <div>
                                         <h1 className="company-page-title">Overview</h1>
@@ -352,6 +353,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                         </div>
                                     </aside>
                                 </div>
+                            </div>
                             </>
                         )}
 
@@ -995,7 +997,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         )}
 
                         {tab === 'team' && (
-                            <div className="settings-section">
+                            <div className="settings-section brand-intel-section">
                                 <div className="company-page-header">
                                     <div>
                                         <h1 className="company-page-title">Team</h1>
@@ -1043,7 +1045,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         )}
 
                         {tab === 'integrations' && (
-                            <div className="settings-section">
+                            <div className="settings-section brand-intel-section">
                                 <div className="company-page-header">
                                     <div>
                                         <h1 className="company-page-title">Integrations</h1>
