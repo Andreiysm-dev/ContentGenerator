@@ -64,11 +64,13 @@ import {
   ImageGenerationModal,
 } from '@/modals';
 import './App.css';
+import './styles/modals.css';
 import './styles/dashboard.css';
 import './styles/create.css';
 import './styles/calendar.css';
 import './styles/drafts.css';
 import './styles/company-settings.css';
+import './styles/login.css';
 import './polish.css';
 
 type FormState = {
