@@ -428,19 +428,21 @@ function App() {
   const [writerRulesUnlocked, setWriterRulesUnlocked] = useState(false);
   const [reviewerRulesUnlocked, setReviewerRulesUnlocked] = useState(false);
   const [activeBrandRuleEdit, setActiveBrandRuleEdit] = useState<
-    'pack' | 'capabilities' | 'writer' | 'reviewer' | null
+    'pack' | 'capabilities' | 'writer' | 'reviewer' | 'visual' | null
   >(null);
   const [brandRuleDraft, setBrandRuleDraft] = useState<{
     pack: string;
     capabilities: string;
     writer: string;
     reviewer: string;
-  }>({ pack: '', capabilities: '', writer: '', reviewer: '' });
+    visual: string;
+  }>({ pack: '', capabilities: '', writer: '', reviewer: '', visual: '' });
   const brandRuleSnapshotRef = useRef<{
     pack: string;
     capabilities: string;
     writer: string;
     reviewer: string;
+    visual: string;
   } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const viewModalPollRef = useRef<number | null>(null);
@@ -673,12 +675,13 @@ function App() {
     }
   };
 
-  const startBrandRuleEdit = (key: 'pack' | 'capabilities' | 'writer' | 'reviewer') => {
+  const startBrandRuleEdit = (key: 'pack' | 'capabilities' | 'writer' | 'reviewer' | 'visual') => {
     const snapshot = {
       pack: brandPack,
       capabilities: brandCapability,
       writer: aiWriterSystemPrompt,
       reviewer: aiWriterUserPrompt,
+      visual: systemInstruction,
     };
     brandRuleSnapshotRef.current = snapshot;
     setBrandRuleDraft(snapshot);
@@ -706,11 +709,13 @@ function App() {
       activeBrandRuleEdit === 'capabilities' ? brandRuleDraft.capabilities : brandCapability;
     const nextWriter = activeBrandRuleEdit === 'writer' ? brandRuleDraft.writer : aiWriterSystemPrompt;
     const nextReviewer = activeBrandRuleEdit === 'reviewer' ? brandRuleDraft.reviewer : aiWriterUserPrompt;
+    const nextVisual = activeBrandRuleEdit === 'visual' ? brandRuleDraft.visual : systemInstruction;
 
     setBrandPack(nextPack);
     setBrandCapability(nextCapabilities);
     setAiWriterSystemPrompt(nextWriter);
     setAiWriterUserPrompt(nextReviewer);
+    setSystemInstruction(nextVisual);
 
     const saved = await saveBrandSetup();
     if (saved) {
@@ -2403,18 +2408,7 @@ function App() {
                 <FileText className="nav-rail-icon" aria-hidden="true" />
                 Drafts
               </button>
-              <button
-                type="button"
-                className={`nav-rail-link ${activeNavKey === 'integrations' ? 'is-active' : ''}`}
-                onClick={() => {
-                  if (!activeCompanyId) return;
-                  navigate(`/company/${encodeURIComponent(activeCompanyId)}/integrations`);
-                }}
-                disabled={!activeCompanyId || !isNavDrawerOpen}
-              >
-                <Plug className="nav-rail-icon" aria-hidden="true" />
-                Integrations
-              </button>
+
               <button
                 type="button"
                 className={`nav-rail-link ${activeNavKey === 'settings' ? 'is-active' : ''}`}
@@ -2556,10 +2550,7 @@ function App() {
                 element={<BrandRedirect />}
               />
 
-              <Route
-                path="/company/:companyId/integrations"
-                element={<IntegrationsPage />}
-              />
+
 
               <Route
                 path="/company/:companyId/settings/overview"
