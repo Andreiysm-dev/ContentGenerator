@@ -52,6 +52,7 @@ import { ProfilePage } from '@/pages/ProfilePage';
 import { SettingsPage, type CompanySettingsTab } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
+import { LoginPage } from '@/pages/LoginPage';
 import {
   AddCompanyModal,
   CsvExportModal,
@@ -2328,31 +2329,9 @@ function App() {
     );
   }
 
+
   if (!session) {
-    return (
-      <div className="auth-screen">
-        <div className="auth-card">
-          <h1>Welcome back</h1>
-          <p>Sign in with Google to continue.</p>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={async () => {
-              if (!supabase) {
-                notify('Supabase is not configured.', 'error');
-                return;
-              }
-              await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: { redirectTo: window.location.origin },
-              });
-            }}
-          >
-            Sign in with Google
-          </button>
-        </div>
-      </div>
-    );
+    return <LoginPage supabase={supabase} notify={notify} />;
   }
 
   return (
