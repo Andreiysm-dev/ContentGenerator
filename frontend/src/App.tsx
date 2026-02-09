@@ -2383,7 +2383,6 @@ function App() {
                     navigate('/profile');
                   }}
                 >
-                  <User size={16} />
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -2392,7 +2391,6 @@ function App() {
                     await supabase?.auth.signOut();
                   }}
                 >
-                  <LogOut size={16} />
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>
