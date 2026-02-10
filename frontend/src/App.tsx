@@ -2,23 +2,11 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { createClient, type Session } from '@supabase/supabase-js';
 import {
 
-  Building2,
-  CalendarDays,
-  HelpCircle,
-  LayoutDashboard,
-  Bell,
   Plug,
-  Settings,
-  Wand2,
   CheckCircle2,
   XCircle,
   Info,
-  FileText,
-  User,
-  LogOut,
   SearchX,
-  Plus,
-  Check,
   TrendingUp,
   TrendingDown,
   Target,
@@ -27,7 +15,6 @@ import {
   Search,
   Filter,
   FilterX,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Activity,
@@ -63,6 +50,8 @@ import {
   ViewContentModal,
   ImageGenerationModal,
 } from '@/modals';
+import { Header } from '@/components/Header';
+import { Sidebar } from '@/components/Sidebar';
 import './App.css';
 import './styles/modals.css';
 import './styles/dashboard.css';
@@ -113,6 +102,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
+  const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
   const [form, setForm] = useState<FormState>({
     date: '',
     brandHighlight: '',
@@ -2350,202 +2340,34 @@ function App() {
 
   return (
     <div>
-      <header className="app-header">
-        <div className="app-header-inner">
-          <button
-            type="button"
-            className="app-title-trigger"
-            onClick={() => setIsNavDrawerOpen((prev) => !prev)}
-          >
-            <span className="app-title-text">ContentGenerator</span>
-            <span className="app-title-context">· {activeCompany?.companyName || 'Select company'}</span>
-          </button>
+      <Header
+        isNavDrawerOpen={isNavDrawerOpen}
+        setIsNavDrawerOpen={setIsNavDrawerOpen}
+        activeCompany={activeCompany}
+        notify={notify}
+        navigate={navigate}
+        session={session}
+        supabase={supabase}
+      />
 
-          <div className="header-actions">
-            <button
-              type="button"
-              className="header-icon-btn"
-              onClick={() => {
-                notify('No notifications yet.', 'info');
-              }}
-              title="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
+      <div className="flex min-h-[calc(100vh-80px)] relative">
+        <Sidebar
+          isNavDrawerOpen={isNavDrawerOpen}
+          activeCompany={activeCompany}
+          activeCompanyId={activeCompanyId}
+          companies={companies}
+          isCompanyDropdownOpen={isCompanyDropdownOpen}
+          setIsCompanyDropdownOpen={setIsCompanyDropdownOpen}
+          navigate={navigate}
+          activeNavKey={activeNavKey}
+          setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+          setNewCompanyName={setNewCompanyName}
+          setNewCompanyDescription={setNewCompanyDescription}
+          setIsAddCompanyModalOpen={setIsAddCompanyModalOpen}
+          notify={notify}
+        />
 
-            <button
-              type="button"
-              className="header-icon-btn"
-              onClick={() => {
-                navigate('/profile');
-              }}
-              title="User settings"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="btn btn-secondary btn-sm">
-                  {session?.user?.user_metadata?.full_name || session?.user?.email || 'Profile'}
-                  <span className="company-trigger-caret">▾</span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onSelect={() => {
-                    navigate('/profile');
-                  }}
-                >
-                  { <User size={20} className="mr-2"/>}
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={async () => {
-                    await supabase?.auth.signOut();
-                  }}
-                >
-                { <LogOut size={20} className="mr-2 text-red-500"/>}
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </header>
-
-      <div className="app-shell">
-        <aside
-          className={`w-[264px] flex-none bg-white text-brand-dark border-r border-[rgba(56,89,128,0.18)] p-3.5 px-3 flex flex-col gap-3 sticky top-[80px] h-[calc(100vh-80px)] overflow-y-auto will-change-[width,transform,opacity] transition-[width_220ms_cubic-bezier(0.2,0.8,0.2,1),transform_220ms_cubic-bezier(0.2,0.8,0.2,1),opacity_160ms_ease] ${isNavDrawerOpen ? 'opacity-100 translate-x-0 pointer-events-auto' : 'w-0 px-0 border-r-0 opacity-0 -translate-x-2 pointer-events-none'}`}
-          aria-label="Primary navigation"
-        >
-          <div className="flex flex-col gap-2 px-1.5">
-            <div className="text-[0.7rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold">Company</div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="w-full flex items-center justify-between gap-2.5 py-2.5 px-3 rounded-xl border border-brand-dark/[0.12] bg-[rgba(248,250,252,0.9)] text-brand-dark/90 cursor-pointer hover:border-brand-primary/25 hover:bg-brand-primary/[0.06] transition-colors" disabled={!isNavDrawerOpen}>
-                  <span className="max-w-[190px] overflow-hidden text-ellipsis whitespace-nowrap font-bold">{activeCompany?.companyName || 'Select company'}</span>
-                  <span className="text-xs opacity-75">▾</span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="company-menu">
-                {companies.map((company) => {
-                  const isActive = company.companyId === activeCompanyId;
-                  return (
-                    <DropdownMenuItem
-                      key={company.companyId}
-                      onSelect={() => {
-                        setActiveCompanyIdWithPersistence(company.companyId);
-                        navigate(`/company/${encodeURIComponent(company.companyId)}/dashboard`);
-                      }}
-                      className={`company-dropdown-item ${isActive ? 'is-active' : ''}`}
-                    >
-                      <Building2 className="nav-rail-icon" style={{ width: '16px', height: '16px' }} />
-                      <span style={{ flex: 1 }}>{company.companyName || company.companyId}</span>
-                      {isActive && <Check style={{ width: '16px', height: '16px', marginLeft: 'auto' }} />}
-                    </DropdownMenuItem>
-                  );
-                })}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="company-dropdown-item add-company"
-                  onSelect={() => {
-                    setNewCompanyName('');
-                    setNewCompanyDescription('');
-                    setIsAddCompanyModalOpen(true);
-                  }}
-                >
-                  <Plus style={{ width: '16px', height: '16px' }} />
-                  <span>Add company…</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <div className="flex flex-col gap-2 px-1.5">
-            <div className="text-[0.7rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold">Workspace</div>
-            <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                className="w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed"
-                onClick={() => {
-                  if (!activeCompanyId) return;
-                  navigate(`/company/${encodeURIComponent(activeCompanyId)}/dashboard`);
-                }}
-                disabled={!activeCompanyId || !isNavDrawerOpen}
-              >
-                <LayoutDashboard className="w-4 h-4 text-brand-dark/55 flex-none" aria-hidden="true" />
-                Dashboard
-              </button>
-              <button
-                type="button"
-                className={`w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed ${activeNavKey === 'generate' ? 'text-brand-primary/95 after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-100 after:opacity-100' : 'after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-0 after:opacity-0 after:transition-[transform_0.18s_ease,opacity_0.18s_ease]'}`}
-                onClick={() => {
-                  if (!activeCompanyId) return;
-                  navigate(`/company/${encodeURIComponent(activeCompanyId)}/generate`);
-                }}
-                disabled={!activeCompanyId || !isNavDrawerOpen}
-              >
-                <Wand2 className={`w-4 h-4 flex-none ${activeNavKey === 'generate' ? 'text-brand-primary/95' : 'text-brand-dark/55'}`} aria-hidden="true" />
-                Create
-              </button>
-              <button
-                type="button"
-                className={`w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed ${activeNavKey === 'calendar' ? 'text-brand-primary/95 after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-100 after:opacity-100' : 'after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-0 after:opacity-0 after:transition-[transform_0.18s_ease,opacity_0.18s_ease]'}`}
-                onClick={() => {
-                  if (!activeCompanyId) return;
-                  navigate(`/company/${encodeURIComponent(activeCompanyId)}/calendar`);
-                }}
-                disabled={!activeCompanyId || !isNavDrawerOpen}
-              >
-                <CalendarDays className={`w-4 h-4 flex-none ${activeNavKey === 'calendar' ? 'text-brand-primary/95' : 'text-brand-dark/55'}`} aria-hidden="true" />
-                Calendar
-              </button>
-              <button
-                type="button"
-                className={`w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed ${activeNavKey === 'drafts' ? 'text-brand-primary/95 after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-100 after:opacity-100' : 'after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-0 after:opacity-0 after:transition-[transform_0.18s_ease,opacity_0.18s_ease]'}`}
-                onClick={() => {
-                  if (!activeCompanyId) return;
-                  navigate(`/company/${encodeURIComponent(activeCompanyId)}/drafts`);
-                }}
-                disabled={!activeCompanyId || !isNavDrawerOpen}
-              >
-                <FileText className={`w-4 h-4 flex-none ${activeNavKey === 'drafts' ? 'text-brand-primary/95' : 'text-brand-dark/55'}`} aria-hidden="true" />
-                Drafts
-              </button>
-
-              <button
-                type="button"
-                className={`w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed ${activeNavKey === 'settings' ? 'text-brand-primary/95 after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-100 after:opacity-100' : 'after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-0 after:opacity-0 after:transition-[transform_0.18s_ease,opacity_0.18s_ease]'}`}
-                onClick={() => {
-                  if (!activeCompanyId) return;
-                  navigate(`/company/${encodeURIComponent(activeCompanyId)}/settings/overview`);
-                }}
-                disabled={!activeCompanyId || !isNavDrawerOpen}
-              >
-                <Building2 className={`w-4 h-4 flex-none ${activeNavKey === 'settings' ? 'text-brand-primary/95' : 'text-brand-dark/55'}`} aria-hidden="true" />
-                Company Settings
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 px-1.5">
-            <div className="text-[0.7rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold">Support</div>
-            <div className="flex flex-col gap-1">
-              <button type="button" className="w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed" onClick={() => { notify('FAQ is coming soon.', 'info'); }} disabled={!isNavDrawerOpen}>
-                <HelpCircle className="w-4 h-4 text-brand-dark/55 flex-none" aria-hidden="true" />
-                FAQ
-              </button>
-              <button type="button" className="w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed" onClick={() => { notify('Contact Support is coming soon.', 'info'); }} disabled={!isNavDrawerOpen}>
-                <HelpCircle className="w-4 h-4 text-brand-dark/55 flex-none" aria-hidden="true" />
-                Contact Support
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        <div className="app-shell-content">
+        <div className="flex-1 min-w-0 bg-[var(--surface-raise)] transition-all duration-200 ease-in-out">
           <div className="app-root">
             <Routes>
               <Route
@@ -3164,7 +2986,7 @@ function App() {
           startWaitingForImageUpdate={startWaitingForImageUpdate}
         />
 
-      </div>
+      </div >
 
       {toast && (
         <div
@@ -3178,14 +3000,15 @@ function App() {
           {(toast.tone === 'info' || !toast.tone) && <Info className="toast-icon" aria-hidden />}
           <span className="toast-message">{toast.message}</span>
         </div>
-      )}
+      )
+      }
 
       <ConfirmModal
         isOpen={isConfirmOpen}
         config={confirmConfig}
         onResolve={resolveConfirm}
       />
-    </div>
+    </div >
   );
 }
 
