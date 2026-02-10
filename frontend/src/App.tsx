@@ -2417,7 +2417,7 @@ function App() {
 
       <div className="app-shell">
         <aside
-          className={`w-[264px] flex-none bg-white text-brand-dark border-r border-[rgba(56,89,128,0.18)] p-3.5 px-3 flex flex-col gap-3 sticky top-0 h-screen overflow-y-auto will-change-[width,transform,opacity] transition-[width_220ms_cubic-bezier(0.2,0.8,0.2,1),transform_220ms_cubic-bezier(0.2,0.8,0.2,1),opacity_160ms_ease] ${isNavDrawerOpen ? 'opacity-100 translate-x-0 pointer-events-auto' : 'w-0 px-0 border-r-0 opacity-0 -translate-x-2 pointer-events-none'}`}
+          className={`w-[264px] flex-none bg-white text-brand-dark border-r border-[rgba(56,89,128,0.18)] p-3.5 px-3 flex flex-col gap-3 sticky top-[80px] h-[calc(100vh-80px)] overflow-y-auto will-change-[width,transform,opacity] transition-[width_220ms_cubic-bezier(0.2,0.8,0.2,1),transform_220ms_cubic-bezier(0.2,0.8,0.2,1),opacity_160ms_ease] ${isNavDrawerOpen ? 'opacity-100 translate-x-0 pointer-events-auto' : 'w-0 px-0 border-r-0 opacity-0 -translate-x-2 pointer-events-none'}`}
           aria-label="Primary navigation"
         >
           <div className="flex flex-col gap-2 px-1.5">

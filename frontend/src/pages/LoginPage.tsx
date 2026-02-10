@@ -12,17 +12,16 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
       <div className="bg-white p-6 sm:p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-[400px] text-center my-4">
         {!isSignUp ? (
           <>
-            {/* Sign In */}
             <div className="text-3xl sm:text-md font-bold text-brand-dark uppercase pb-5 mb-2 font-body">Welcome Back</div>
 
             <form className="flex flex-col gap-3 mb-4">
-              <input type="email" placeholder="Email" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
-              <input type="password" placeholder="Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+              <input type="email" placeholder="Email" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+              <input type="password" placeholder="Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
             </form>
 
             <button type="submit" className="w-full text-md btn btn-primary flex justify-center">
               LOGIN
-            </button>
+            </button> 
 
             <div className="relative text-center my-6 font-medium">
               <span className="relative z-10 bg-white px-4">OR</span>
@@ -63,13 +62,14 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
             <p className="text-gray-600 mb-8">Sign up to get started.</p>
 
             <form className="flex flex-col gap-3 mb-4">
-              <input type="text" placeholder="Full Name" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
-              <input type="email" placeholder="Email" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
-              <input type="password" placeholder="Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
-              <input type="password" placeholder="Confirm Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+              <input type="text" placeholder="First Name" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+              <input type="text" placeholder="Last Name" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+              <input type="email" placeholder="Email" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+              <input type="password" placeholder="Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+              <input type="password" placeholder="Confirm Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
             </form>
 
-            <button type="submit" className="w-full bg-brand-primary hover:bg-brand-dark-alt text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98] uppercase tracking-wide">
+            <button type="submit" className="w-full flex justify-center btn btn-primary">
               SIGN UP
             </button>
 
