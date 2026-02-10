@@ -70,7 +70,7 @@ import './styles/create.css';
 import './styles/calendar.css';
 import './styles/drafts.css';
 import './styles/company-settings.css';
-import './styles/login.css';
+
 import './polish.css';
 
 type FormState = {
@@ -2391,12 +2391,13 @@ function App() {
                   <span className="company-trigger-caret">▾</span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="company-menu">
+              <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   onSelect={() => {
                     navigate('/profile');
                   }}
                 >
+                  { <User size={20} className="mr-2"/>}
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -2405,6 +2406,7 @@ function App() {
                     await supabase?.auth.signOut();
                   }}
                 >
+                { <LogOut size={20} className="mr-2 text-red-500"/>}
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -2415,16 +2417,16 @@ function App() {
 
       <div className="app-shell">
         <aside
-          className={`nav-rail ${isNavDrawerOpen ? 'is-open' : 'is-closed'}`}
+          className={`w-[264px] flex-none bg-white text-brand-dark border-r border-[rgba(56,89,128,0.18)] p-3.5 px-3 flex flex-col gap-3 sticky top-0 h-screen overflow-y-auto will-change-[width,transform,opacity] transition-[width_220ms_cubic-bezier(0.2,0.8,0.2,1),transform_220ms_cubic-bezier(0.2,0.8,0.2,1),opacity_160ms_ease] ${isNavDrawerOpen ? 'opacity-100 translate-x-0 pointer-events-auto' : 'w-0 px-0 border-r-0 opacity-0 -translate-x-2 pointer-events-none'}`}
           aria-label="Primary navigation"
         >
-          <div className="nav-rail-section">
-            <div className="nav-rail-section-title">Company</div>
+          <div className="flex flex-col gap-2 px-1.5">
+            <div className="text-[0.7rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold">Company</div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="nav-rail-company-trigger" disabled={!isNavDrawerOpen}>
-                  <span className="nav-rail-company-name">{activeCompany?.companyName || 'Select company'}</span>
-                  <span className="company-trigger-caret">▾</span>
+                <button type="button" className="w-full flex items-center justify-between gap-2.5 py-2.5 px-3 rounded-xl border border-brand-dark/[0.12] bg-[rgba(248,250,252,0.9)] text-brand-dark/90 cursor-pointer hover:border-brand-primary/25 hover:bg-brand-primary/[0.06] transition-colors" disabled={!isNavDrawerOpen}>
+                  <span className="max-w-[190px] overflow-hidden text-ellipsis whitespace-nowrap font-bold">{activeCompany?.companyName || 'Select company'}</span>
+                  <span className="text-xs opacity-75">▾</span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="company-menu">
@@ -2461,82 +2463,82 @@ function App() {
             </DropdownMenu>
           </div>
 
-          <div className="nav-rail-section">
-            <div className="nav-rail-section-title">Workspace</div>
-            <div className="nav-rail-links">
+          <div className="flex flex-col gap-2 px-1.5">
+            <div className="text-[0.7rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold">Workspace</div>
+            <div className="flex flex-col gap-1">
               <button
                 type="button"
-                className="nav-rail-link"
+                className="w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed"
                 onClick={() => {
                   if (!activeCompanyId) return;
                   navigate(`/company/${encodeURIComponent(activeCompanyId)}/dashboard`);
                 }}
                 disabled={!activeCompanyId || !isNavDrawerOpen}
               >
-                <LayoutDashboard className="nav-rail-icon" aria-hidden="true" />
+                <LayoutDashboard className="w-4 h-4 text-brand-dark/55 flex-none" aria-hidden="true" />
                 Dashboard
               </button>
               <button
                 type="button"
-                className={`nav-rail-link ${activeNavKey === 'generate' ? 'is-active' : ''}`}
+                className={`w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed ${activeNavKey === 'generate' ? 'text-brand-primary/95 after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-100 after:opacity-100' : 'after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-0 after:opacity-0 after:transition-[transform_0.18s_ease,opacity_0.18s_ease]'}`}
                 onClick={() => {
                   if (!activeCompanyId) return;
                   navigate(`/company/${encodeURIComponent(activeCompanyId)}/generate`);
                 }}
                 disabled={!activeCompanyId || !isNavDrawerOpen}
               >
-                <Wand2 className="nav-rail-icon" aria-hidden="true" />
+                <Wand2 className={`w-4 h-4 flex-none ${activeNavKey === 'generate' ? 'text-brand-primary/95' : 'text-brand-dark/55'}`} aria-hidden="true" />
                 Create
               </button>
               <button
                 type="button"
-                className={`nav-rail-link ${activeNavKey === 'calendar' ? 'is-active' : ''}`}
+                className={`w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed ${activeNavKey === 'calendar' ? 'text-brand-primary/95 after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-100 after:opacity-100' : 'after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-0 after:opacity-0 after:transition-[transform_0.18s_ease,opacity_0.18s_ease]'}`}
                 onClick={() => {
                   if (!activeCompanyId) return;
                   navigate(`/company/${encodeURIComponent(activeCompanyId)}/calendar`);
                 }}
                 disabled={!activeCompanyId || !isNavDrawerOpen}
               >
-                <CalendarDays className="nav-rail-icon" aria-hidden="true" />
+                <CalendarDays className={`w-4 h-4 flex-none ${activeNavKey === 'calendar' ? 'text-brand-primary/95' : 'text-brand-dark/55'}`} aria-hidden="true" />
                 Calendar
               </button>
               <button
                 type="button"
-                className={`nav-rail-link ${activeNavKey === 'drafts' ? 'is-active' : ''}`}
+                className={`w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed ${activeNavKey === 'drafts' ? 'text-brand-primary/95 after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-100 after:opacity-100' : 'after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-0 after:opacity-0 after:transition-[transform_0.18s_ease,opacity_0.18s_ease]'}`}
                 onClick={() => {
                   if (!activeCompanyId) return;
                   navigate(`/company/${encodeURIComponent(activeCompanyId)}/drafts`);
                 }}
                 disabled={!activeCompanyId || !isNavDrawerOpen}
               >
-                <FileText className="nav-rail-icon" aria-hidden="true" />
+                <FileText className={`w-4 h-4 flex-none ${activeNavKey === 'drafts' ? 'text-brand-primary/95' : 'text-brand-dark/55'}`} aria-hidden="true" />
                 Drafts
               </button>
 
               <button
                 type="button"
-                className={`nav-rail-link ${activeNavKey === 'settings' ? 'is-active' : ''}`}
+                className={`w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed ${activeNavKey === 'settings' ? 'text-brand-primary/95 after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-100 after:opacity-100' : 'after:content-[\'\'] after:absolute after:left-3 after:right-3 after:bottom-1.5 after:h-0.5 after:rounded-full after:bg-brand-primary/95 after:scale-x-0 after:opacity-0 after:transition-[transform_0.18s_ease,opacity_0.18s_ease]'}`}
                 onClick={() => {
                   if (!activeCompanyId) return;
                   navigate(`/company/${encodeURIComponent(activeCompanyId)}/settings/overview`);
                 }}
                 disabled={!activeCompanyId || !isNavDrawerOpen}
               >
-                <Building2 className="nav-rail-icon" aria-hidden="true" />
+                <Building2 className={`w-4 h-4 flex-none ${activeNavKey === 'settings' ? 'text-brand-primary/95' : 'text-brand-dark/55'}`} aria-hidden="true" />
                 Company Settings
               </button>
             </div>
           </div>
 
-          <div className="nav-rail-section">
-            <div className="nav-rail-section-title">Support</div>
-            <div className="nav-rail-links">
-              <button type="button" className="nav-rail-link" onClick={() => { notify('FAQ is coming soon.', 'info'); }} disabled={!isNavDrawerOpen}>
-                <HelpCircle className="nav-rail-icon" aria-hidden="true" />
+          <div className="flex flex-col gap-2 px-1.5">
+            <div className="text-[0.7rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold">Support</div>
+            <div className="flex flex-col gap-1">
+              <button type="button" className="w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed" onClick={() => { notify('FAQ is coming soon.', 'info'); }} disabled={!isNavDrawerOpen}>
+                <HelpCircle className="w-4 h-4 text-brand-dark/55 flex-none" aria-hidden="true" />
                 FAQ
               </button>
-              <button type="button" className="nav-rail-link" onClick={() => { notify('Contact Support is coming soon.', 'info'); }} disabled={!isNavDrawerOpen}>
-                <HelpCircle className="nav-rail-icon" aria-hidden="true" />
+              <button type="button" className="w-full text-left border border-transparent bg-transparent text-brand-dark/[0.86] py-2.5 px-3 rounded-xl font-bold cursor-pointer flex items-center gap-2.5 relative transition-[background_0.15s_ease,transform_0.12s_ease] hover:bg-transparent hover:text-brand-primary/95 disabled:opacity-55 disabled:cursor-not-allowed" onClick={() => { notify('Contact Support is coming soon.', 'info'); }} disabled={!isNavDrawerOpen}>
+                <HelpCircle className="w-4 h-4 text-brand-dark/55 flex-none" aria-hidden="true" />
                 Contact Support
               </button>
             </div>

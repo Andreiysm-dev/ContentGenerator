@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { useState } from "react";
 interface LoginPageProps {
   supabase: any;
@@ -6,19 +5,35 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ supabase, notify }: LoginPageProps) {
-    const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
   return (
-    <div className="auth-screen">
-      <div className="auth-card">
+    <div className="flex justify-center items-center min-h-screen bg-cover bg-center px-4 sm:px-6" style={{ backgroundImage: "url('https://i.pinimg.com/1200x/a5/c7/e6/a5c7e61c0ea7ee0cfa03a220c6de9272.jpg')" }}>
+      <div className="bg-white p-6 sm:p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-[400px] text-center my-4">
         {!isSignUp ? (
           <>
             {/* Sign In */}
-            <h1 style={{ textAlign: "center", textTransform: "uppercase", paddingBottom: "20px" }}>Welcome Back</h1>
+            <div className="text-3xl sm:text-md font-bold text-brand-dark uppercase pb-5 mb-2 font-body">Welcome Back</div>
+
+            <form className="flex flex-col gap-3 mb-4">
+              <input type="email" placeholder="Email" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+              <input type="password" placeholder="Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+            </form>
+
+            <button type="submit" className="w-full text-md btn btn-primary flex justify-center">
+              LOGIN
+            </button>
+
+            <div className="relative text-center my-6 font-medium">
+              <span className="relative z-10 bg-white px-4">OR</span>
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+            </div>
 
             <button
               type="button"
-              className="btn btn-primary"
+              className="w-full flex items-center justify-center gap-2 btn btn-primary text-black"
               onClick={async () => {
                 if (!supabase) {
                   notify("Supabase is not configured.", "error");
@@ -30,23 +45,13 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
                 });
               }}
             >
-              <img src="https://cdn.freebiesupply.com/logos/large/2x/google-g-2015-logo-png-transparent.png" alt="Google" style={{ width: "25px", height: "25px", marginRight: "8px" }} />
+              <img src="https://cdn.freebiesupply.com/logos/large/2x/google-g-2015-logo-png-transparent.png" alt="Google" className="w-6 h-6" />
               Sign in with Google
             </button>
 
-            <div className="divider">OR</div>
-
-            <form className="auth-form">
-              <input type="email" placeholder="Email" />
-              <input type="password" placeholder="Password" />
-            </form>
-            <button type="submit" className="btn btn-primary">
-              LOGIN
-            </button>
-
-            <p className="auth-footer">
+            <p className="mt-6 text-sm text-gray-500">
               Don't have an account?{" "}
-              <button type="button" className="link-button" onClick={() => setIsSignUp(true)}>
+              <button type="button" className="text-brand-primary underline font-medium transition-colors cursor-pointer bg-transparent border-none p-0" onClick={() => setIsSignUp(true)}>
                 Sign Up
               </button>
             </p>
@@ -54,22 +59,23 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
         ) : (
           <>
             {/* Sign Up */}
-            <h1>Create an account</h1>
-            <p className="auth-subtitle">Sign up to get started.</p>
+            <div className="text-2xl sm:text-md font-bold uppercase mb-2">Create an account</div>
+            <p className="text-gray-600 mb-8">Sign up to get started.</p>
 
-            <form className="auth-form">
-              <input type="text" placeholder="Full Name" />
-              <input type="email" placeholder="Email" />
-              <input type="password" placeholder="Password" />
-              <input type="password" placeholder="Confirm Password" />
+            <form className="flex flex-col gap-3 mb-4">
+              <input type="text" placeholder="Full Name" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+              <input type="email" placeholder="Email" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+              <input type="password" placeholder="Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
+              <input type="password" placeholder="Confirm Password" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-all" />
             </form>
-            <button type="submit" className="btn btn-primary">
+
+            <button type="submit" className="w-full bg-brand-primary hover:bg-brand-dark-alt text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98] uppercase tracking-wide">
               SIGN UP
             </button>
 
-            <p className="auth-footer">
+            <p className="mt-6 text-sm text-gray-500">
               Already have an account?{" "}
-              <button type="button" className="link-button" onClick={() => setIsSignUp(false)}>
+              <button type="button" className=" underline font-medium transition-colors cursor-pointer bg-transparent border-none p-0" onClick={() => setIsSignUp(false)}>
                 Log In
               </button>
             </p>

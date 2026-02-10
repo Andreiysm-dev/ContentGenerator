@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
 
 /* Ribo brand: body = Poppins, headers = Helvetica Now. Colors: #0b2641, #1d3d5e, #3fa9f5 */
 :root {
