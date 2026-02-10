@@ -61,454 +61,551 @@ export function ViewContentModal({
     if (!isOpen || !selectedRow) return null;
 
     return (
-        <div className="modal-backdrop">
-            <div className="modal modal-wide content-modal">
-                <div className="modal-header content-modal-header">
-                    <div className="content-modal-title">
-                        <h2>Content Details</h2>
-                        <p>Review inputs, generated outputs, and final approvals.</p>
-                    </div>
-                    <div className="content-modal-actions">
-                        <span className="status-pill status-pill--muted">
-                            {getStatusValue(selectedRow.status) || 'Draft'}
-                        </span>
-                        <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => {
-                                if (!selectedRow?.finalCaption) {
-                                    notify('Add a final caption before preparing this content for publishing.', 'error');
-                                    return;
-                                }
-                                setDraftPublishIntent('draft');
-                                setIsDraftModalOpen(true);
-                            }}
-                        >
-                            Draft & Publish
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="modal-close"
-                        >
-                            ×
-                        </button>
-                    </div>
-                </div>
-                <div className="modal-body content-modal-body">
-                    <div className="section content-section">
-                        <div className="section-title-row">
-                            <div>
-                                <h3 className="section-title">Inputs</h3>
-                                <p className="section-subtitle">What was provided for generation.</p>
-                            </div>
+        <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Content Details"
+            onMouseDown={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div className="w-full max-w-5xl">
+                <div className="rounded-2xl border border-slate-200/60 bg-white shadow-xl overflow-hidden flex flex-col">
+                    {/* Header */}
+                    <div className="flex items-center justify-between gap-4 border-b border-slate-200/60 p-6 bg-gradient-to-b from-white to-slate-50/50">
+                        <div>
+                            <h2 className="text-xl font-bold text-brand-dark tracking-tight font-display">
+                                Content Details
+                            </h2>
+                            <p className="mt-1 text-sm text-brand-dark/60 font-medium">
+                                Review inputs, generated outputs, and final approvals.
+                            </p>
                         </div>
-                        <div className="kv-grid">
-                            <div className="kv-item">
-                                <div className="kv-label">Date</div>
-                                <div className="kv-value">{selectedRow.date ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Brand Highlight</div>
-                                <div className="kv-value">{selectedRow.brandHighlight ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Cross Promo</div>
-                                <div className="kv-value">{selectedRow.crossPromo ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Theme</div>
-                                <div className="kv-value">{selectedRow.theme ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Content Type</div>
-                                <div className="kv-value">{selectedRow.contentType ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Channels</div>
-                                <div className="kv-value">{selectedRow.channels ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Target Audience</div>
-                                <div className="kv-value">{selectedRow.targetAudience ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Primary Goal</div>
-                                <div className="kv-value">{selectedRow.primaryGoal ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">CTA</div>
-                                <div className="kv-value">{selectedRow.cta ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Promo Type</div>
-                                <div className="kv-value">{selectedRow.promoType ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Framework Used</div>
-                                <div className="kv-value">{selectedRow.frameworkUsed ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Status</div>
-                                <div className="kv-value">{getStatusValue(selectedRow.status)}</div>
-                            </div>
+                        <div className="flex items-center gap-3">
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-brand-dark/70 border border-slate-200/60">
+                                {getStatusValue(selectedRow.status) || 'Draft'}
+                            </span>
+
+                            <button
+                                type="button"
+                                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2"
+                                onClick={() => {
+                                    if (!selectedRow?.finalCaption) {
+                                        notify(
+                                            'Add a final caption before preparing this content for publishing.',
+                                            'error',
+                                        );
+                                        return;
+                                    }
+                                    setDraftPublishIntent('draft');
+                                    setIsDraftModalOpen(true);
+                                }}
+                            >
+                                Draft &amp; Publish
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/70 bg-white text-brand-dark/70 shadow-sm transition hover:bg-slate-50 hover:text-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2"
+                                aria-label="Close"
+                                title="Close"
+                            >
+                                ×
+                            </button>
                         </div>
                     </div>
 
-                    <div className="section content-section">
-                        <div className="section-title-row">
-                            <div>
-                                <h3 className="section-title">AI-Generated Outputs</h3>
-                                <p className="section-subtitle">What the system generated for review.</p>
+                    {/* Body */}
+                    <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
+                        {/* Section: Inputs */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">
+                                    Inputs
+                                </h3>
+                                <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
+                                <span className="text-xs text-brand-dark/50 italic">
+                                    What was provided for generation
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {[
+                                    { label: 'Date', value: selectedRow.date },
+                                    { label: 'Brand Highlight', value: selectedRow.brandHighlight },
+                                    { label: 'Cross Promo', value: selectedRow.crossPromo },
+                                    { label: 'Theme', value: selectedRow.theme },
+                                    { label: 'Content Type', value: selectedRow.contentType },
+                                    { label: 'Channels', value: selectedRow.channels },
+                                    { label: 'Target Audience', value: selectedRow.targetAudience },
+                                    { label: 'Primary Goal', value: selectedRow.primaryGoal },
+                                    { label: 'CTA', value: selectedRow.cta },
+                                    { label: 'Promo Type', value: selectedRow.promoType },
+                                    { label: 'Framework Used', value: selectedRow.frameworkUsed },
+                                    { label: 'Status', value: getStatusValue(selectedRow.status) },
+                                ].map((item, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="p-3 rounded-xl border border-slate-200/60 bg-slate-50/50"
+                                    >
+                                        <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">
+                                            {item.label}
+                                        </div>
+                                        <div className="text-sm font-medium text-brand-dark break-words">
+                                            {item.value || '—'}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
-                        <div className="content-grid">
-                            <div className="content-card content-card--primary">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">Caption Output</div>
-                                    <button
-                                        type="button"
-                                        className="copy-btn"
-                                        onClick={() => handleCopy('captionOutput', selectedRow.captionOutput)}
-                                    >
-                                        {copiedField === 'captionOutput' ? 'Copied' : 'Copy'}
-                                    </button>
-                                </div>
-                                <div className="content-box content-box--scroll">{selectedRow.captionOutput ?? ''}</div>
+
+                        {/* Section: AI Outputs */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">
+                                    AI-Generated Outputs
+                                </h3>
+                                <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
+                                <span className="text-xs text-brand-dark/50 italic">
+                                    What the system generated for review
+                                </span>
                             </div>
 
-                            <div className="content-card content-card--secondary">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">CTA Output</div>
-                                    <button
-                                        type="button"
-                                        className="copy-btn"
-                                        onClick={() => handleCopy('ctaOuput', selectedRow.ctaOuput)}
-                                    >
-                                        {copiedField === 'ctaOuput' ? 'Copied' : 'Copy'}
-                                    </button>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div className="p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col gap-3 lg:col-span-1">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-xs font-bold text-brand-dark/70">Caption Output</div>
+                                        <button
+                                            type="button"
+                                            className="text-[0.7rem] font-bold text-[#3fa9f5] hover:underline"
+                                            onClick={() => handleCopy('captionOutput', selectedRow.captionOutput)}
+                                        >
+                                            {copiedField === 'captionOutput' ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+                                    <div className="text-sm text-brand-dark/80 bg-slate-50 p-3 rounded-lg border border-slate-100 min-h-[120px] whitespace-pre-wrap max-h-60 overflow-y-auto">
+                                        {selectedRow.captionOutput ?? '—'}
+                                    </div>
                                 </div>
-                                <div className="content-box content-box--scroll">{selectedRow.ctaOuput ?? ''}</div>
-                            </div>
 
-                            <div className="content-card content-card--secondary">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">Hashtags Output</div>
-                                    <button
-                                        type="button"
-                                        className="copy-btn"
-                                        onClick={() => handleCopy('hastagsOutput', selectedRow.hastagsOutput)}
-                                    >
-                                        {copiedField === 'hastagsOutput' ? 'Copied' : 'Copy'}
-                                    </button>
+                                <div className="p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col gap-3 lg:col-span-1">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-xs font-bold text-brand-dark/70">CTA Output</div>
+                                        <button
+                                            type="button"
+                                            className="text-[0.7rem] font-bold text-[#3fa9f5] hover:underline"
+                                            onClick={() => handleCopy('ctaOuput', selectedRow.ctaOuput)}
+                                        >
+                                            {copiedField === 'ctaOuput' ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+                                    <div className="text-sm text-brand-dark/80 bg-slate-50 p-3 rounded-lg border border-slate-100 min-h-[120px] whitespace-pre-wrap max-h-60 overflow-y-auto">
+                                        {selectedRow.ctaOuput ?? '—'}
+                                    </div>
                                 </div>
-                                <div className="content-box content-box--scroll">{selectedRow.hastagsOutput ?? ''}</div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div className="section content-section section-final">
-                        <div className="section-title-row">
-                            <div>
-                                <h3 className="section-title">Review & Final Approval</h3>
-                                <p className="section-subtitle">What will ship after human approval.</p>
-                            </div>
-                        </div>
-                        <div className="content-grid">
-                            <div className="content-card content-card--secondary">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">Review Decision</div>
-                                </div>
-                                <div className="content-box content-box--scroll">{selectedRow.reviewDecision ?? ''}</div>
-                            </div>
-                            <div className="content-card content-card--secondary">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">Review Notes</div>
-                                </div>
-                                <div className="content-box content-box--scroll">{selectedRow.reviewNotes ?? ''}</div>
-                            </div>
-
-
-                            <div className="content-card content-card--final">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">Final Caption</div>
-                                    <button
-                                        type="button"
-                                        className="copy-btn"
-                                        onClick={() => handleCopy('finalCaption', selectedRow.finalCaption)}
-                                    >
-                                        {copiedField === 'finalCaption' ? 'Copied' : 'Copy'}
-                                    </button>
-                                </div>
-                                <div className="content-box content-box--final">{selectedRow.finalCaption ?? ''}</div>
-                            </div>
-                            <div className="content-card content-card--final">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">Final CTA</div>
-                                    <button
-                                        type="button"
-                                        className="copy-btn"
-                                        onClick={() => handleCopy('finalCTA', selectedRow.finalCTA)}
-                                    >
-                                        {copiedField === 'finalCTA' ? 'Copied' : 'Copy'}
-                                    </button>
-                                </div>
-                                <div className="content-box content-box--final">{selectedRow.finalCTA ?? ''}</div>
-                            </div>
-                            <div className="content-card content-card--final">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">Final Hashtags</div>
-                                    <button
-                                        type="button"
-                                        className="copy-btn"
-                                        onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags)}
-                                    >
-                                        {copiedField === 'finalHashtags' ? 'Copied' : 'Copy'}
-                                    </button>
-                                </div>
-                                <div className="content-box content-box--final">{selectedRow.finalHashtags ?? ''}</div>
-                            </div>
-
-                            <div className="content-card content-card--final">
-                                <div className="content-card-header">
-                                    <div className="content-card-title">Final Description (Ready to Post)</div>
-                                    <button
-                                        type="button"
-                                        className="copy-btn"
-                                        onClick={() => {
-                                            const finalDescription = [
-                                                selectedRow.finalCaption,
-                                                selectedRow.finalHashtags
-                                            ].filter(Boolean).join('\n\n');
-                                            handleCopy('finalDescription', finalDescription);
-                                        }}
-                                    >
-                                        {copiedField === 'finalDescription' ? 'Copied' : 'Copy'}
-                                    </button>
-                                </div>
-                                <div className="content-box content-box--final">
-                                    {[selectedRow.finalCaption, selectedRow.finalHashtags]
-                                        .filter(Boolean)
-                                        .join('\n\n') || ''}
+                                <div className="p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col gap-3 lg:col-span-1">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-xs font-bold text-brand-dark/70">Hashtags Output</div>
+                                        <button
+                                            type="button"
+                                            className="text-[0.7rem] font-bold text-[#3fa9f5] hover:underline"
+                                            onClick={() => handleCopy('hastagsOutput', selectedRow.hastagsOutput)}
+                                        >
+                                            {copiedField === 'hastagsOutput' ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+                                    <div className="text-sm text-brand-dark/80 bg-slate-50 p-3 rounded-lg border border-slate-100 min-h-[120px] whitespace-pre-wrap max-h-60 overflow-y-auto">
+                                        {selectedRow.hastagsOutput ?? '—'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <details className="section content-section section-system" open={false}>
-                        <summary className="section-title-row">
-                            <div>
-                                <h3 className="section-title section-title--muted">System / Internal</h3>
-                                <p className="section-subtitle section-subtitle--muted">Internal references and metadata.</p>
+                        {/* Section: Review & Final Approval */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">
+                                    Review &amp; Final Approval
+                                </h3>
+                                <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
+                                <span className="text-xs text-brand-dark/50 italic">
+                                    What will ship after human approval
+                                </span>
                             </div>
-                        </summary>
-                        <div className="kv-grid">
-                            <div className="kv-item">
-                                <div className="kv-label">DMP</div>
-                                <div className="kv-value">
+
+                            {/* ✅ Restored CSS-like 3-column layout */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                {/* Review Decision */}
+                                <div className="rounded-2xl border border-slate-200/60 bg-slate-50/50 p-4">
+                                    <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-2">
+                                        Review Decision
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm font-semibold text-brand-dark">
+                                        {selectedRow.reviewDecision ?? '—'}
+                                    </div>
+                                </div>
+
+                                {/* Review Notes */}
+                                <div className="rounded-2xl border border-slate-200/60 bg-slate-50/50 p-4">
+                                    <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-2">
+                                        Review Notes
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/80 whitespace-pre-wrap">
+                                        {selectedRow.reviewNotes ?? '—'}
+                                    </div>
+                                </div>
+
+                                {/* Final Caption */}
+                                <div className="rounded-2xl border border-[#3fa9f5]/25 bg-slate-50/40 p-4 shadow-sm">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="text-sm font-bold text-[#3fa9f5]">Final Caption</div>
+                                        <button
+                                            type="button"
+                                            className="text-xs font-bold text-[#3fa9f5] hover:underline"
+                                            onClick={() => handleCopy('finalCaption', selectedRow.finalCaption)}
+                                        >
+                                            {copiedField === 'finalCaption' ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/90 whitespace-pre-wrap max-h-[240px] overflow-y-auto">
+                                        {selectedRow.finalCaption ?? '—'}
+                                    </div>
+                                </div>
+
+                                {/* Final CTA */}
+                                <div className="rounded-2xl border border-slate-200/60 bg-slate-50/50 p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="text-xs font-bold uppercase tracking-widest text-brand-dark/60">
+                                            Final CTA
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="text-xs font-bold text-[#3fa9f5] hover:underline"
+                                            onClick={() => handleCopy('finalCTA', selectedRow.finalCTA)}
+                                        >
+                                            {copiedField === 'finalCTA' ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/80 whitespace-pre-wrap">
+                                        {selectedRow.finalCTA || '—'}
+                                    </div>
+                                </div>
+
+                                {/* Final Hashtags */}
+                                <div className="rounded-2xl border border-slate-200/60 bg-slate-50/50 p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="text-xs font-bold uppercase tracking-widest text-brand-dark/60">
+                                            Final Hashtags
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="text-xs font-bold text-[#3fa9f5] hover:underline"
+                                            onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags)}
+                                        >
+                                            {copiedField === 'finalHashtags' ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/80 whitespace-pre-wrap">
+                                        {selectedRow.finalHashtags || '—'}
+                                    </div>
+                                </div>
+
+                                {/* Final Description */}
+                                <div className="rounded-2xl border border-brand-dark/10 bg-slate-50/50 p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="text-sm font-bold text-brand-dark/80">
+                                            Final Description (Ready to Post)
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="text-xs font-bold text-[#3fa9f5] hover:underline"
+                                            onClick={() => {
+                                                const finalDescription = [
+                                                    selectedRow.finalCaption,
+                                                    selectedRow.finalHashtags,
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join('\n\n');
+                                                handleCopy('finalDescription', finalDescription);
+                                            }}
+                                        >
+                                            {copiedField === 'finalDescription' ? 'Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/90 whitespace-pre-wrap max-h-[240px] overflow-y-auto">
+                                        {[selectedRow.finalCaption, selectedRow.finalHashtags].filter(Boolean).join('\n\n') ||
+                                            '—'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Section: System Metadata (Expandable) */}
+                        <details className="group border border-slate-200/60 rounded-xl bg-slate-50/30 overflow-hidden">
+                            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-sm font-bold tracking-wide text-brand-dark/50 uppercase">
+                                        System / Internal
+                                    </h3>
+                                    <span className="text-xs text-brand-dark/30 italic">
+                                        Internal references and metadata
+                                    </span>
+                                </div>
+                                <div className="text-brand-dark/30 group-open:rotate-180 transition-transform">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </summary>
+
+                            <div className="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-200/60 mt-0">
+                                <div className="space-y-2">
+                                    <label className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
+                                        DMP (Data Management Plan)
+                                    </label>
                                     <textarea
-                                        className="field-input field-textarea"
+                                        className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-3 text-brand-dark/70 outline-none focus:border-[#3fa9f5]/30 transition-colors"
                                         rows={6}
                                         value={selectedRow.dmp ?? ''}
                                         readOnly
-                                        style={{ resize: 'vertical', maxHeight: '200px', overflowY: 'auto' }}
+                                        style={{ resize: 'vertical', maxHeight: '200px' }}
                                     />
                                 </div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Attached Design</div>
-                                <div className="kv-value">{selectedRow.attachedDesign ? JSON.stringify(selectedRow.attachedDesign) : ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Image Generated</div>
-                                <div className="kv-value">
-                                    {getImageGeneratedUrl(selectedRow) ? (
-                                        (() => {
-                                            const imageUrl = getImageGeneratedUrl(selectedRow);
-                                            const separator = imageUrl?.includes('?') ? '&' : '?';
-                                            return (
-                                                <img
-                                                    src={`${imageUrl}${separator}v=${imagePreviewNonce}`}
-                                                    alt="Generated"
-                                                    style={{ maxWidth: '220px', borderRadius: 8 }}
-                                                />
-                                            );
-                                        })()
-                                    ) : (
-                                        <span>{selectedRow.imageGenerated ? JSON.stringify(selectedRow.imageGenerated) : ''}</span>
-                                    )}
+
+                                <div className="space-y-4">
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
+                                            Generated Image Preview
+                                        </label>
+                                        <div className="p-2 border border-slate-200 rounded-xl bg-white min-h-[120px] flex items-center justify-center">
+                                            {getImageGeneratedUrl(selectedRow) ? (
+                                                (() => {
+                                                    const imageUrl = getImageGeneratedUrl(selectedRow);
+                                                    const separator = imageUrl?.includes('?') ? '&' : '?';
+                                                    return (
+                                                        <img
+                                                            src={`${imageUrl}${separator}v=${imagePreviewNonce}`}
+                                                            alt="Generated"
+                                                            className="max-w-full h-auto rounded-lg shadow-sm border border-slate-100"
+                                                            style={{ maxWidth: '220px' }}
+                                                        />
+                                                    );
+                                                })()
+                                            ) : (
+                                                <div className="text-xs text-brand-dark/30 italic">No image generated yet</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
+                                                Company ID
+                                            </div>
+                                            <div className="text-[0.7rem] font-mono text-brand-dark/60 truncate">
+                                                {selectedRow.companyId || '—'}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
+                                                Calendar ID
+                                            </div>
+                                            <div className="text-[0.7rem] font-mono text-brand-dark/60 truncate">
+                                                {selectedRow.contentCalendarId || '—'}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
+                                                Created At
+                                            </div>
+                                            <div className="text-[0.7rem] font-mono text-brand-dark/60 truncate">
+                                                {selectedRow.created_at || '—'}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Company ID</div>
-                                <div className="kv-value">{selectedRow.companyId ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Content Calendar ID</div>
-                                <div className="kv-value">{selectedRow.contentCalendarId ?? ''}</div>
-                            </div>
-                            <div className="kv-item">
-                                <div className="kv-label">Created At</div>
-                                <div className="kv-value">{selectedRow.created_at ?? ''}</div>
-                            </div>
-                        </div>
-                    </details>
-                </div>
-                <div className="modal-footer">
-                    <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={async () => {
-                            if (!selectedRow) return;
-                            const proceed = await requestConfirm({
-                                title: 'Generate caption for this item?',
-                                description: "You're about to trigger caption generation for this content item.",
-                                confirmLabel: 'Generate caption',
-                                cancelLabel: 'Go back',
-                            });
-                            if (!proceed) return;
+                        </details>
+                    </div>
 
-                            setIsGeneratingCaption(true);
-                            try {
-                                const genRes = await authedFetch(
-                                    `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/generate-caption`,
-                                    {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                    },
-                                );
-                                const genData = await genRes.json().catch(() => ({}));
-                                if (!genRes.ok) {
-                                    if (genRes.status === 409) {
-                                        notify(genData.error || 'Caption generation is already running or completed.', 'info');
-                                    } else {
-                                        notify(genData.error || 'Failed to generate caption.', 'error');
-                                    }
-                                } else {
-                                    notify('Caption generation started.', 'success');
-                                }
-                            } catch (err) {
-                                console.error('Failed to call generation endpoint', err);
-                                notify('Failed to trigger generation. Check console for details.', 'error');
-                            } finally {
-                                await refreshCalendarRow(selectedRow.contentCalendarId);
-                                setIsGeneratingCaption(false);
-                            }
-                        }}
-                    >
-                        {isGeneratingCaption ? 'Generating…' : 'Generate Caption'}
-                        {isGeneratingCaption && <span className="loading-spinner"></span>}
-                    </button>
-                    <button
-                        type="button"
-                        className={`btn btn-${['review', 'approved'].includes(
-                            getStatusValue(selectedRow.status).trim().toLowerCase(),
-                        )
-                            ? 'primary'
-                            : 'secondary'
-                            } btn-sm`}
-                        title="Send for revision again"
-                        disabled={
-                            getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review' ||
-                            !selectedRow.captionOutput
-                        }
-                        onClick={async () => {
-                            if (!selectedRow) return;
-                            if (getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review') return;
-                            if (!selectedRow.captionOutput) return;
-                            const proceed = await requestConfirm({
-                                title: 'Send this item for revision?',
-                                description: "You're about to send this content item for AI revision.",
-                                confirmLabel: 'Send for revision',
-                                cancelLabel: 'Keep item',
-                            });
-                            if (!proceed) return;
+                    {/* Footer */}
+                    <div className="flex items-center justify-end gap-3 border-t border-slate-200/60 p-6 bg-slate-50/30">
+                        <button
+                            type="button"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                            onClick={async () => {
+                                if (!selectedRow) return;
 
-                            setIsRevisingCaption(true);
-                            try {
-                                const res = await authedFetch(
-                                    `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/review-content`,
-                                    {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({}),
-                                    },
-                                );
-                                const data = await res.json().catch(() => ({}));
-                                if (!res.ok) {
-                                    if (res.status === 409) {
-                                        notify(data.error || 'Review is not allowed for this status.', 'info');
-                                    } else {
-                                        notify(data.error || 'Failed to trigger revision.', 'error');
-                                    }
-                                    return;
-                                }
-                                notify('Sent for revision.', 'success');
-                            } catch (err) {
-                                console.error('Failed to call review endpoint', err);
-                                notify('Failed to trigger revision. Check console for details.', 'error');
-                                return;
-                            } finally {
-                                await refreshCalendarRow(selectedRow.contentCalendarId);
-                                setIsRevisingCaption(false);
-                            }
-                        }}
-                    >
-                        {isRevisingCaption ? 'Revising…' : 'Revise caption'}
-                        {isRevisingCaption && <span className="loading-spinner"></span>}
-                    </button>
-                    <button
-                        type="button"
-                        className={`btn btn-${['approved', 'design completed'].includes(
-                            getStatusValue(selectedRow.status).trim().toLowerCase(),
-                        )
-                            ? 'primary'
-                            : 'secondary'
-                            } btn-sm`}
-                        title="Generate image (coming soon)"
-                        disabled={
-                            !['approved', 'design completed'].includes(
-                                getStatusValue(selectedRow.status).trim().toLowerCase(),
-                            )
-                        }
-                        onClick={() => {
-                            if (
-                                !['approved', 'design completed'].includes(
-                                    getStatusValue(selectedRow.status).trim().toLowerCase(),
-                                )
-                            )
-                                return;
-                            setIsImageModalOpen(true);
-                            setIsViewModalOpen(false);
-                            // Prefill from BrandKB for this company
-                            const companyId = selectedRow?.companyId ?? activeCompanyId;
-                            if (companyId) {
-                                (async () => {
-                                    try {
-                                        const res = await authedFetch(`${backendBaseUrl}/api/brandkb/company/${companyId}`);
-                                        const data = await res.json();
-                                        const list = Array.isArray(data.brandKBs) ? data.brandKBs : data;
-                                        const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
-                                        if (first) {
-                                            if (typeof first.brandKbId === 'string') setBrandKbId(first.brandKbId);
-                                            if (typeof first.systemInstruction === 'string') setSystemInstruction(first.systemInstruction);
+                                const proceed = await requestConfirm({
+                                    title: 'Generate caption for this item?',
+                                    description: "You're about to trigger caption generation for this content item.",
+                                    confirmLabel: 'Generate caption',
+                                    cancelLabel: 'Go back',
+                                });
+                                if (!proceed) return;
+
+                                setIsGeneratingCaption(true);
+                                try {
+                                    const genRes = await authedFetch(
+                                        `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/generate-caption`,
+                                        {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                        },
+                                    );
+
+                                    const genData = await genRes.json().catch(() => ({}));
+
+                                    if (!genRes.ok) {
+                                        if (genRes.status === 409) {
+                                            notify(
+                                                genData.error || 'Caption generation is already running or completed.',
+                                                'info',
+                                            );
+                                        } else {
+                                            notify(genData.error || 'Failed to generate caption.', 'error');
                                         }
-                                    } catch (err) {
-                                        console.error('Failed to load BrandKB for image generation', err);
+                                    } else {
+                                        notify('Caption generation started.', 'success');
                                     }
-                                })();
+                                } catch (err) {
+                                    console.error('Failed to call generation endpoint', err);
+                                    notify('Failed to trigger generation. Check console for details.', 'error');
+                                } finally {
+                                    await refreshCalendarRow(selectedRow.contentCalendarId);
+                                    setIsGeneratingCaption(false);
+                                }
+                            }}
+                        >
+                            {isGeneratingCaption ? 'Generating…' : 'Generate Caption'}
+                            {isGeneratingCaption && (
+                                <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            )}
+                        </button>
+
+                        <button
+                            type="button"
+                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['review', 'approved'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                                    ? 'bg-white text-brand-dark border border-slate-200/70 hover:bg-slate-50'
+                                    : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
+                                }`}
+                            title="Send for revision again"
+                            disabled={
+                                getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review' ||
+                                !selectedRow.captionOutput
                             }
-                        }}
-                    >
-                        Generate Image
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={onClose}
-                    >
-                        Close
-                    </button>
+                            onClick={async () => {
+                                if (!selectedRow) return;
+                                if (getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review') return;
+                                if (!selectedRow.captionOutput) return;
+
+                                const proceed = await requestConfirm({
+                                    title: 'Send this item for revision?',
+                                    description: "You're about to send this content item for AI revision.",
+                                    confirmLabel: 'Send for revision',
+                                    cancelLabel: 'Keep item',
+                                });
+                                if (!proceed) return;
+
+                                setIsRevisingCaption(true);
+                                try {
+                                    const res = await authedFetch(
+                                        `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/review-content`,
+                                        {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({}),
+                                        },
+                                    );
+
+                                    const data = await res.json().catch(() => ({}));
+
+                                    if (!res.ok) {
+                                        if (res.status === 409) {
+                                            notify(data.error || 'Review is not allowed for this status.', 'info');
+                                        } else {
+                                            notify(data.error || 'Failed to trigger revision.', 'error');
+                                        }
+                                        return;
+                                    }
+
+                                    notify('Sent for revision.', 'success');
+                                } catch (err) {
+                                    console.error('Failed to call review endpoint', err);
+                                    notify('Failed to trigger revision. Check console for details.', 'error');
+                                    return;
+                                } finally {
+                                    await refreshCalendarRow(selectedRow.contentCalendarId);
+                                    setIsRevisingCaption(false);
+                                }
+                            }}
+                        >
+                            {isRevisingCaption ? 'Revising…' : 'Revise caption'}
+                            {isRevisingCaption && (
+                                <span className="inline-block w-3 h-3 border-2 border-brand-dark/20 border-t-brand-dark rounded-full animate-spin" />
+                            )}
+                        </button>
+
+                        <button
+                            type="button"
+                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['approved', 'design completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                                    ? 'bg-white text-brand-dark border border-slate-200/70 hover:bg-slate-50'
+                                    : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
+                                }`}
+                            disabled={
+                                !['approved', 'design completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                            }
+                            onClick={() => {
+                                if (
+                                    !['approved', 'design completed'].includes(
+                                        getStatusValue(selectedRow.status).trim().toLowerCase(),
+                                    )
+                                )
+                                    return;
+
+                                setIsImageModalOpen(true);
+                                setIsViewModalOpen(false);
+
+                                // Prefill from BrandKB for this company
+                                const companyId = selectedRow?.companyId ?? activeCompanyId;
+                                if (companyId) {
+                                    (async () => {
+                                        try {
+                                            const res = await authedFetch(`${backendBaseUrl}/api/brandkb/company/${companyId}`);
+                                            const data = await res.json();
+                                            const list = Array.isArray(data.brandKBs) ? data.brandKBs : data;
+                                            const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
+                                            if (first) {
+                                                if (typeof first.brandKbId === 'string') setBrandKbId(first.brandKbId);
+                                                if (typeof first.systemInstruction === 'string') setSystemInstruction(first.systemInstruction);
+                                            }
+                                        } catch (err) {
+                                            console.error('Failed to load BrandKB for image generation', err);
+                                        }
+                                    })();
+                                }
+                            }}
+                        >
+                            Generate Image
+                        </button>
+
+                        <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-bold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px]"
+                            onClick={onClose}
+                        >
+                            Close
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
