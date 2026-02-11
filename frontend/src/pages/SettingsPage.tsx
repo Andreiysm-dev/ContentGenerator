@@ -377,9 +377,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
         <div className="min-h-screen bg-slate-50">
             <main className="px-4 sm:px-6 lg:px-7 py-5 sm:py-6">
                 <div className="mx-auto w-full max-w-[1120px]">
-                    {/* Tabs */}
-                    <div className="sticky top-3 z-10">
-                        <div className="relative flex items-center gap-1.5 rounded-2xl border border-slate-200/70 bg-white/90 p-2 shadow-[0_12px_26px_rgba(11,38,65,0.06)] backdrop-blur">
+                    <div className="sticky top-0 z-30 bg-slate-50 pb-2">
+                        <div className="relative flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-slate-200/70 bg-white p-2 shadow-sm">
                             <TabLink to={`${companyUrlBase}/overview`} id="overview">
                                 Overview
                             </TabLink>

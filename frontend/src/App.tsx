@@ -2346,6 +2346,7 @@ function App() {
       <div className="flex min-h-[calc(100vh-80px)] relative">
         <Sidebar
           isNavDrawerOpen={isNavDrawerOpen}
+          setIsNavDrawerOpen={setIsNavDrawerOpen}
           activeCompany={activeCompany}
           activeCompanyId={activeCompanyId}
           companies={companies}
@@ -2360,8 +2361,8 @@ function App() {
           notify={notify}
         />
 
-        <div className="flex-1 min-w-0 bg-surface-raise transition-all duration-200 ease-in-out">
-          <div className="max-w-[1200px] mx-auto my-8 mb-12 px-6 min-h-[calc(100vh-80px)]">
+         <div className="flex-1 ml-0 lg:ml-[264px] overflow-y-auto h-[calc(100vh-80px)] bg-gray-50">
+          <div>
             <Routes>
               <Route
                 path="/"
@@ -2369,8 +2370,8 @@ function App() {
                   activeCompanyId
                     ? <Navigate to={`/company/${encodeURIComponent(activeCompanyId)}/dashboard`} replace />
                     : (
-                      <div className="flex flex-col gap-[22px] animate-page-fade-in">
-                        <div className="flex flex-col items-center justify-center p-8 text-center text-ink-500 gap-3">
+                    <div className="app-main">
+                        <div className="empty-state">
                           <p>Select a company to continue.</p>
                         </div>
                       </div>
