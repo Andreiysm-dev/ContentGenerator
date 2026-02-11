@@ -1,4 +1,5 @@
 import db from '../database/db.js';
+import { IMAGE_GENERATION_SYSTEM_PROMPT, IMAGE_GENERATION_USER_PROMPT } from './prompts.js';
 
 const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -199,21 +200,15 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
       ? opts.systemInstruction
       : (brandKB?.systemInstruction ?? '');
 
-  const openAiSystem =
-    'You are an expert prompt engineer specializing in text-to-image generation for Gemini.\n\nYour task is to generate ONE (1) production-ready IMAGE MEGAPROMPT that will be sent directly to Gemini for image generation.\n\nYou MUST strictly follow the provided brand system instruction. The brand system instruction defines the visual identity, tone, and design boundaries and OVERRIDES all other creative decisions.\n\n---\n\nBRAND SYSTEM INSTRUCTION (MANDATORY):\n{{SYSTEM_INSTRUCTION}}\n\nDo not introduce visual styles, colors, typography, layouts, moods, or imagery that are not aligned with or implied by the brand system instruction.\n\n---\n\nOBJECTIVE:\nCreate a visually clear, on-brand social media image concept that:\n- Prioritizes the Brand Highlight as the dominant visual message\n- Supports Cross Promotion as a secondary element without competing for attention\n- Is optimized for social media feeds and small-screen readability\n- Fully aligns with the provided brand system instruction\n\n---\n\nOUTPUT FORMAT (STRICT — FOLLOW EXACTLY):\n\nMEGAPROMPT:\n<Write ONE cohesive paragraph describing the image to be generated. \nInclude visual style, composition, layout hierarchy, color treatment, subject matter, mood, and brand alignment.\nDescribe how text, imagery, and CTA are visually organized without inventing copy unless necessary.>\n\nNEGATIVE:\n<Write ONE cohesive paragraph listing what the image must avoid, including off-brand styles, conflicting tones, cluttered layouts, poor readability, unrealistic visuals, decorative fonts, experimental art styles, or anything that violates the brand system instruction.>\n\n---\n\nHARD RULES:\n- Output ONLY the MEGAPROMPT and NEGATIVE sections.\n- Do NOT include explanations, bullet points, headings, markdown, or commentary.\n- Do NOT generate multiple concepts or variations.\n- Do NOT invent logos, colors, typography, or brand elements.\n- Do NOT restate the brand system instruction.';
+  const openAiSystem = IMAGE_GENERATION_SYSTEM_PROMPT;
 
-  const openAiUser =
-    'Create a social media post image using the following context. \nUse only what is visually relevant and prioritize clarity, hierarchy, and brand alignment.\n\nPost Caption:\n{{FINAL_CAPTION}}\n\nBrand Highlight (Primary focus – ~80% visual emphasis):\n{{BRAND_HIGHLIGHT}}\n\nCross Promotion (Secondary focus – ~20% visual emphasis):\n{{CROSS_PROMO}}\n\nTheme:\n{{THEME}}\n\nCall To Action (CTA):\n{{CTA}}\n\nTarget Audience:\n{{TARGET_AUDIENCE}}\n';
+  const openAiUser = IMAGE_GENERATION_USER_PROMPT;
 
   const openAiRes = await callOpenAIText({
-    systemPrompt: openAiSystem.replaceAll('{{SYSTEM_INSTRUCTION}}', systemInstruction || ''),
+    systemPrompt: openAiSystem.replaceAll('{{brandKB.systemInstruction}}', systemInstruction || ''),
     userPrompt: openAiUser
-      .replaceAll('{{FINAL_CAPTION}}', String(row.finalCaption ?? ''))
-      .replaceAll('{{BRAND_HIGHLIGHT}}', String(row.brandHighlight ?? ''))
-      .replaceAll('{{CROSS_PROMO}}', String(row.crossPromo ?? ''))
-      .replaceAll('{{THEME}}', String(row.theme ?? ''))
-      .replaceAll('{{CTA}}', String(row.cta ?? ''))
-      .replaceAll('{{TARGET_AUDIENCE}}', String(row.targetAudience ?? '')),
+      .replaceAll('{{contentCalendar.finalCaption}}', String(row.finalCaption || row.captionOutput || ''))
+      .replaceAll('{{contentCalendar.finalCTA}}', String(row.finalCTA || row.cta || '')),
     temperature: 1,
   });
 

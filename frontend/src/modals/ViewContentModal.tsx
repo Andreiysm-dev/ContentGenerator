@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface ViewContentModalProps {
     isOpen: boolean;
@@ -58,6 +58,8 @@ export function ViewContentModal({
     setBrandKbId,
     setSystemInstruction,
 }: ViewContentModalProps) {
+    const [isManualApproving, setIsManualApproving] = useState(false);
+
     if (!isOpen || !selectedRow) return null;
 
     return (
@@ -494,24 +496,24 @@ export function ViewContentModal({
 
                         <button
                             type="button"
-                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['review', 'approved'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
-                                    ? 'bg-white text-brand-dark border border-slate-200/70 hover:bg-slate-50'
-                                    : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
+                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['review', 'approved', 'needs revision'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                                ? 'bg-white text-brand-dark border border-slate-200/70 hover:bg-slate-50'
+                                : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
                                 }`}
-                            title="Send for revision again"
+                            title="Send for review again"
                             disabled={
-                                getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review' ||
+                                !['review', 'approved', 'needs revision'].includes(getStatusValue(selectedRow.status).trim().toLowerCase()) ||
                                 !selectedRow.captionOutput
                             }
                             onClick={async () => {
                                 if (!selectedRow) return;
-                                if (getStatusValue(selectedRow.status).trim().toLowerCase() !== 'review') return;
+                                if (!['review', 'approved', 'needs revision'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())) return;
                                 if (!selectedRow.captionOutput) return;
 
                                 const proceed = await requestConfirm({
-                                    title: 'Send this item for revision?',
-                                    description: "You're about to send this content item for AI revision.",
-                                    confirmLabel: 'Send for revision',
+                                    title: 'Send this item for review?',
+                                    description: "You're about to send this content item for AI review.",
+                                    confirmLabel: 'Send for review',
                                     cancelLabel: 'Keep item',
                                 });
                                 if (!proceed) return;
@@ -533,15 +535,15 @@ export function ViewContentModal({
                                         if (res.status === 409) {
                                             notify(data.error || 'Review is not allowed for this status.', 'info');
                                         } else {
-                                            notify(data.error || 'Failed to trigger revision.', 'error');
+                                            notify(data.error || 'Failed to trigger review.', 'error');
                                         }
                                         return;
                                     }
 
-                                    notify('Sent for revision.', 'success');
+                                    notify('Sent for review.', 'success');
                                 } catch (err) {
                                     console.error('Failed to call review endpoint', err);
-                                    notify('Failed to trigger revision. Check console for details.', 'error');
+                                    notify('Failed to trigger review. Check console for details.', 'error');
                                     return;
                                 } finally {
                                     await refreshCalendarRow(selectedRow.contentCalendarId);
@@ -549,17 +551,84 @@ export function ViewContentModal({
                                 }
                             }}
                         >
-                            {isRevisingCaption ? 'Revising…' : 'Revise caption'}
+                            {isRevisingCaption ? 'Reviewing…' : 'Review caption'}
                             {isRevisingCaption && (
                                 <span className="inline-block w-3 h-3 border-2 border-brand-dark/20 border-t-brand-dark rounded-full animate-spin" />
                             )}
                         </button>
 
+                        {getStatusValue(selectedRow.status).trim().toLowerCase() === 'needs revision' && (
+                            <button
+                                type="button"
+                                className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${selectedRow.captionOutput
+                                    ? 'bg-white text-green-600 border border-green-200 hover:bg-green-50'
+                                    : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
+                                    }`}
+                                disabled={
+                                    isManualApproving ||
+                                    !selectedRow.captionOutput
+                                }
+                                onClick={async () => {
+                                    if (!selectedRow) return;
+
+                                    const proceed = await requestConfirm({
+                                        title: 'Manual Approval',
+                                        description: "You're about to manually approve this content. This will set the status to 'Approved' and copy the generated outputs into the final fields.",
+                                        confirmLabel: 'Approve Manually',
+                                        cancelLabel: 'Cancel',
+                                    });
+                                    if (!proceed) return;
+
+                                    setIsManualApproving(true);
+                                    try {
+                                        const res = await authedFetch(
+                                            `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`,
+                                            {
+                                                method: 'PUT',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    status: {
+                                                        state: 'Approved',
+                                                        updatedAt: new Date().toISOString(),
+                                                        by: 'user_manual',
+                                                    },
+                                                    reviewDecision: 'APPROVED',
+                                                    finalCaption: selectedRow.captionOutput,
+                                                    finalCTA: selectedRow.ctaOuput || selectedRow.cta,
+                                                    finalHashtags: selectedRow.hastagsOutput,
+                                                    reviewNotes: 'Manually approved by user',
+                                                }),
+                                            },
+                                        );
+
+                                        if (!res.ok) {
+                                            const data = await res.json().catch(() => ({}));
+                                            notify(data.error || 'Failed to approve manually.', 'error');
+                                            return;
+                                        }
+
+                                        notify('Content manually approved.', 'success');
+                                        await refreshCalendarRow(selectedRow.contentCalendarId);
+                                    } catch (err) {
+                                        console.error('Manual approve error:', err);
+                                        notify('Failed to approve manually.', 'error');
+                                    } finally {
+                                        setIsManualApproving(false);
+                                    }
+                                }}
+                            >
+                                {isManualApproving ? 'Approving…' : 'Approve Manually'}
+                                {isManualApproving && (
+                                    <span className="inline-block w-3 h-3 border-2 border-green-600/30 border-t-green-600 rounded-full animate-spin" />
+                                )}
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['approved', 'design completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
-                                    ? 'bg-white text-brand-dark border border-slate-200/70 hover:bg-slate-50'
-                                    : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
+                                ? 'bg-white text-brand-dark border border-slate-200/70 hover:bg-slate-50'
+                                : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
                                 }`}
                             disabled={
                                 !['approved', 'design completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())

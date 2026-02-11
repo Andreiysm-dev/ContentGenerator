@@ -1,5 +1,7 @@
 import db from '../database/db.js';
 
+import { CAPTION_USER_PROMPT_TEMPLATE } from './prompts.js';
+
 const ALLOWED_FRAMEWORKS = new Set([
   'EDUCATIONAL',
   'PSA',
@@ -46,56 +48,19 @@ const buildUserPrompt = ({ contentCalendar, brandKB }) => {
     ? contentCalendar.channels.join(', ')
     : contentCalendar.channels ?? '';
 
-  return [
-    'Use the following inputs to generate ONE social caption. All inputs are authoritative.',
-    '',
-    'INPUTS',
-    `Brand Highlight (80%): ${contentCalendar.brandHighlight ?? ''}`,
-    `Cross-Promo (20%): ${contentCalendar.crossPromo ?? ''}`,
-    `Theme: ${contentCalendar.theme ?? ''}`,
-    `Content Type: ${contentCalendar.contentType ?? ''}`,
-    `Channel(s): ${channelsValue}`,
-    `Target Audience: ${contentCalendar.targetAudience ?? ''}`,
-    `Primary Goal: ${contentCalendar.primaryGoal ?? ''}`,
-    `CTA (if provided): ${contentCalendar.cta ?? ''}`,
-    `Type of Promotion: ${contentCalendar.promoType ?? ''}`,
-    `Emoji Rule: ${brandKB?.emojiRule ?? ''}`,
-    `Brand Pack: ${brandKB?.brandPack ?? ''}`,
-    `Brand Capability Map: ${brandKB?.brandCapability ?? ''}`,
-    '',
-    'EXECUTION RULES (NON-NEGOTIABLE)',
-    '- Adapt tone and length to the listed Channel(s).',
-    '- Speak directly to the Target Audience.',
-    '- Deliver clear value BEFORE any promotion.',
-    '- Maintain ecosystem framing:',
-    '  - Brand Highlight is the primary focus.',
-    '  - Cross-Promo is secondary and optional.',
-    '- If CTA is missing, empty, or "", choose the most appropriate CTA based on Brand Pack and Capability Map.',
-    '- Hashtags must be relevant, minimal (3–8), and professional.',
-    '- Emoji Rule must be followed exactly.',
-    '- Do NOT use markdown (**bold**, headings, bullets).',
-    '- Do NOT add labels like “Context”, “Overview”, or explanations.',
-    '',
-    'FORMATTING RULES (CRITICAL)',
-    '- The caption MAY contain multiple paragraphs.',
-    '- Paragraphs must be separated by a single blank line.',
-    '- Do NOT insert extra section titles or prefixes inside the caption.',
-    '',
-    'OUTPUT FORMAT (STRICT — MUST MATCH EXACTLY)',
-    'Return STRICT JSON only (no markdown, no prose).',
-    'Required JSON format:',
-    '{',
-    '  "framework": "EDUCATIONAL | PSA | STORY | CHECKLIST | PROBLEM-SOLUTION | PROMO | COMMUNITY",',
-    '  "caption": "string (may include multiple paragraphs separated by a single blank line)",',
-    '  "cta": "short CTA text only",',
-    '  "hashtags": ["#Tag1", "#Tag2"]',
-    '}',
-    '',
-    'FORMAT CHECK',
-    '- Do not add extra keys.',
-    '- Do not wrap the JSON in markdown.',
-    '- Ensure hashtags are returned as an array of 3 to 8 strings, each starting with #.',
-  ].join('\n');
+  return CAPTION_USER_PROMPT_TEMPLATE
+    .replaceAll('{{brandHighlight}}', contentCalendar.brandHighlight ?? '')
+    .replaceAll('{{crossPromo}}', contentCalendar.crossPromo ?? '')
+    .replaceAll('{{theme}}', contentCalendar.theme ?? '')
+    .replaceAll('{{contentType}}', contentCalendar.contentType ?? '')
+    .replaceAll('{{channels}}', channelsValue)
+    .replaceAll('{{targetAudience}}', contentCalendar.targetAudience ?? '')
+    .replaceAll('{{primaryGoal}}', contentCalendar.primaryGoal ?? '')
+    .replaceAll('{{cta}}', contentCalendar.cta ?? '')
+    .replaceAll('{{promoType}}', contentCalendar.promoType ?? '')
+    .replaceAll('{{emojiRule}}', brandKB?.emojiRule ?? '')
+    .replaceAll('{{brandPack}}', brandKB?.brandPack ?? '')
+    .replaceAll('{{brandCapability}}', brandKB?.brandCapability ?? '');
 };
 
 const safeParseModelJson = (text) => {
@@ -288,11 +253,7 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
   if (state === 'Generating') {
     return { ok: false, status: 409, error: 'Generation already running', code: 'ALREADY_GENERATING' };
   }
-  if (state === 'Review') {
-    return { ok: false, status: 409, error: 'Already generated', code: 'ALREADY_REVIEW' };
-  }
-
-  const generationAllowed = state === 'Draft' || state === 'Error' || state === 'Generate';
+  const generationAllowed = ['Draft', 'Error', 'Generate', 'Review', 'Approved', 'Needs Revision'].includes(state);
   if (!generationAllowed) {
     return { ok: false, status: 409, error: `Generation blocked for status: ${state}`, code: 'STATUS_BLOCKED' };
   }
@@ -437,11 +398,7 @@ export async function generateCaptionForContentSystem(payload = {}) {
   if (effectiveState === 'Generating') {
     return { ok: false, status: 409, error: 'Generation already running', code: 'ALREADY_GENERATING' };
   }
-  if (effectiveState === 'Review') {
-    return { ok: false, status: 409, error: 'Already generated', code: 'ALREADY_REVIEW' };
-  }
-
-  const generationAllowed = effectiveState === 'Draft' || effectiveState === 'Error' || effectiveState === 'Generate';
+  const generationAllowed = ['Draft', 'Error', 'Generate', 'Review', 'Approved', 'Needs Revision'].includes(effectiveState);
   if (!generationAllowed) {
     return {
       ok: false,

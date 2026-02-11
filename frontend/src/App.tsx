@@ -53,14 +53,7 @@ import {
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import './App.css';
-import './styles/modals.css';
 
-
-import './styles/calendar.css';
-import './styles/drafts.css';
-import './styles/company-settings.css';
-
-import './polish.css';
 
 type FormState = {
   date: string;
@@ -2367,8 +2360,8 @@ function App() {
           notify={notify}
         />
 
-        <div className="flex-1 min-w-0 bg-[var(--surface-raise)] transition-all duration-200 ease-in-out">
-          <div className="app-root">
+        <div className="flex-1 min-w-0 bg-surface-raise transition-all duration-200 ease-in-out">
+          <div className="max-w-[1200px] mx-auto my-8 mb-12 px-6 min-h-[calc(100vh-80px)]">
             <Routes>
               <Route
                 path="/"
@@ -2376,8 +2369,8 @@ function App() {
                   activeCompanyId
                     ? <Navigate to={`/company/${encodeURIComponent(activeCompanyId)}/dashboard`} replace />
                     : (
-                      <div className="app-main">
-                        <div className="empty-state">
+                      <div className="flex flex-col gap-[22px] animate-page-fade-in">
+                        <div className="flex flex-col items-center justify-center p-8 text-center text-ink-500 gap-3">
                           <p>Select a company to continue.</p>
                         </div>
                       </div>
@@ -2387,7 +2380,7 @@ function App() {
 
               <Route
                 path="/profile"
-                element={<ProfilePage session={session} />}
+                element={<ProfilePage session={session} supabase={supabase} notify={notify} />}
               />
 
               <Route
@@ -2990,18 +2983,20 @@ function App() {
 
       {toast && (
         <div
-          className={`toast toast--${toast.tone || 'info'}`}
+          className={`fixed bottom-6 right-6 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-white border shadow-premium-lg z-[9999] animate-[toast-slide-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md max-w-[400px] ${toast.tone === 'success' ? 'border-emerald-500/30 bg-emerald-50/95 text-emerald-800' :
+            toast.tone === 'error' ? 'border-rose-500/30 bg-rose-50/95 text-rose-800' :
+              'border-brand-primary/30 bg-sky-50/95 text-brand-dark'
+            }`}
           role="status"
           aria-live="polite"
           aria-atomic="true"
         >
-          {toast.tone === 'success' && <CheckCircle2 className="toast-icon" aria-hidden />}
-          {toast.tone === 'error' && <XCircle className="toast-icon" aria-hidden />}
-          {(toast.tone === 'info' || !toast.tone) && <Info className="toast-icon" aria-hidden />}
-          <span className="toast-message">{toast.message}</span>
+          {toast.tone === 'success' && <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" aria-hidden />}
+          {toast.tone === 'error' && <XCircle className="w-5 h-5 flex-shrink-0 text-rose-500" aria-hidden />}
+          {(toast.tone === 'info' || !toast.tone) && <Info className="w-5 h-5 flex-shrink-0 text-brand-primary" aria-hidden />}
+          <span className="text-sm font-semibold leading-tight">{toast.message}</span>
         </div>
-      )
-      }
+      )}
 
       <ConfirmModal
         isOpen={isConfirmOpen}

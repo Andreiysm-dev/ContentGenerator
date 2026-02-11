@@ -11,6 +11,10 @@ import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
 
+console.log('DEBUG: Backend started');
+console.log('DEBUG: Working directory:', process.cwd());
+console.log('DEBUG: IMAGEN_MODEL from env:', process.env.IMAGEN_MODEL);
+
 const app = express();
 const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
 

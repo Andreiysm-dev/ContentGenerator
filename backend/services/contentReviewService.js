@@ -1,5 +1,7 @@
 import db from '../database/db.js';
 
+import { REVIEW_USER_PROMPT_TEMPLATE } from './prompts.js';
+
 const nowIso = () => new Date().toISOString();
 
 const normalizeStatusState = (status) => {
@@ -112,15 +114,16 @@ const safeParseReviewerText = (text) => {
   }
 
   const extractBetween = (startLabel, endLabel) => {
-    const startRe = new RegExp(`^\\s*${startLabel}\\s*$`, 'im');
-    const endRe = endLabel ? new RegExp(`^\\s*${endLabel}\\s*$`, 'im') : null;
-    const start = normalized.search(startRe);
-    if (start === -1) return '';
-    const afterStart = normalized.slice(start).replace(startRe, '');
-    if (!endRe) return afterStart.trim();
-    const endIndex = afterStart.search(endRe);
-    if (endIndex === -1) return afterStart.trim();
-    return afterStart.slice(0, endIndex).trim();
+    const startIdx = normalized.search(new RegExp(`^\\s*${startLabel}`, 'im'));
+    if (startIdx === -1) return '';
+
+    const afterStart = normalized.slice(startIdx).replace(new RegExp(`^\\s*${startLabel}.*?(\\r?\\n|$)`, 'im'), '');
+    if (!endLabel) return afterStart.trim();
+
+    const endIdx = afterStart.search(new RegExp(`^\\s*${endLabel}`, 'im'));
+    if (endIdx === -1) return afterStart.trim();
+
+    return afterStart.slice(0, endIdx).trim();
   };
 
   const notesBlock = extractBetween('NOTES:', 'FINAL CAPTION:');
@@ -130,10 +133,10 @@ const safeParseReviewerText = (text) => {
 
   const reviewNotes = notesBlock
     ? notesBlock
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .join('\n')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join('\n')
     : '';
 
   return {
@@ -154,61 +157,14 @@ const buildReviewerUserPrompt = ({ contentCalendar, brandKB }) => {
     ? contentCalendar.channels.join(', ')
     : contentCalendar.channels ?? '';
 
-  return [
-    'You are reviewing content',
-    '',
-    'Inputs',
-    '',
-    `Draft Caption:${contentCalendar.captionOutput ?? ''}`,
-    '',
-    `Draft CTA:${contentCalendar.ctaOuput ?? ''}`,
-    '',
-    `Draft Hashtags:${contentCalendar.hastagsOutput ?? ''}`,
-    '',
-    `Channel:${channelsValue}`,
-    '',
-    `Primary Goal:${contentCalendar.primaryGoal ?? ''}`,
-    '',
-    `Brand Pack:${brandKB?.brandPack ?? ''}`,
-    '',
-    `Capability Map:${brandKB?.brandCapability ?? ''}`,
-    '',
-    'Instructions',
-    '',
-    'Review the draft for brand alignment, clarity, and compliance',
-    'Simplify language where needed',
-    'Remove or replace any forbidden words or risky claims',
-    'Ensure tone matches the channel and audience',
-    'Fix the content directly if possible',
-    'If you can fully correct the content to be compliant and on-brand, you MUST mark APPROVED even if you made changes.',
-    'NEEDS REVISION is ONLY allowed when you require specific human input (missing facts, unclear offer details, legal/compliance uncertainty that cannot be safely removed).',
-    'If you choose NEEDS REVISION, NOTES MUST include a bullet that starts with: HUMAN INPUT REQUIRED: <question(s) or missing info>',
-    'If you mark NEEDS REVISION, you MUST still revise the content yourself and provide corrected final outputs.',
-    'If you mark NEEDS REVISION, NOTES must include a clear list of the specific changes you made (what you changed and why).',
-    'Only mark NEEDS REVISION if the content still has material issues that require human input even after your best corrections.',
-    '',
-    'Final Output Requirement',
-    '',
-    'Output must follow this structure exactly:',
-    '',
-    'DECISION: <APPROVED or NEEDS REVISION>',
-    'NOTES:',
-    '',
-    '<bullet>',
-    '<bullet>',
-    '',
-    'FINAL CAPTION:',
-    '',
-    '<caption>',
-    '',
-    'FINAL CTA:',
-    '<cta>',
-    '',
-    'FINAL HASHTAGS:',
-    '<hashtags>',
-    '',
-    'Do not include anything else.',
-  ].join('\n');
+  return REVIEW_USER_PROMPT_TEMPLATE
+    .replaceAll('{{captionOutput}}', contentCalendar.captionOutput ?? '')
+    .replaceAll('{{ctaOuput}}', contentCalendar.ctaOuput ?? '')
+    .replaceAll('{{hastagsOutput}}', contentCalendar.hastagsOutput ?? '')
+    .replaceAll('{{channels}}', channelsValue)
+    .replaceAll('{{primaryGoal}}', contentCalendar.primaryGoal ?? '')
+    .replaceAll('{{brandPack}}', brandKB?.brandPack ?? '')
+    .replaceAll('{{brandCapability}}', brandKB?.brandCapability ?? '');
 };
 
 const callOpenAIForReview = async ({ systemPrompt, userPrompt }) => {
@@ -293,7 +249,7 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
     return { ok: false, status: 409, error: 'Review already running', code: 'ALREADY_REVIEWING' };
   }
 
-  const reviewAllowed = state === 'Review';
+  const reviewAllowed = ['Review', 'Approved', 'Needs Revision'].includes(state);
   if (!reviewAllowed) {
     return { ok: false, status: 409, error: `Review blocked for status: ${state}`, code: 'STATUS_BLOCKED' };
   }
@@ -439,7 +395,7 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
     return { ok: false, status: 409, error: 'Review already running', code: 'ALREADY_REVIEWING' };
   }
 
-  const reviewAllowed = effectiveState === 'Review';
+  const reviewAllowed = ['Review', 'Approved', 'Needs Revision'].includes(effectiveState);
   if (!reviewAllowed) {
     return { ok: false, status: 409, error: `Review blocked for status: ${effectiveState}`, code: 'STATUS_BLOCKED' };
   }
