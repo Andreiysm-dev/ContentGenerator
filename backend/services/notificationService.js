@@ -1,7 +1,7 @@
 
 import db from '../database/db.js';
 
-export const sendNotification = async ({ userId, title, message, type = 'info', link = null, triggeredByName = null, companyName = null }) => {
+export const sendNotification = async ({ userId, title, message, type = 'info', link = null }) => {
     if (!userId) {
         console.warn('[Notification] Skipped: No userId provided');
         return;
@@ -16,8 +16,6 @@ export const sendNotification = async ({ userId, title, message, type = 'info', 
                 message,
                 type,
                 link,
-                triggered_by_name: triggeredByName,
-                company_name: companyName,
                 read: false,
             }]);
 

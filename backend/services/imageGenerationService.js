@@ -162,7 +162,7 @@ const loadContentCalendarRow = async ({ contentCalendarId, userId }) => {
 
   const { data: company, error: companyError } = await db
     .from('company')
-    .select('user_id, collaborator_ids, companyName')
+    .select('user_id, collaborator_ids')
     .eq('companyId', row.companyId)
     .single();
 
@@ -174,11 +174,7 @@ const loadContentCalendarRow = async ({ contentCalendarId, userId }) => {
     return { ok: false, status: 403, error: 'Forbidden' };
   }
 
-  // Fetch user metadata for triggeredByName
-  const { data: { user }, error: userError } = await db.auth.admin.getUserById(userId);
-  const triggeredByName = user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email || 'Unknown User';
-
-  return { ok: true, row, companyName: company.companyName, triggeredByName };
+  return { ok: true, row };
 };
 
 export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
@@ -189,8 +185,6 @@ export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
   if (!loaded.ok) return loaded;
 
   const row = loaded.row;
-  const companyName = loaded.companyName;
-  const triggeredByName = loaded.triggeredByName;
 
   const { data: brandKB, error: brandError } = await db
     .from('brandKB')
@@ -234,7 +228,7 @@ export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
     return { ok: false, status: 500, error: 'Failed to save DMP' };
   }
 
-  return { ok: true, dmp: dmpRaw, row: { ...row, dmp: dmpRaw }, companyName, triggeredByName };
+  return { ok: true, dmp: dmpRaw, row: { ...row, dmp: dmpRaw } };
 }
 
 export async function generateImageForCalendarRow(contentCalendarId, opts = {}) {
@@ -247,8 +241,6 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
 
   const dmpRaw = dmpResult.dmp;
   const row = dmpResult.row;
-  const companyName = dmpResult.companyName;
-  const triggeredByName = dmpResult.triggeredByName;
 
   // 2. Proceed to Image Generation
   const parsed = parseMegaPromptBlock(dmpRaw);
@@ -299,8 +291,6 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
       message: 'Image generation completed successfully',
       type: 'success',
       link: '/calendar',
-      triggeredByName,
-      companyName,
     });
   }
 
@@ -331,8 +321,6 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
   if (!loaded.ok) return loaded;
 
   const row = loaded.row;
-  const companyName = loaded.companyName;
-  const triggeredByName = loaded.triggeredByName;
 
   const { error: saveDmpError } = await db
     .from('contentCalendar')
@@ -384,8 +372,6 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     message: 'Image generation from custom DMP completed successfully',
     type: 'success',
     link: '/calendar',
-    triggeredByName,
-    companyName,
   });
 
   return {

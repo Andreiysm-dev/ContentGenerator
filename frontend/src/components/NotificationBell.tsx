@@ -85,20 +85,6 @@ export function NotificationBell() {
                                         {notification.message}
                                     </p>
                                 )}
-                                {(notification.triggered_by_name || notification.company_name) && (
-                                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
-                                        {notification.triggered_by_name && (
-                                            <span className="text-[10px] font-semibold text-brand-primary/70">
-                                                By {notification.triggered_by_name}
-                                            </span>
-                                        )}
-                                        {notification.company_name && (
-                                            <span className="text-[10px] font-semibold text-slate-400">
-                                                for {notification.company_name}
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
                                 <span className="text-[10px] text-muted-foreground/60 w-full text-right mt-1">
                                     {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                 </span>

@@ -10,8 +10,6 @@ export interface Notification {
     message?: string;
     type: NotificationType;
     link?: string;
-    triggered_by_name?: string;
-    company_name?: string;
     read: boolean;
     created_at: string;
 }
@@ -117,7 +115,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             .subscribe();
 
         return () => {
-            if (supabase) supabase.removeChannel(channel);
+            supabase.removeChannel(channel);
         };
     }, []);
 
