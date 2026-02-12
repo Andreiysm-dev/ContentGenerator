@@ -55,6 +55,8 @@ export type CompanySettingsShellProps = {
   setBrandBasicsType: (value: string) => void;
   brandBasicsOffer: string;
   setBrandBasicsOffer: (value: string) => void;
+  brandBasicsGoal: string;
+  setBrandBasicsGoal: (value: string) => void;
   audienceRole: string;
   setAudienceRole: (value: string) => void;
   audienceIndustry: string;
@@ -79,6 +81,10 @@ export type CompanySettingsShellProps = {
   setAbsoluteTruths: (value: string) => void;
   noSayRules: string[];
   setNoSayRules: Dispatch<SetStateAction<string[]>>;
+  regulatedIndustry: string;
+  setRegulatedIndustry: (value: string) => void;
+  legalReview: string;
+  setLegalReview: (value: string) => void;
   advancedPositioning: string;
   setAdvancedPositioning: (value: string) => void;
   advancedDifferentiators: string;
@@ -89,10 +95,23 @@ export type CompanySettingsShellProps = {
   setAdvancedCompetitors: (value: string) => void;
   advancedProofPoints: string;
   setAdvancedProofPoints: (value: string) => void;
+  advancedRequiredPhrases: string;
+  setAdvancedRequiredPhrases: (value: string) => void;
+  advancedForbiddenPhrases: string;
+  setAdvancedForbiddenPhrases: (value: string) => void;
+  advancedComplianceNotes: string;
+  setAdvancedComplianceNotes: (value: string) => void;
+  writerRulesUnlocked: boolean;
+  reviewerRulesUnlocked: boolean;
   newCollaboratorEmail: string;
   setNewCollaboratorEmail: (value: string) => void;
-  handleAddCollaborator: () => void;
-  handleRemoveCollaborator: (id: string) => void;
+  onAddCollaborator: () => void;
+  onRemoveCollaborator: (id: string) => void;
+  isBrandWebhookCoolingDown: boolean;
+  brandWebhookCooldownSecondsLeft: number;
+  isEditingBrandSetup: boolean;
+  brandEditingRef: React.RefObject<boolean>;
+  formAnswerCache: any;
 };
 
 const TabLink = ({ to, id, children, pressedTab, onClick }: { to: string; id: CompanySettingsTab; children: React.ReactNode; pressedTab: string | null; onClick: () => void }) => (
@@ -254,10 +273,23 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     setAdvancedCompetitors,
     advancedProofPoints,
     setAdvancedProofPoints,
+    advancedRequiredPhrases,
+    setAdvancedRequiredPhrases,
+    advancedForbiddenPhrases,
+    setAdvancedForbiddenPhrases,
+    advancedComplianceNotes,
+    setAdvancedComplianceNotes,
+    writerRulesUnlocked,
+    reviewerRulesUnlocked,
     newCollaboratorEmail,
     setNewCollaboratorEmail,
-    handleAddCollaborator,
-    handleRemoveCollaborator,
+    onAddCollaborator,
+    onRemoveCollaborator,
+    isBrandWebhookCoolingDown,
+    brandWebhookCooldownSecondsLeft,
+    isEditingBrandSetup,
+    brandEditingRef,
+    formAnswerCache,
   } = props;
 
   const navigate = useNavigate();
@@ -266,7 +298,6 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   const companyUrlBase = `/company/${encodeURIComponent(decodedId)}/settings`;
   const hasBrandIntelligenceConfigured = !!brandIntelligenceReady;
   const resolvedBrandSetupType = brandSetupLevel || brandSetupMode || null;
-  const isEditingBrandSetup = !!brandSetupMode;
   const [pressedTab, setPressedTab] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1048,7 +1079,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         <label className="text-xs font-bold text-slate-700">Add collaborator (email)</label>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                           <Input type="email" placeholder="user@example.com" value={newCollaboratorEmail} onChange={(e) => setNewCollaboratorEmail(e.target.value)} />
-                          <button className="btn btn-primary btn-sm" type="button" onClick={handleAddCollaborator} disabled={!newCollaboratorEmail}>
+                          <button className="btn btn-primary btn-sm" type="button" onClick={onAddCollaborator} disabled={!newCollaboratorEmail}>
                             Add
                           </button>
                         </div>
@@ -1068,7 +1099,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                     <div className="mt-1 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-700">{c.role}</div>
                                   </div>
                                   {c.role !== "owner" && (
-                                    <button className="btn btn-danger btn-sm self-start sm:self-auto" type="button" onClick={() => handleRemoveCollaborator(c.id)}>
+                                    <button className="btn btn-danger btn-sm self-start sm:self-auto" type="button" onClick={() => onRemoveCollaborator(c.id)}>
                                       Remove
                                     </button>
                                   )}

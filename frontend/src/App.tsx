@@ -2518,6 +2518,17 @@ function App() {
                       saveBrandSetup={saveBrandSetup}
                       sendBrandWebhook={sendBrandWebhook}
                       buildFormAnswer={buildFormAnswer}
+                      brandBasicsGoal={brandBasicsGoal}
+                      setBrandBasicsGoal={setBrandBasicsGoal}
+                      regulatedIndustry={regulatedIndustry}
+                      setRegulatedIndustry={setRegulatedIndustry}
+                      legalReview={legalReview}
+                      setLegalReview={setLegalReview}
+                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
+                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
+                      isEditingBrandSetup={isEditingBrandSetup}
+                      brandEditingRef={brandEditingRef}
+                      formAnswerCache={formAnswerCache}
                       industryOptions={industryOptions}
                       audienceRoleOptions={audienceRoleOptions}
                       painPointOptions={painPointOptions}
@@ -2564,10 +2575,18 @@ function App() {
                       setAdvancedCompetitors={setAdvancedCompetitors}
                       advancedProofPoints={advancedProofPoints}
                       setAdvancedProofPoints={setAdvancedProofPoints}
+                      advancedRequiredPhrases={advancedRequiredPhrases}
+                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
+                      advancedForbiddenPhrases={advancedForbiddenPhrases}
+                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
+                      advancedComplianceNotes={advancedComplianceNotes}
+                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
+                      writerRulesUnlocked={writerRulesUnlocked}
+                      reviewerRulesUnlocked={reviewerRulesUnlocked}
                       newCollaboratorEmail={newCollaboratorEmail}
                       setNewCollaboratorEmail={setNewCollaboratorEmail}
-                      handleAddCollaborator={handleAddCollaborator}
-                      handleRemoveCollaborator={handleRemoveCollaborator}
+                      onAddCollaborator={handleAddCollaborator}
+                      onRemoveCollaborator={handleRemoveCollaborator}
                     />
                   }
                 />
@@ -2613,6 +2632,17 @@ function App() {
                       saveBrandSetup={saveBrandSetup}
                       sendBrandWebhook={sendBrandWebhook}
                       buildFormAnswer={buildFormAnswer}
+                      brandBasicsGoal={brandBasicsGoal}
+                      setBrandBasicsGoal={setBrandBasicsGoal}
+                      regulatedIndustry={regulatedIndustry}
+                      setRegulatedIndustry={setRegulatedIndustry}
+                      legalReview={legalReview}
+                      setLegalReview={setLegalReview}
+                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
+                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
+                      isEditingBrandSetup={isEditingBrandSetup}
+                      brandEditingRef={brandEditingRef}
+                      formAnswerCache={formAnswerCache}
                       industryOptions={industryOptions}
                       audienceRoleOptions={audienceRoleOptions}
                       painPointOptions={painPointOptions}
@@ -2659,10 +2689,18 @@ function App() {
                       setAdvancedCompetitors={setAdvancedCompetitors}
                       advancedProofPoints={advancedProofPoints}
                       setAdvancedProofPoints={setAdvancedProofPoints}
+                      advancedRequiredPhrases={advancedRequiredPhrases}
+                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
+                      advancedForbiddenPhrases={advancedForbiddenPhrases}
+                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
+                      advancedComplianceNotes={advancedComplianceNotes}
+                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
+                      writerRulesUnlocked={writerRulesUnlocked}
+                      reviewerRulesUnlocked={reviewerRulesUnlocked}
                       newCollaboratorEmail={newCollaboratorEmail}
                       setNewCollaboratorEmail={setNewCollaboratorEmail}
-                      handleAddCollaborator={handleAddCollaborator}
-                      handleRemoveCollaborator={handleRemoveCollaborator}
+                      onAddCollaborator={handleAddCollaborator}
+                      onRemoveCollaborator={handleRemoveCollaborator}
                     />
                   }
                 />
