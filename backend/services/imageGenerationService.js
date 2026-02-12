@@ -1,6 +1,6 @@
 import db from '../database/db.js';
 import { IMAGE_GENERATION_SYSTEM_PROMPT, IMAGE_GENERATION_USER_PROMPT } from './prompts.js';
-import { sendNotification } from './notificationService.js';
+import { sendNotification, sendTeamNotification } from './notificationService.js';
 
 const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -293,8 +293,8 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     .select();
 
   if (!saveError) {
-    await sendNotification({
-      userId,
+    await sendTeamNotification({
+      companyId: row.companyId,
       title: 'Image Generated',
       message: 'Image generation completed successfully',
       type: 'success',
@@ -378,8 +378,8 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     return { ok: false, status: 500, error: 'Failed to save image output' };
   }
 
-  await sendNotification({
-    userId,
+  await sendTeamNotification({
+    companyId: row.companyId,
     title: 'Image Generated (Custom DMP)',
     message: 'Image generation from custom DMP completed successfully',
     type: 'success',

@@ -1,7 +1,7 @@
 import db from '../database/db.js';
 
 import { CAPTION_USER_PROMPT_TEMPLATE } from './prompts.js';
-import { sendNotification } from './notificationService.js';
+import { sendNotification, sendTeamNotification } from './notificationService.js';
 
 const ALLOWED_FRAMEWORKS = new Set([
   'EDUCATIONAL',
@@ -357,8 +357,8 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
   const updated = Array.isArray(updatedRows) ? updatedRows[0] : null;
 
   if (updated) {
-    await sendNotification({
-      userId,
+    await sendTeamNotification({
+      companyId,
       title: 'Caption Generated',
       message: `Caption generated for ${contentCalendar.theme || 'New Content'}`,
       type: 'success',
