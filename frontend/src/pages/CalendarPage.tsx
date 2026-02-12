@@ -126,49 +126,52 @@ export function CalendarPage(props: CalendarPageProps) {
 
   return (
     <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6">
-        <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-brand-primary/10 to-white border-t border-l border-r border-gray-200 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
-            <div>
-              <h2 className="text-md md:text-xl font-bold">Content Calendar</h2>
-              <p className="mt-1 text-sm font-medium">Plan, generate, review, and track content status.</p>
-            </div>
+      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-brand-primary/10 to-white border-t border-l border-r border-gray-200 rounded-t-2xl shadow-sm flex flex-col gap-4">
+          <div className="flex-1">
+            <h2 className="text-md md:text-xl font-bold">Content Calendar</h2>
+            <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Plan, generate, review, and track content status.</p>
+          </div>
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end w-full md:w-auto">
-              {showClear && (
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold bg-white text-rose-600 border border-slate-200/70 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 focus-visible:ring-offset-2"
-                  onClick={() => {
-                    setCalendarSearch("");
-                    setCalendarStatusFilter("all");
-                  }}
-                >
-                  <FilterX className="h-4 w-4" />
-                  Clear filters
-                </button>
-              )}
+          <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-3 w-full">
+            {showClear && (
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold bg-white text-rose-600 border border-slate-200/70 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 focus-visible:ring-offset-2 w-full md:w-auto"
+                onClick={() => {
+                  setCalendarSearch("");
+                  setCalendarStatusFilter("all");
+                }}
+              >
+                <FilterX className="h-4 w-4" />
+                Clear filters
+              </button>
+            )}
 
-              {/* Search */}
-              <div className="relative w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row md:flex-row md:items-center gap-3 flex-1">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="search"
-                  className="w-full md:w-[320px] focus:md:w-[400px] transition-all rounded-xl border border-slate-200/70 bg-white pl-10 pr-3 py-2.5 text-sm font-medium text-brand-dark placeholder:text-slate-400 outline-none focus:border-[#3fa9f5]/50 focus:ring-4 focus:ring-[#3fa9f5]/10"
+                  className="w-full md:w-auto rounded-xl border border-slate-200/70 bg-white pl-10 pr-3 py-2.5 text-sm font-medium text-brand-dark placeholder:text-slate-400 outline-none focus:border-[#3fa9f5]/50 focus:ring-4 focus:ring-[#3fa9f5]/10 transition-all"
                   placeholder="Search calendar..."
                   value={calendarSearch}
                   onChange={(e) => setCalendarSearch(e.target.value)}
                 />
               </div>
 
-              {/* Status filter */}
-              <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-2 shadow-sm mt-2 md:mt-0">
+              <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-2 shadow-sm w-full sm:w-auto">
                 <span className="inline-flex items-center gap-2 text-[0.78rem] font-bold text-brand-dark/60 whitespace-nowrap">
                   <Filter className="h-4 w-4" />
                   Status
                 </span>
 
-                <div className="relative">
-                  <select className="appearance-none bg-transparent pr-7 pl-2 py-1 text-sm font-semibold text-brand-dark outline-none cursor-pointer" value={calendarStatusFilter} onChange={(e) => setCalendarStatusFilter(e.target.value)}>
+                <div className="relative flex-1 sm:flex-none">
+                  <select
+                    className="appearance-none w-full sm:w-auto bg-transparent pr-7 pl-2 py-1 text-sm font-semibold text-brand-dark outline-none cursor-pointer"
+                    value={calendarStatusFilter}
+                    onChange={(e) => setCalendarStatusFilter(e.target.value)}
+                  >
                     {calendarStatusOptions.map((opt) => (
                       <option key={opt} value={opt}>
                         {opt === "all" ? "All" : opt}
@@ -180,55 +183,54 @@ export function CalendarPage(props: CalendarPageProps) {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Bulk Actions */}
-          {selectedIds.length > 0 && (
-            <div className="mt-5 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 shadow-sm flex flex-col gap-3 md:gap-0 md:flex-row md:items-center md:justify-between flex-wrap">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="text-sm font-bold text-brand-dark">Selected actions</div>
-                <span className="inline-flex items-center rounded-full bg-[#3fa9f5]/10 px-2.5 py-1 text-xs font-bold text-[#3fa9f5]">{selectedIds.length} selected</span>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleBatchGenerate}
-                  disabled={isBatchGenerating}
-                >
-                  {isBatchGenerating ? "Generating…" : "Generate"}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleBatchReview}
-                  disabled={isBatchReviewing}
-                >
-                  {isBatchReviewing ? "Reviewing…" : "Review"}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleBatchGenerateImages}
-                  disabled={isBatchGeneratingImages}
-                >
-                  {isBatchGeneratingImages ? "Generating…" : "Generate Image"}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-rose-700 border border-slate-200/70 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 focus-visible:ring-offset-2"
-                  onClick={handleDeleteSelected}
-                >
-                  Delete ({selectedIds.length})
-                </button>
-              </div>
+        {/* Bulk Actions */}
+        {selectedIds.length > 0 && (
+          <div className="mt-5 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 shadow-sm flex flex-col gap-3 md:gap-0 md:flex-row md:items-center md:justify-between flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="text-sm font-bold text-brand-dark">Selected actions</div>
+              <span className="inline-flex items-center rounded-full bg-[#3fa9f5]/10 px-2.5 py-1 text-xs font-bold text-[#3fa9f5]">{selectedIds.length} selected</span>
             </div>
-          )}
 
-          
+            <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleBatchGenerate}
+                disabled={isBatchGenerating}
+              >
+                {isBatchGenerating ? "Generating…" : "Generate"}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleBatchReview}
+                disabled={isBatchReviewing}
+              >
+                {isBatchReviewing ? "Reviewing…" : "Review"}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleBatchGenerateImages}
+                disabled={isBatchGeneratingImages}
+              >
+                {isBatchGeneratingImages ? "Generating…" : "Generate Image"}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-rose-700 border border-slate-200/70 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 focus-visible:ring-offset-2"
+                onClick={handleDeleteSelected}
+              >
+                Delete ({selectedIds.length})
+              </button>
+            </div>
+          </div>
+        )}
 
-          {/* Table */}
-         <div className="p-4 md:p-6">
+        {/* Table */}
+        <div className="p-4 md:p-6">
           {isBackendWaking && (
             <div className="mt-5 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm flex items-center gap-3">
               <span className="h-4 w-4 rounded-full border-2 border-slate-300 border-t-transparent animate-spin" aria-hidden="true" />
@@ -265,7 +267,7 @@ export function CalendarPage(props: CalendarPageProps) {
               <p className="mt-1 text-sm text-brand-dark/60">Try adjusting your search or filter to see more content.</p>
             </div>
           )}
-             {!isLoadingCalendar && !calendarError && filteredCalendarRows.length > 0 && (
+          {!isLoadingCalendar && !calendarError && filteredCalendarRows.length > 0 && (
             <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
               <div className="overflow-x-auto">
                 <table className="min-w-full table-fixed text-sm">
@@ -386,7 +388,7 @@ export function CalendarPage(props: CalendarPageProps) {
                   </tbody>
                 </table>
               </div>
-              
+
               {/* Pagination */}
               <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50 px-4 py-3 sm:px-5 sm:py-4">
                 <div className="flex items-center gap-2 sm:gap-4">
@@ -448,8 +450,8 @@ export function CalendarPage(props: CalendarPageProps) {
               </div>
             </div>
           )}
-         </div>
-        </section>
+        </div>
+      </section>
     </main>
   );
 }

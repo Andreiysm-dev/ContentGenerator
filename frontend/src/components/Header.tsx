@@ -28,7 +28,7 @@ export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, not
           onClick={() => setIsNavDrawerOpen((prev) => !prev)}
           aria-label={isNavDrawerOpen ? "Close sidebar" : "Open sidebar"}
         >
-          <span className="relative w-5 h-5 flex flex-col justify-between sm:hidden">
+          <span className="relative w-5 h-5 flex flex-col justify-between lg:hidden">
             <span className={`block h-1 w-5 bg-blue-400 rounded transform transition duration-300 ${isNavDrawerOpen ? "rotate-45 translate-y-2.5" : ""}`} />
             <span className={`block h-1 w-5 bg-blue-500 rounded transition duration-300 ${isNavDrawerOpen ? "opacity-0" : "opacity-100"}`} />
             <span className={`block h-1 w-5 bg-blue-500 rounded transform transition duration-300 ${isNavDrawerOpen ? "-rotate-45 -translate-y-2.5" : ""}`} />

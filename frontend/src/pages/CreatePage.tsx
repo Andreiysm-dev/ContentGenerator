@@ -72,7 +72,7 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
                     name="date"
                     value={form.date}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-x"
+                    className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">

@@ -40,6 +40,8 @@ import { SettingsPage, type CompanySettingsTab } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
 import { LoginPage } from '@/pages/LoginPage';
+import Faq from "@/pages/Faq"; 
+
 import {
   AddCompanyModal,
   CsvExportModal,
@@ -2384,6 +2386,7 @@ function App() {
                 element={<ProfilePage session={session} supabase={supabase} notify={notify} />}
               />
 
+         <Route path="/faq" element={<Faq />} />
               <Route
                 path="/company/:companyId/dashboard"
                 element={

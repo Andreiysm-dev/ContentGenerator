@@ -100,7 +100,6 @@ export function DraftsPage({ calendarRows, getStatusValue, getImageGeneratedUrl,
 
                 return (
                   <div key={row.contentCalendarId} className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm transition hover:shadow-lg">
-                    {/* Actions (visible on mobile too) */}
                     <div className="absolute right-3 top-3 z-10 flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                       <button
                         type="button"
@@ -142,7 +141,7 @@ export function DraftsPage({ calendarRows, getStatusValue, getImageGeneratedUrl,
                       <div className="flex items-start justify-between gap-3">
                         <div className="text-xs font-semibold text-[#3fa9f5]">{row.date || "No date"}</div>
 
-                        <span className="text-[0.72rem] font-semibold px-2 py-0.5 rounded-full bg-green-200">{getStatusValue(row.status)}</span>
+                        <span className="text-[0.72rem] font-semibold px-2 py-0.5 rounded-full bg-blue-100">{getStatusValue(row.status)}</span>
                       </div>
 
                       <div className="text-sm leading-relaxed text-brand-dark/80 line-clamp-3">{captionPreview || <span className="text-brand-dark/50">No caption available.</span>}</div>
@@ -160,7 +159,7 @@ export function DraftsPage({ calendarRows, getStatusValue, getImageGeneratedUrl,
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          className="rounded-xl px-3 py-2 text-sm font-semibold bg-[#3fa9f5] text-white hover:bg-[#2f97e6]"
+                          className="btn btn-primary btn-sm flex justify-center"
                           onClick={() => {
                             setSelectedRow(row);
                             setIsViewModalOpen(true);
@@ -169,7 +168,7 @@ export function DraftsPage({ calendarRows, getStatusValue, getImageGeneratedUrl,
                           View Details
                         </button>
 
-                        <button type="button" className="rounded-xl px-3 py-2 text-sm font-semibold bg-white border border-slate-200 hover:bg-slate-50" onClick={() => copyAllText(row)}>
+                        <button type="button" className="btn btn-secondary btn-sm flex justify-center" onClick={() => copyAllText(row)}>
                           Copy All
                         </button>
                       </div>
