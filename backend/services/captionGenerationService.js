@@ -206,7 +206,7 @@ const callOpenAIForCaption = async ({ systemPrompt, userPrompt }) => {
 const assertUserCanAccessCompany = async ({ userId, companyId }) => {
   const { data: company, error } = await db
     .from('company')
-    .select('user_id, collaborator_ids')
+    .select('user_id, collaborator_ids, companyName')
     .eq('companyId', companyId)
     .single();
 
@@ -218,7 +218,11 @@ const assertUserCanAccessCompany = async ({ userId, companyId }) => {
     return { ok: false, status: 403, error: 'Forbidden' };
   }
 
-  return { ok: true };
+  // Fetch user metadata for triggeredByName
+  const { data: { user }, error: userError } = await db.auth.admin.getUserById(userId);
+  const triggeredByName = user?.user_metadata?.full_name || user?.user_metadata?.display_name || user?.email || 'Unknown User';
+
+  return { ok: true, companyName: company.companyName, triggeredByName };
 };
 
 export async function generateCaptionForContent(contentCalendarId, opts = {}) {
@@ -247,6 +251,9 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
 
   const auth = await assertUserCanAccessCompany({ userId, companyId });
   if (!auth.ok) return auth;
+
+  const companyName = auth.companyName;
+  const triggeredByName = auth.triggeredByName;
 
   const normalized = normalizeStatusState(contentCalendar.status);
   const state = String(normalized.state || 'Draft');
@@ -355,7 +362,9 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
       title: 'Caption Generated',
       message: `Caption generated for ${contentCalendar.theme || 'New Content'}`,
       type: 'success',
-      link: '/calendar' // Or deep link to the item
+      link: '/calendar', // Or deep link to the item
+      triggeredByName,
+      companyName,
     });
   }
 
