@@ -1,6 +1,6 @@
-import { Building2, CalendarDays, Check, ChevronDown, FileText, HelpCircle, LayoutDashboard, Plus, Settings, Wand2 } from "lucide-react";
+import { Building2, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, LayoutDashboard, Plus, Settings, Wand2 } from "lucide-react";
 import type { NavigateFunction } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 interface Company {
@@ -42,6 +42,10 @@ export function Sidebar({
   notify,
 }: SidebarProps) {
   const location = useLocation();
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+  const [supportMessage, setSupportMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     if (window.innerWidth < 1024) {
@@ -140,7 +144,7 @@ export function Sidebar({
               return (
                 <button
                   key={item.key}
-                  className={`flex items-center gap-2.5 py-2.5 px-2 rounded-r-xl font-bold transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
+                  className={`flex items-center gap-2.5 py-2.5 px-2 rounded-r-xl font-bold transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500 rounded-xl" : "hover:bg-blue-50 hover:text-blue-400"}`}
                   onClick={() => {
                     if (!activeCompanyId) return;
                     navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
@@ -155,19 +159,75 @@ export function Sidebar({
           </nav>
         </div>
 
-        {/* SUPPORT BUTTONS PINNED AT BOTTOM */}
         <div className="flex flex-col gap-2 px-1.5 mt-auto">
-          <button onClick={() => navigate("/faq")} className="flex items-center gap-2 py-2 px-2 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-400">
+          <button
+            onClick={() => {
+              navigate("/faq");
+              if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
+            }}
+            className={`flex items-center gap-2 py-2 px-2 rounded-xl font-bold transition ${location.pathname.startsWith("/faq") ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
+          >
             <HelpCircle size={18} />
             FAQ
           </button>
 
-          <button onClick={() => notify("Contact Support is coming soon.", "info")} className="flex items-center gap-2 py-2 px-2 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-400">
-            <HelpCircle size={18} />
+          <button onClick={() => setShowSupport(true)} className="flex items-center gap-2 py-2 px-2 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-400 transition">
+            <Headphones size={18} />
             Contact Support
           </button>
         </div>
       </aside>
+      {/* CONTACT SUPPORT MODAL */}
+      {showSupport && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] animate-in fade-in duration-200 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* HEADER */}
+            <div className="bg-[#3fa9f5] px-6 py-4 flex items-center justify-between">
+              <h3 className="text-white font-bold text-lg">Contact Support</h3>
+              <button onClick={() => setShowSupport(false)} className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-lg transition-all">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* BODY */}
+            <div className="p-6 space-y-5">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Your Email</label>
+                <input type="email" placeholder="you@example.com" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg" />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Message</label>
+                <textarea value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} rows={4} placeholder="How can we help you?" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg resize-none" />
+              </div>
+
+              {/* FOOTER */}
+              <div className="flex justify-end gap-3 pt-4">
+                <button onClick={() => setShowSupport(false)} className="btn btn-secondary btn-sm">
+                  Cancel
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsSending(true);
+                    setTimeout(() => {
+                      setIsSending(false);
+                      notify("Support request sent successfully!", "success");
+                      setShowSupport(false);
+                      setSupportMessage("");
+                    }, 1000);
+                  }}
+                  className="btn btn-primary btn-sm"
+                >
+                  {isSending ? "Sending..." : "Send Message"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

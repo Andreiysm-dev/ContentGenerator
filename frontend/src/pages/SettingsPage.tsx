@@ -304,16 +304,15 @@ export function SettingsPage(props: CompanySettingsShellProps) {
             </div>
           </div>
 
-          {/* Tab Content Panel */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div key={tab} className="pt-4 animate-[panelFade_160ms_ease-out] p-4 md:p-6">
+          {/* Panel */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div key={tab} className="pt-2 animate-[panelFade_160ms_ease-out] px-4 md:p-6">
               {tab === "overview" && (
                 <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)]">
-                  {/* Overview Header */}
                   <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <div>
-                      <h1 className="text-xl font-extrabold text-slate-900">Overview</h1>
-                      <p className="mt-1 text-sm text-slate-600 max-w-[72ch]">Key configuration signals for this company. Review Brand Intelligence before generating content at scale.</p>
+                      <div className="text-md md:text-xl font-bold">Overview</div>
+                      <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Key configuration signals for this company. Review Brand Intelligence before generating content at scale.</p>
                     </div>
                   </div>
 
@@ -393,8 +392,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                   {/* Header */}
                   <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <div>
-                      <h1 className="text-xl font-extrabold text-slate-900">Brand Intelligence</h1>
-                      <p className="mt-1 text-sm text-slate-600 max-w-[78ch]">Controls AI behavior for this company—tone, brand rules, and compliance guardrails. Designed to be guided and reversible.</p>
+                      <div className="text-md md:text-xl font-bold">Brand</div>
+                      <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Controls AI behavior for this company—tone, brand rules, and compliance guardrails. Designed to be guided and reversible.</p>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
@@ -1039,8 +1038,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
               {tab === "team" && (
                 <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)]">
                   <div className="mb-5">
-                    <h1 className="text-xl font-extrabold text-slate-900">Team</h1>
-                    <p className="mt-1 text-sm text-slate-600">Manage collaborators with access to this company.</p>
+                    <div className="text-md md:text-xl font-bold">Team</div>
+                    <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Manage collaborators with access to this company.</p>
                   </div>
 
                   <Card className="bg-white" title="Collaborators" subtitle="Add teammates who can access and approve content.">
@@ -1049,7 +1048,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         <label className="text-xs font-bold text-slate-700">Add collaborator (email)</label>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                           <Input type="email" placeholder="user@example.com" value={newCollaboratorEmail} onChange={(e) => setNewCollaboratorEmail(e.target.value)} />
-                          <button className="btn btn-primary btn-sm sm:w-[120px]" type="button" onClick={handleAddCollaborator} disabled={!newCollaboratorEmail}>
+                          <button className="btn btn-primary btn-sm" type="button" onClick={handleAddCollaborator} disabled={!newCollaboratorEmail}>
                             Add
                           </button>
                         </div>
@@ -1087,10 +1086,10 @@ export function SettingsPage(props: CompanySettingsShellProps) {
               {tab === "integrations" && (
                 <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)]">
                   <div className="mb-3">
-                    <h1 className="text-xl font-extrabold text-slate-900">Integrations</h1>
-                    <p className="mt-1 text-sm text-slate-600">Connect services used for publishing, approvals, and automation.</p>
+                    <div className="text-md md:text-xl font-bold">Integrations</div>
+                    <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Connect services used for publishing, approvals, and automation.</p>
                   </div>
-                  <div className="text-sm text-slate-600">Coming soon.</div>
+                  <div className="text-sm text-slate-500 py-4">Coming soon.</div>
                 </div>
               )}
             </div>
