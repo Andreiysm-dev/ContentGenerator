@@ -6,6 +6,8 @@ create table public.notifications (
   type text check (type in ('info', 'success', 'warning', 'error')) default 'info',
   link text,
   read boolean default false,
+  triggered_by_name text,
+  company_name text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
