@@ -1,5 +1,6 @@
 import db from '../database/db.js';
 import { IMAGE_GENERATION_SYSTEM_PROMPT, IMAGE_GENERATION_USER_PROMPT } from './prompts.js';
+import { sendNotification } from './notificationService.js';
 
 const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -65,36 +66,41 @@ const parseMegaPromptBlock = (text) => {
   return { ok: true, value: { mega, negative }, raw: text };
 };
 
-const callImagenPredict = async ({ model, prompt, aspectRatio = '1:1', personGeneration = 'allow_adult' }) => {
+const cleanPromptForImagen = (prompt) => {
+  if (typeof prompt !== 'string') return '';
+  // Strip markdown markers that Gemini often draws literally on the image
+  return prompt
+    .replace(/\*\*/g, '') // remove bold markers
+    .replace(/__/g, '')   // remove italic markers
+    .replace(/#/g, '')    // remove heading markers
+    .trim();
+};
+
+const callImagenPredict = async ({ model, prompt }) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return { ok: false, error: 'Missing GEMINI_API_KEY' };
   }
 
+  // FORCE Imagen 4.0 as it is verified to work with the :predict endpoint and sampleImageSize: 1024
+  const actualModel = 'imagen-4.0-generate-001';
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${actualModel}:predict`;
 
-  // Official Gemini Imagen REST API endpoint (uses :predict, not :generateImages)
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:predict`;
-
-
-  // Official API format: instances array with parameters object
   const body = {
     instances: [
-      {
-        prompt: prompt
-      }
+      { prompt: cleanPromptForImagen(prompt) }
     ],
     parameters: {
       sampleCount: 1,
-      aspectRatio: aspectRatio,
-      personGeneration: personGeneration,
-    },
+      aspectRatio: '1:1',
+      sampleImageSize: '2K' // Upgraded to 2K for premium quality
+    }
   };
 
-  const res = await fetch(endpoint, {
+  const res = await fetch(`${endpoint}?key=${apiKey}`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body),
   });
@@ -102,30 +108,26 @@ const callImagenPredict = async ({ model, prompt, aspectRatio = '1:1', personGen
   const raw = await res.text().catch(() => '');
   if (!res.ok) {
     const detail = typeof raw === 'string' && raw.trim() ? `: ${raw.slice(0, 800)}` : '';
-    return { ok: false, error: `Imagen error ${res.status}${detail}`, raw };
+    return { ok: false, error: `Gemini/Imagen error ${res.status}${detail}`, raw };
   }
 
   let data;
   try {
     data = JSON.parse(raw);
   } catch {
-    return { ok: false, error: 'Imagen returned non-JSON response', raw };
+    return { ok: false, error: 'Gemini returned non-JSON response', raw };
   }
 
-  // API returns predictions array
+  // Parse :predict response format
+  // Expected: { predictions: [ { bytesBase64Encoded: "...", mimeType: "image/png" } ] }
   const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
-  const first = predictions[0] || null;
+  if (predictions.length === 0) {
+    return { ok: false, error: 'No predictions returned', raw: data };
+  }
 
-  // Try multiple possible field names for the base64 image data
-  const base64 =
-    (typeof first?.bytesBase64Encoded === 'string' && first.bytesBase64Encoded) ||
-    (typeof first?.image?.bytesBase64Encoded === 'string' && first.image.bytesBase64Encoded) ||
-    (typeof first?.imageBytes === 'string' && first.imageBytes) ||
-    (typeof first?.image?.imageBytes === 'string' && first.image.imageBytes) ||
-    null;
-
+  const base64 = predictions[0]?.bytesBase64Encoded;
   if (!base64) {
-    return { ok: false, error: 'Imagen response missing image bytes', raw: data };
+    return { ok: false, error: 'Missing bytesBase64Encoded in prediction', raw: data };
   }
 
   return { ok: true, base64, raw: data };
@@ -175,7 +177,7 @@ const loadContentCalendarRow = async ({ contentCalendarId, userId }) => {
   return { ok: true, row };
 };
 
-export async function generateImageForCalendarRow(contentCalendarId, opts = {}) {
+export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
   const userId = opts.userId;
   if (!userId) return { ok: false, status: 401, error: 'Unauthorized' };
 
@@ -201,7 +203,6 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
       : (brandKB?.systemInstruction ?? '');
 
   const openAiSystem = IMAGE_GENERATION_SYSTEM_PROMPT;
-
   const openAiUser = IMAGE_GENERATION_USER_PROMPT;
 
   const openAiRes = await callOpenAIText({
@@ -227,6 +228,21 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     return { ok: false, status: 500, error: 'Failed to save DMP' };
   }
 
+  return { ok: true, dmp: dmpRaw, row: { ...row, dmp: dmpRaw } };
+}
+
+export async function generateImageForCalendarRow(contentCalendarId, opts = {}) {
+  const userId = opts.userId;
+  if (!userId) return { ok: false, status: 401, error: 'Unauthorized' };
+
+  // 1. Generate DMP First
+  const dmpResult = await generateDmpForCalendarRow(contentCalendarId, opts);
+  if (!dmpResult.ok) return dmpResult;
+
+  const dmpRaw = dmpResult.dmp;
+  const row = dmpResult.row;
+
+  // 2. Proceed to Image Generation
   const parsed = parseMegaPromptBlock(dmpRaw);
   if (!parsed.ok) {
     return { ok: false, status: 500, error: parsed.error };
@@ -237,23 +253,15 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
 
   // Use Imagen 4.0 (Imagen 3 has been shut down)
   const imageModel = process.env.IMAGEN_MODEL || 'imagen-4.0-generate-001';
-  console.log('[Image Generation] Calling Gemini Imagen API with model:', imageModel);
-  console.log('[Image Generation] Prompt length:', fullPrompt.length);
-
   const imagenRes = await callImagenPredict({
     model: imageModel,
     prompt: fullPrompt,
-    aspectRatio: '1:1',
-    personGeneration: 'allow_adult',
   });
 
   if (!imagenRes.ok) {
-    console.error('[Image Generation] Gemini API error:', imagenRes.error);
-    console.error('[Image Generation] Raw response:', JSON.stringify(imagenRes.raw).slice(0, 500));
     return { ok: false, status: 500, error: imagenRes.error };
   }
 
-  console.log('[Image Generation] Gemini API success, image received');
 
   const bytes = Buffer.from(imagenRes.base64, 'base64');
   const uploadRes = await uploadGeneratedImage({
@@ -275,6 +283,16 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     })
     .eq('contentCalendarId', contentCalendarId)
     .select();
+
+  if (!saveError) {
+    await sendNotification({
+      userId,
+      title: 'Image Generated',
+      message: 'Image generation completed successfully',
+      type: 'success',
+      link: '/calendar',
+    });
+  }
 
   if (saveError) {
     return { ok: false, status: 500, error: 'Failed to save image output' };
@@ -317,8 +335,6 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
   const imagenRes = await callImagenPredict({
     model: imageModel,
     prompt: dmp.trim(),
-    aspectRatio: '1:1',
-    personGeneration: 'allow_adult',
   });
 
   if (!imagenRes.ok) {
@@ -349,6 +365,14 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
   if (saveError) {
     return { ok: false, status: 500, error: 'Failed to save image output' };
   }
+
+  await sendNotification({
+    userId,
+    title: 'Image Generated (Custom DMP)',
+    message: 'Image generation from custom DMP completed successfully',
+    type: 'success',
+    link: '/calendar',
+  });
 
   return {
     ok: true,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+﻿import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
 import {
 
@@ -40,7 +40,7 @@ import { SettingsPage, type CompanySettingsTab } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
 import { LoginPage } from '@/pages/LoginPage';
-import Faq from "@/pages/Faq"; 
+import Faq from "@/pages/Faq";
 
 import {
   AddCompanyModal,
@@ -55,6 +55,7 @@ import {
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import './App.css';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 
 type FormState = {
@@ -79,14 +80,12 @@ function BrandRedirect() {
 }
 
 
+import { supabase } from '@/lib/supabase';
+
 const backendBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 const supabaseBaseUrl = (import.meta.env as any).VITE_SUPABASE_URL || '';
-const defaultCompanyId = import.meta.env.VITE_COMPANY_ID as string | undefined;
-const supabaseAnonKey = (import.meta.env as any).VITE_SUPABASE_ANON_KEY || '';
-const supabase = supabaseBaseUrl && supabaseAnonKey
-  ? createClient(supabaseBaseUrl, supabaseAnonKey)
-  : null;
 const revisionWebhookUrl = (import.meta.env as any).VITE_MAKE_REVISION_WEBHOOK || '';
+const defaultCompanyId = import.meta.env.VITE_COMPANY_ID || '';
 const VIEW_MODAL_POLL_MS = 1500;
 const CALENDAR_POLL_MS = 2500;
 
@@ -242,7 +241,8 @@ function App() {
 
   const handleUploadDesigns = async (files: FileList | null) => {
     if (!files || !files.length) return;
-    if (!supabase) {
+    const client = supabase;
+    if (!client) {
       notify('Supabase is not configured.', 'error');
       return;
     }
@@ -252,11 +252,11 @@ function App() {
       const uploads = Array.from(files).map(async (file) => {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const path = `designs/${selectedRow.contentCalendarId}-${Date.now()}-${safeName}`;
-        const { error } = await supabase.storage
+        const { error } = await client.storage
           .from('generated-images')
           .upload(path, file, { upsert: true });
         if (error) throw error;
-        const { data } = supabase.storage.from('generated-images').getPublicUrl(path);
+        const { data } = client.storage.from('generated-images').getPublicUrl(path);
         return data?.publicUrl || '';
       });
 
@@ -796,13 +796,11 @@ function App() {
       (row as any).generatedImage;
 
     if (!ig) {
-      console.log('No image field found in row. Available fields:', Object.keys(row));
       return null;
     }
 
     // If it's already a full URL, return as-is
     if (typeof ig === 'string' && (ig.startsWith('http://') || ig.startsWith('https://'))) {
-      console.log('Found full URL:', ig);
       return ig;
     }
 
@@ -838,7 +836,6 @@ function App() {
         }
       }
       const normalized = normalize(trimmed);
-      console.log('Normalized path to URL:', normalized);
       return normalized;
     }
     if (typeof ig === 'object') {
@@ -2334,530 +2331,459 @@ function App() {
   }
 
   return (
-    <div>
-      <Header
-        isNavDrawerOpen={isNavDrawerOpen}
-        setIsNavDrawerOpen={setIsNavDrawerOpen}
-        activeCompany={activeCompany}
-        notify={notify}
-        navigate={navigate}
-        session={session}
-        supabase={supabase}
-      />
+    <NotificationProvider>
 
-      <div className="flex min-h-[calc(100vh-80px)] relative">
-        <Sidebar
+      <div className="flex flex-col h-screen w-full bg-[#FAFBFC] text-brand-dark transition-colors duration-300">
+        <Header
           isNavDrawerOpen={isNavDrawerOpen}
           setIsNavDrawerOpen={setIsNavDrawerOpen}
           activeCompany={activeCompany}
-          activeCompanyId={activeCompanyId}
-          companies={companies}
-          isCompanyDropdownOpen={isCompanyDropdownOpen}
-          setIsCompanyDropdownOpen={setIsCompanyDropdownOpen}
-          navigate={navigate}
-          activeNavKey={activeNavKey}
-          setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-          setNewCompanyName={setNewCompanyName}
-          setNewCompanyDescription={setNewCompanyDescription}
-          setIsAddCompanyModalOpen={setIsAddCompanyModalOpen}
           notify={notify}
+          navigate={navigate}
+          session={session}
+          supabase={supabase}
         />
 
-         <div className="flex-1 ml-0 lg:ml-[264px] overflow-y-auto h-[calc(100vh-80px)] bg-gray-50">
-          <div>
-            <Routes>
-              <Route
-                path="/"
-                element={
-                  activeCompanyId
-                    ? <Navigate to={`/company/${encodeURIComponent(activeCompanyId)}/dashboard`} replace />
-                    : (
-                    <div className="app-main">
-                        <div className="empty-state">
-                          <p>Select a company to continue.</p>
+        <div className="flex min-h-[calc(100vh-80px)] relative">
+          <Sidebar
+            isNavDrawerOpen={isNavDrawerOpen}
+            setIsNavDrawerOpen={setIsNavDrawerOpen}
+            activeCompany={activeCompany}
+            activeCompanyId={activeCompanyId}
+            companies={companies}
+            isCompanyDropdownOpen={isCompanyDropdownOpen}
+            setIsCompanyDropdownOpen={setIsCompanyDropdownOpen}
+            navigate={navigate}
+            activeNavKey={activeNavKey}
+            setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+            setNewCompanyName={setNewCompanyName}
+            setNewCompanyDescription={setNewCompanyDescription}
+            setIsAddCompanyModalOpen={setIsAddCompanyModalOpen}
+            notify={notify}
+          />
+
+          <div className="flex-1 ml-0 lg:ml-[264px] overflow-y-auto h-[calc(100vh-80px)] bg-gray-50">
+            <div>
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    activeCompanyId
+                      ? <Navigate to={`/company/${encodeURIComponent(activeCompanyId)}/dashboard`} replace />
+                      : (
+                        <div className="app-main">
+                          <div className="empty-state">
+                            <p>Select a company to continue.</p>
+                          </div>
                         </div>
-                      </div>
-                    )
-                }
-              />
+                      )
+                  }
+                />
 
-              <Route
-                path="/profile"
-                element={<ProfilePage session={session} supabase={supabase} notify={notify} />}
-              />
+                <Route
+                  path="/profile"
+                  element={<ProfilePage session={session} supabase={supabase} notify={notify} />}
+                />
 
-         <Route path="/faq" element={<Faq />} />
-              <Route
-                path="/company/:companyId/dashboard"
-                element={
-                  <DashboardPage
-                    activeCompany={activeCompany}
-                    activeCompanyId={activeCompanyId}
-                    dashboardStats={dashboardStats}
-                  />
-                }
-              />
+                <Route path="/faq" element={<Faq />} />
+                <Route
+                  path="/company/:companyId/dashboard"
+                  element={
+                    <DashboardPage
+                      activeCompany={activeCompany}
+                      activeCompanyId={activeCompanyId}
+                      dashboardStats={dashboardStats}
+                    />
+                  }
+                />
 
-              <Route
-                path="/company/:companyId/generate"
-                element={
-                  <CreatePage
-                    form={form}
-                    handleChange={handleChange}
-                    handleAdd={handleAdd}
-                    isAdding={isAdding}
-                    setBulkText={setBulkText}
-                    setBulkPreview={setBulkPreview}
-                    setShowPreview={setShowPreview}
-                    setIsBulkModalOpen={setIsBulkModalOpen}
-                  />
-                }
-              />
+                <Route
+                  path="/company/:companyId/generate"
+                  element={
+                    <CreatePage
+                      form={form}
+                      handleChange={handleChange}
+                      handleAdd={handleAdd}
+                      isAdding={isAdding}
+                      setBulkText={setBulkText}
+                      setBulkPreview={setBulkPreview}
+                      setShowPreview={setShowPreview}
+                      setIsBulkModalOpen={setIsBulkModalOpen}
+                    />
+                  }
+                />
 
-              <Route
-                path="/company/:companyId/calendar"
-                element={
-                  <CalendarPage
-                    calendarSearch={calendarSearch}
-                    setCalendarSearch={setCalendarSearch}
-                    calendarStatusFilter={calendarStatusFilter}
-                    setCalendarStatusFilter={setCalendarStatusFilter}
-                    calendarStatusOptions={calendarStatusOptions}
-                    selectedIds={selectedIds}
-                    isBatchGenerating={isBatchGenerating}
-                    isBatchReviewing={isBatchReviewing}
-                    isBatchGeneratingImages={isBatchGeneratingImages}
-                    handleBatchGenerate={handleBatchGenerate}
-                    handleBatchReview={handleBatchReview}
-                    handleBatchGenerateImages={handleBatchGenerateImages}
-                    openCsvModal={openCsvModal}
-                    openCopyModal={openCopyModal}
-                    handleDeleteSelected={handleDeleteSelected}
-                    isBackendWaking={isBackendWaking}
-                    calendarError={calendarError}
-                    isLoadingCalendar={isLoadingCalendar}
-                    calendarRows={calendarRows}
-                    filteredCalendarRows={filteredCalendarRows}
-                    activeCompanyId={activeCompanyId}
-                    isPageFullySelected={isPageFullySelected}
-                    toggleSelectAllOnPage={toggleSelectAllOnPage}
-                    toggleSelectOne={toggleSelectOne}
-                    getStatusValue={getStatusValue}
-                    setSelectedRow={setSelectedRow}
-                    setIsViewModalOpen={setIsViewModalOpen}
-                    pageSize={pageSize}
-                    setPageSize={setPageSize}
-                    page={page}
-                    setPage={setPage}
-                    currentPageRows={currentPageRows}
-                  />
-                }
-              />
+                <Route
+                  path="/company/:companyId/calendar"
+                  element={
+                    <CalendarPage
+                      calendarSearch={calendarSearch}
+                      setCalendarSearch={setCalendarSearch}
+                      calendarStatusFilter={calendarStatusFilter}
+                      setCalendarStatusFilter={setCalendarStatusFilter}
+                      calendarStatusOptions={calendarStatusOptions}
+                      selectedIds={selectedIds}
+                      isBatchGenerating={isBatchGenerating}
+                      isBatchReviewing={isBatchReviewing}
+                      isBatchGeneratingImages={isBatchGeneratingImages}
+                      handleBatchGenerate={handleBatchGenerate}
+                      handleBatchReview={handleBatchReview}
+                      handleBatchGenerateImages={handleBatchGenerateImages}
+                      openCsvModal={openCsvModal}
+                      openCopyModal={openCopyModal}
+                      handleDeleteSelected={handleDeleteSelected}
+                      isBackendWaking={isBackendWaking}
+                      calendarError={calendarError}
+                      isLoadingCalendar={isLoadingCalendar}
+                      calendarRows={calendarRows}
+                      filteredCalendarRows={filteredCalendarRows}
+                      activeCompanyId={activeCompanyId}
+                      isPageFullySelected={isPageFullySelected}
+                      toggleSelectAllOnPage={toggleSelectAllOnPage}
+                      toggleSelectOne={toggleSelectOne}
+                      getStatusValue={getStatusValue}
+                      setSelectedRow={setSelectedRow}
+                      setIsViewModalOpen={setIsViewModalOpen}
+                      pageSize={pageSize}
+                      setPageSize={setPageSize}
+                      page={page}
+                      setPage={setPage}
+                      currentPageRows={currentPageRows}
+                    />
+                  }
+                />
 
-              <Route
-                path="/company/:companyId/drafts"
-                element={
-                  <DraftsPage
-                    calendarRows={calendarRows}
-                    getStatusValue={getStatusValue}
-                    getImageGeneratedUrl={getImageGeneratedUrl}
-                    getAttachedDesignUrls={getAttachedDesignUrls}
-                    setSelectedRow={setSelectedRow}
-                    setIsViewModalOpen={setIsViewModalOpen}
-                    notify={notify}
-                    activeCompanyId={activeCompanyId}
-                  />
-                }
-              />
+                <Route
+                  path="/company/:companyId/drafts"
+                  element={
+                    <DraftsPage
+                      calendarRows={calendarRows}
+                      getStatusValue={getStatusValue}
+                      getImageGeneratedUrl={getImageGeneratedUrl}
+                      getAttachedDesignUrls={getAttachedDesignUrls}
+                      setSelectedRow={setSelectedRow}
+                      setIsViewModalOpen={setIsViewModalOpen}
+                      notify={notify}
+                      activeCompanyId={activeCompanyId}
+                    />
+                  }
+                />
 
-              <Route
-                path="/company/:companyId/brand"
-                element={<BrandRedirect />}
-              />
-
+                <Route
+                  path="/company/:companyId/brand"
+                  element={<BrandRedirect />}
+                />
 
 
-              <Route
-                path="/company/:companyId/settings/overview"
-                element={
-                  <SettingsPage
-                    tab="overview"
-                    setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                    brandIntelligenceReady={brandIntelligenceReady}
-                    brandSetupMode={brandSetupMode}
-                    setBrandSetupMode={setBrandSetupMode}
-                    brandSetupLevel={brandSetupLevel}
-                    setBrandSetupLevel={setBrandSetupLevel}
-                    brandSetupStep={brandSetupStep}
-                    setBrandSetupStep={setBrandSetupStep}
-                    setIsEditingBrandSetup={setIsEditingBrandSetup}
-                    collaborators={collaborators}
-                    companyName={companyName}
-                    setCompanyName={setCompanyName}
-                    companyDescription={companyDescription}
-                    setCompanyDescription={setCompanyDescription}
-                    loadBrandKB={loadBrandKB}
-                    brandKbId={brandKbId}
-                    brandPack={brandPack}
-                    setBrandPack={setBrandPack}
-                    brandCapability={brandCapability}
-                    setBrandCapability={setBrandCapability}
-                    emojiRule={emojiRule}
-                    setEmojiRule={setEmojiRule}
-                    systemInstruction={systemInstruction}
-                    setSystemInstruction={setSystemInstruction}
-                    aiWriterSystemPrompt={aiWriterSystemPrompt}
-                    setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                    aiWriterUserPrompt={aiWriterUserPrompt}
-                    setAiWriterUserPrompt={setAiWriterUserPrompt}
-                    activeBrandRuleEdit={activeBrandRuleEdit}
-                    brandRuleDraft={brandRuleDraft}
-                    setBrandRuleDraft={setBrandRuleDraft}
-                    startBrandRuleEdit={startBrandRuleEdit}
-                    cancelBrandRuleEdit={cancelBrandRuleEdit}
-                    saveBrandRuleEdit={saveBrandRuleEdit}
-                    saveBrandSetup={saveBrandSetup}
-                    sendBrandWebhook={sendBrandWebhook}
-                    buildFormAnswer={buildFormAnswer}
-                    industryOptions={industryOptions}
-                    audienceRoleOptions={audienceRoleOptions}
-                    painPointOptions={painPointOptions}
-                    noSayOptions={noSayOptions}
-                    brandBasicsName={brandBasicsName}
-                    setBrandBasicsName={setBrandBasicsName}
-                    brandBasicsIndustry={brandBasicsIndustry}
-                    setBrandBasicsIndustry={setBrandBasicsIndustry}
-                    brandBasicsType={brandBasicsType}
-                    setBrandBasicsType={setBrandBasicsType}
-                    brandBasicsOffer={brandBasicsOffer}
-                    setBrandBasicsOffer={setBrandBasicsOffer}
-                    audienceRole={audienceRole}
-                    setAudienceRole={setAudienceRole}
-                    audienceIndustry={audienceIndustry}
-                    setAudienceIndustry={setAudienceIndustry}
-                    audiencePainPoints={audiencePainPoints}
-                    setAudiencePainPoints={setAudiencePainPoints}
-                    audienceOutcome={audienceOutcome}
-                    setAudienceOutcome={setAudienceOutcome}
-                    toneFormal={toneFormal}
-                    setToneFormal={setToneFormal}
-                    toneEnergy={toneEnergy}
-                    setToneEnergy={setToneEnergy}
-                    toneBold={toneBold}
-                    setToneBold={setToneBold}
-                    emojiUsage={emojiUsage}
-                    setEmojiUsage={setEmojiUsage}
-                    writingLength={writingLength}
-                    setWritingLength={setWritingLength}
-                    ctaStrength={ctaStrength}
-                    setCtaStrength={setCtaStrength}
-                    absoluteTruths={absoluteTruths}
-                    setAbsoluteTruths={setAbsoluteTruths}
-                    noSayRules={noSayRules}
-                    setNoSayRules={setNoSayRules}
-                    advancedPositioning={advancedPositioning}
-                    setAdvancedPositioning={setAdvancedPositioning}
-                    advancedDifferentiators={advancedDifferentiators}
-                    setAdvancedDifferentiators={setAdvancedDifferentiators}
-                    advancedPillars={advancedPillars}
-                    setAdvancedPillars={setAdvancedPillars}
-                    advancedCompetitors={advancedCompetitors}
-                    setAdvancedCompetitors={setAdvancedCompetitors}
-                    advancedProofPoints={advancedProofPoints}
-                    setAdvancedProofPoints={setAdvancedProofPoints}
-                    newCollaboratorEmail={newCollaboratorEmail}
-                    setNewCollaboratorEmail={setNewCollaboratorEmail}
-                    handleAddCollaborator={handleAddCollaborator}
-                    handleRemoveCollaborator={handleRemoveCollaborator}
-                  />
-                }
-              />
-              <Route
-                path="/company/:companyId/settings/brand-intelligence"
-                element={
-                  <SettingsPage
-                    tab="brand-intelligence"
-                    setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                    brandIntelligenceReady={brandIntelligenceReady}
-                    brandSetupMode={brandSetupMode}
-                    setBrandSetupMode={setBrandSetupMode}
-                    brandSetupLevel={brandSetupLevel}
-                    setBrandSetupLevel={setBrandSetupLevel}
-                    brandSetupStep={brandSetupStep}
-                    setBrandSetupStep={setBrandSetupStep}
-                    setIsEditingBrandSetup={setIsEditingBrandSetup}
-                    collaborators={collaborators}
-                    companyName={companyName}
-                    setCompanyName={setCompanyName}
-                    companyDescription={companyDescription}
-                    setCompanyDescription={setCompanyDescription}
-                    loadBrandKB={loadBrandKB}
-                    brandKbId={brandKbId}
-                    brandPack={brandPack}
-                    setBrandPack={setBrandPack}
-                    brandCapability={brandCapability}
-                    setBrandCapability={setBrandCapability}
-                    emojiRule={emojiRule}
-                    setEmojiRule={setEmojiRule}
-                    systemInstruction={systemInstruction}
-                    setSystemInstruction={setSystemInstruction}
-                    aiWriterSystemPrompt={aiWriterSystemPrompt}
-                    setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                    aiWriterUserPrompt={aiWriterUserPrompt}
-                    setAiWriterUserPrompt={setAiWriterUserPrompt}
-                    activeBrandRuleEdit={activeBrandRuleEdit}
-                    brandRuleDraft={brandRuleDraft}
-                    setBrandRuleDraft={setBrandRuleDraft}
-                    startBrandRuleEdit={startBrandRuleEdit}
-                    cancelBrandRuleEdit={cancelBrandRuleEdit}
-                    saveBrandRuleEdit={saveBrandRuleEdit}
-                    saveBrandSetup={saveBrandSetup}
-                    sendBrandWebhook={sendBrandWebhook}
-                    buildFormAnswer={buildFormAnswer}
-                    industryOptions={industryOptions}
-                    audienceRoleOptions={audienceRoleOptions}
-                    painPointOptions={painPointOptions}
-                    noSayOptions={noSayOptions}
-                    brandBasicsName={brandBasicsName}
-                    setBrandBasicsName={setBrandBasicsName}
-                    brandBasicsIndustry={brandBasicsIndustry}
-                    setBrandBasicsIndustry={setBrandBasicsIndustry}
-                    brandBasicsType={brandBasicsType}
-                    setBrandBasicsType={setBrandBasicsType}
-                    brandBasicsOffer={brandBasicsOffer}
-                    setBrandBasicsOffer={setBrandBasicsOffer}
-                    audienceRole={audienceRole}
-                    setAudienceRole={setAudienceRole}
-                    audienceIndustry={audienceIndustry}
-                    setAudienceIndustry={setAudienceIndustry}
-                    audiencePainPoints={audiencePainPoints}
-                    setAudiencePainPoints={setAudiencePainPoints}
-                    audienceOutcome={audienceOutcome}
-                    setAudienceOutcome={setAudienceOutcome}
-                    toneFormal={toneFormal}
-                    setToneFormal={setToneFormal}
-                    toneEnergy={toneEnergy}
-                    setToneEnergy={setToneEnergy}
-                    toneBold={toneBold}
-                    setToneBold={setToneBold}
-                    emojiUsage={emojiUsage}
-                    setEmojiUsage={setEmojiUsage}
-                    writingLength={writingLength}
-                    setWritingLength={setWritingLength}
-                    ctaStrength={ctaStrength}
-                    setCtaStrength={setCtaStrength}
-                    absoluteTruths={absoluteTruths}
-                    setAbsoluteTruths={setAbsoluteTruths}
-                    noSayRules={noSayRules}
-                    setNoSayRules={setNoSayRules}
-                    advancedPositioning={advancedPositioning}
-                    setAdvancedPositioning={setAdvancedPositioning}
-                    advancedDifferentiators={advancedDifferentiators}
-                    setAdvancedDifferentiators={setAdvancedDifferentiators}
-                    advancedPillars={advancedPillars}
-                    setAdvancedPillars={setAdvancedPillars}
-                    advancedCompetitors={advancedCompetitors}
-                    setAdvancedCompetitors={setAdvancedCompetitors}
-                    advancedProofPoints={advancedProofPoints}
-                    setAdvancedProofPoints={setAdvancedProofPoints}
-                    newCollaboratorEmail={newCollaboratorEmail}
-                    setNewCollaboratorEmail={setNewCollaboratorEmail}
-                    handleAddCollaborator={handleAddCollaborator}
-                    handleRemoveCollaborator={handleRemoveCollaborator}
-                  />
-                }
-              />
-              <Route
-                path="/company/:companyId/settings/team"
-                element={
-                  <SettingsPage
-                    tab="team"
-                    setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                    brandIntelligenceReady={brandIntelligenceReady}
-                    brandSetupMode={brandSetupMode}
-                    setBrandSetupMode={setBrandSetupMode}
-                    brandSetupLevel={brandSetupLevel}
-                    setBrandSetupLevel={setBrandSetupLevel}
-                    brandSetupStep={brandSetupStep}
-                    setBrandSetupStep={setBrandSetupStep}
-                    setIsEditingBrandSetup={setIsEditingBrandSetup}
-                    collaborators={collaborators}
-                    companyName={companyName}
-                    setCompanyName={setCompanyName}
-                    companyDescription={companyDescription}
-                    setCompanyDescription={setCompanyDescription}
-                    loadBrandKB={loadBrandKB}
-                    brandKbId={brandKbId}
-                    brandPack={brandPack}
-                    setBrandPack={setBrandPack}
-                    brandCapability={brandCapability}
-                    setBrandCapability={setBrandCapability}
-                    emojiRule={emojiRule}
-                    setEmojiRule={setEmojiRule}
-                    systemInstruction={systemInstruction}
-                    setSystemInstruction={setSystemInstruction}
-                    aiWriterSystemPrompt={aiWriterSystemPrompt}
-                    setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                    aiWriterUserPrompt={aiWriterUserPrompt}
-                    setAiWriterUserPrompt={setAiWriterUserPrompt}
-                    activeBrandRuleEdit={activeBrandRuleEdit}
-                    brandRuleDraft={brandRuleDraft}
-                    setBrandRuleDraft={setBrandRuleDraft}
-                    startBrandRuleEdit={startBrandRuleEdit}
-                    cancelBrandRuleEdit={cancelBrandRuleEdit}
-                    saveBrandRuleEdit={saveBrandRuleEdit}
-                    saveBrandSetup={saveBrandSetup}
-                    sendBrandWebhook={sendBrandWebhook}
-                    buildFormAnswer={buildFormAnswer}
-                    industryOptions={industryOptions}
-                    audienceRoleOptions={audienceRoleOptions}
-                    painPointOptions={painPointOptions}
-                    noSayOptions={noSayOptions}
-                    brandBasicsName={brandBasicsName}
-                    setBrandBasicsName={setBrandBasicsName}
-                    brandBasicsIndustry={brandBasicsIndustry}
-                    setBrandBasicsIndustry={setBrandBasicsIndustry}
-                    brandBasicsType={brandBasicsType}
-                    setBrandBasicsType={setBrandBasicsType}
-                    brandBasicsOffer={brandBasicsOffer}
-                    setBrandBasicsOffer={setBrandBasicsOffer}
-                    audienceRole={audienceRole}
-                    setAudienceRole={setAudienceRole}
-                    audienceIndustry={audienceIndustry}
-                    setAudienceIndustry={setAudienceIndustry}
-                    audiencePainPoints={audiencePainPoints}
-                    setAudiencePainPoints={setAudiencePainPoints}
-                    audienceOutcome={audienceOutcome}
-                    setAudienceOutcome={setAudienceOutcome}
-                    toneFormal={toneFormal}
-                    setToneFormal={setToneFormal}
-                    toneEnergy={toneEnergy}
-                    setToneEnergy={setToneEnergy}
-                    toneBold={toneBold}
-                    setToneBold={setToneBold}
-                    emojiUsage={emojiUsage}
-                    setEmojiUsage={setEmojiUsage}
-                    writingLength={writingLength}
-                    setWritingLength={setWritingLength}
-                    ctaStrength={ctaStrength}
-                    setCtaStrength={setCtaStrength}
-                    absoluteTruths={absoluteTruths}
-                    setAbsoluteTruths={setAbsoluteTruths}
-                    noSayRules={noSayRules}
-                    setNoSayRules={setNoSayRules}
-                    advancedPositioning={advancedPositioning}
-                    setAdvancedPositioning={setAdvancedPositioning}
-                    advancedDifferentiators={advancedDifferentiators}
-                    setAdvancedDifferentiators={setAdvancedDifferentiators}
-                    advancedPillars={advancedPillars}
-                    setAdvancedPillars={setAdvancedPillars}
-                    advancedCompetitors={advancedCompetitors}
-                    setAdvancedCompetitors={setAdvancedCompetitors}
-                    advancedProofPoints={advancedProofPoints}
-                    setAdvancedProofPoints={setAdvancedProofPoints}
-                    newCollaboratorEmail={newCollaboratorEmail}
-                    setNewCollaboratorEmail={setNewCollaboratorEmail}
-                    handleAddCollaborator={handleAddCollaborator}
-                    handleRemoveCollaborator={handleRemoveCollaborator}
-                  />
-                }
-              />
-              <Route
-                path="/company/:companyId/settings/integrations"
-                element={
-                  <SettingsPage
-                    tab="integrations"
-                    setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                    brandIntelligenceReady={brandIntelligenceReady}
-                    brandSetupMode={brandSetupMode}
-                    setBrandSetupMode={setBrandSetupMode}
-                    brandSetupLevel={brandSetupLevel}
-                    setBrandSetupLevel={setBrandSetupLevel}
-                    brandSetupStep={brandSetupStep}
-                    setBrandSetupStep={setBrandSetupStep}
-                    setIsEditingBrandSetup={setIsEditingBrandSetup}
-                    collaborators={collaborators}
-                    companyName={companyName}
-                    setCompanyName={setCompanyName}
-                    companyDescription={companyDescription}
-                    setCompanyDescription={setCompanyDescription}
-                    loadBrandKB={loadBrandKB}
-                    brandKbId={brandKbId}
-                    brandPack={brandPack}
-                    setBrandPack={setBrandPack}
-                    brandCapability={brandCapability}
-                    setBrandCapability={setBrandCapability}
-                    emojiRule={emojiRule}
-                    setEmojiRule={setEmojiRule}
-                    systemInstruction={systemInstruction}
-                    setSystemInstruction={setSystemInstruction}
-                    aiWriterSystemPrompt={aiWriterSystemPrompt}
-                    setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                    aiWriterUserPrompt={aiWriterUserPrompt}
-                    setAiWriterUserPrompt={setAiWriterUserPrompt}
-                    activeBrandRuleEdit={activeBrandRuleEdit}
-                    brandRuleDraft={brandRuleDraft}
-                    setBrandRuleDraft={setBrandRuleDraft}
-                    startBrandRuleEdit={startBrandRuleEdit}
-                    cancelBrandRuleEdit={cancelBrandRuleEdit}
-                    saveBrandRuleEdit={saveBrandRuleEdit}
-                    saveBrandSetup={saveBrandSetup}
-                    sendBrandWebhook={sendBrandWebhook}
-                    buildFormAnswer={buildFormAnswer}
-                    industryOptions={industryOptions}
-                    audienceRoleOptions={audienceRoleOptions}
-                    painPointOptions={painPointOptions}
-                    noSayOptions={noSayOptions}
-                    brandBasicsName={brandBasicsName}
-                    setBrandBasicsName={setBrandBasicsName}
-                    brandBasicsIndustry={brandBasicsIndustry}
-                    setBrandBasicsIndustry={setBrandBasicsIndustry}
-                    brandBasicsType={brandBasicsType}
-                    setBrandBasicsType={setBrandBasicsType}
-                    brandBasicsOffer={brandBasicsOffer}
-                    setBrandBasicsOffer={setBrandBasicsOffer}
-                    audienceRole={audienceRole}
-                    setAudienceRole={setAudienceRole}
-                    audienceIndustry={audienceIndustry}
-                    setAudienceIndustry={setAudienceIndustry}
-                    audiencePainPoints={audiencePainPoints}
-                    setAudiencePainPoints={setAudiencePainPoints}
-                    audienceOutcome={audienceOutcome}
-                    setAudienceOutcome={setAudienceOutcome}
-                    toneFormal={toneFormal}
-                    setToneFormal={setToneFormal}
-                    toneEnergy={toneEnergy}
-                    setToneEnergy={setToneEnergy}
-                    toneBold={toneBold}
-                    setToneBold={setToneBold}
-                    emojiUsage={emojiUsage}
-                    setEmojiUsage={setEmojiUsage}
-                    writingLength={writingLength}
-                    setWritingLength={setWritingLength}
-                    ctaStrength={ctaStrength}
-                    setCtaStrength={setCtaStrength}
-                    absoluteTruths={absoluteTruths}
-                    setAbsoluteTruths={setAbsoluteTruths}
-                    noSayRules={noSayRules}
-                    setNoSayRules={setNoSayRules}
-                    advancedPositioning={advancedPositioning}
-                    setAdvancedPositioning={setAdvancedPositioning}
-                    advancedDifferentiators={advancedDifferentiators}
-                    setAdvancedDifferentiators={setAdvancedDifferentiators}
-                    advancedPillars={advancedPillars}
-                    setAdvancedPillars={setAdvancedPillars}
-                    advancedCompetitors={advancedCompetitors}
-                    setAdvancedCompetitors={setAdvancedCompetitors}
-                    advancedProofPoints={advancedProofPoints}
-                    setAdvancedProofPoints={setAdvancedProofPoints}
-                    newCollaboratorEmail={newCollaboratorEmail}
-                    setNewCollaboratorEmail={setNewCollaboratorEmail}
-                    handleAddCollaborator={handleAddCollaborator}
-                    handleRemoveCollaborator={handleRemoveCollaborator}
-                  />
-                }
-              />
-            </Routes>
+
+                <Route
+                  path="/company/:companyId/settings/overview"
+                  element={
+                    <SettingsPage
+                      tab="overview"
+                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+                      brandIntelligenceReady={brandIntelligenceReady}
+                      brandSetupMode={brandSetupMode}
+                      setBrandSetupMode={setBrandSetupMode}
+                      brandSetupLevel={brandSetupLevel}
+                      setBrandSetupLevel={setBrandSetupLevel}
+                      brandSetupStep={brandSetupStep}
+                      setBrandSetupStep={setBrandSetupStep}
+                      setIsEditingBrandSetup={setIsEditingBrandSetup}
+                      collaborators={collaborators}
+                      companyName={companyName}
+                      setCompanyName={setCompanyName}
+                      companyDescription={companyDescription}
+                      setCompanyDescription={setCompanyDescription}
+                      loadBrandKB={loadBrandKB}
+                      brandKbId={brandKbId}
+                      brandPack={brandPack}
+                      setBrandPack={setBrandPack}
+                      brandCapability={brandCapability}
+                      setBrandCapability={setBrandCapability}
+                      emojiRule={emojiRule}
+                      setEmojiRule={setEmojiRule}
+                      systemInstruction={systemInstruction}
+                      setSystemInstruction={setSystemInstruction}
+                      aiWriterSystemPrompt={aiWriterSystemPrompt}
+                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
+                      aiWriterUserPrompt={aiWriterUserPrompt}
+                      setAiWriterUserPrompt={setAiWriterUserPrompt}
+                      activeBrandRuleEdit={activeBrandRuleEdit}
+                      brandRuleDraft={brandRuleDraft}
+                      setBrandRuleDraft={setBrandRuleDraft}
+                      startBrandRuleEdit={startBrandRuleEdit}
+                      cancelBrandRuleEdit={cancelBrandRuleEdit}
+                      saveBrandRuleEdit={saveBrandRuleEdit}
+                      saveBrandSetup={saveBrandSetup}
+                      sendBrandWebhook={sendBrandWebhook}
+                      buildFormAnswer={buildFormAnswer}
+                      industryOptions={industryOptions}
+                      audienceRoleOptions={audienceRoleOptions}
+                      painPointOptions={painPointOptions}
+                      noSayOptions={noSayOptions}
+                      brandBasicsName={brandBasicsName}
+                      setBrandBasicsName={setBrandBasicsName}
+                      brandBasicsIndustry={brandBasicsIndustry}
+                      setBrandBasicsIndustry={setBrandBasicsIndustry}
+                      brandBasicsType={brandBasicsType}
+                      setBrandBasicsType={setBrandBasicsType}
+                      brandBasicsOffer={brandBasicsOffer}
+                      setBrandBasicsOffer={setBrandBasicsOffer}
+                      audienceRole={audienceRole}
+                      setAudienceRole={setAudienceRole}
+                      audienceIndustry={audienceIndustry}
+                      setAudienceIndustry={setAudienceIndustry}
+                      audiencePainPoints={audiencePainPoints}
+                      setAudiencePainPoints={setAudiencePainPoints}
+                      audienceOutcome={audienceOutcome}
+                      setAudienceOutcome={setAudienceOutcome}
+                      toneFormal={toneFormal}
+                      setToneFormal={setToneFormal}
+                      toneEnergy={toneEnergy}
+                      setToneEnergy={setToneEnergy}
+                      toneBold={toneBold}
+                      setToneBold={setToneBold}
+                      emojiUsage={emojiUsage}
+                      setEmojiUsage={setEmojiUsage}
+                      writingLength={writingLength}
+                      setWritingLength={setWritingLength}
+                      ctaStrength={ctaStrength}
+                      setCtaStrength={setCtaStrength}
+                      absoluteTruths={absoluteTruths}
+                      setAbsoluteTruths={setAbsoluteTruths}
+                      noSayRules={noSayRules}
+                      setNoSayRules={setNoSayRules}
+                      advancedPositioning={advancedPositioning}
+                      setAdvancedPositioning={setAdvancedPositioning}
+                      advancedDifferentiators={advancedDifferentiators}
+                      setAdvancedDifferentiators={setAdvancedDifferentiators}
+                      advancedPillars={advancedPillars}
+                      setAdvancedPillars={setAdvancedPillars}
+                      advancedCompetitors={advancedCompetitors}
+                      setAdvancedCompetitors={setAdvancedCompetitors}
+                      advancedProofPoints={advancedProofPoints}
+                      setAdvancedProofPoints={setAdvancedProofPoints}
+                      newCollaboratorEmail={newCollaboratorEmail}
+                      setNewCollaboratorEmail={setNewCollaboratorEmail}
+                      handleAddCollaborator={handleAddCollaborator}
+                      handleRemoveCollaborator={handleRemoveCollaborator}
+                    />
+                  }
+                />
+                <Route
+                  path="/company/:companyId/settings/brand-intelligence"
+                  element={
+                    <SettingsPage
+                      tab="brand-intelligence"
+                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+                      brandIntelligenceReady={brandIntelligenceReady}
+                      brandSetupMode={brandSetupMode}
+                      setBrandSetupMode={setBrandSetupMode}
+                      brandSetupLevel={brandSetupLevel}
+                      setBrandSetupLevel={setBrandSetupLevel}
+                      brandSetupStep={brandSetupStep}
+                      setBrandSetupStep={setBrandSetupStep}
+                      setIsEditingBrandSetup={setIsEditingBrandSetup}
+                      collaborators={collaborators}
+                      companyName={companyName}
+                      setCompanyName={setCompanyName}
+                      companyDescription={companyDescription}
+                      setCompanyDescription={setCompanyDescription}
+                      loadBrandKB={loadBrandKB}
+                      brandKbId={brandKbId}
+                      brandPack={brandPack}
+                      setBrandPack={setBrandPack}
+                      brandCapability={brandCapability}
+                      setBrandCapability={setBrandCapability}
+                      emojiRule={emojiRule}
+                      setEmojiRule={setEmojiRule}
+                      systemInstruction={systemInstruction}
+                      setSystemInstruction={setSystemInstruction}
+                      aiWriterSystemPrompt={aiWriterSystemPrompt}
+                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
+                      aiWriterUserPrompt={aiWriterUserPrompt}
+                      setAiWriterUserPrompt={setAiWriterUserPrompt}
+                      activeBrandRuleEdit={activeBrandRuleEdit}
+                      brandRuleDraft={brandRuleDraft}
+                      setBrandRuleDraft={setBrandRuleDraft}
+                      startBrandRuleEdit={startBrandRuleEdit}
+                      cancelBrandRuleEdit={cancelBrandRuleEdit}
+                      saveBrandRuleEdit={saveBrandRuleEdit}
+                      saveBrandSetup={saveBrandSetup}
+                      sendBrandWebhook={sendBrandWebhook}
+                      buildFormAnswer={buildFormAnswer}
+                      industryOptions={industryOptions}
+                      audienceRoleOptions={audienceRoleOptions}
+                      painPointOptions={painPointOptions}
+                      noSayOptions={noSayOptions}
+                      brandBasicsName={brandBasicsName}
+                      setBrandBasicsName={setBrandBasicsName}
+                      brandBasicsIndustry={brandBasicsIndustry}
+                      setBrandBasicsIndustry={setBrandBasicsIndustry}
+                      brandBasicsType={brandBasicsType}
+                      setBrandBasicsType={setBrandBasicsType}
+                      brandBasicsOffer={brandBasicsOffer}
+                      setBrandBasicsOffer={setBrandBasicsOffer}
+                      audienceRole={audienceRole}
+                      setAudienceRole={setAudienceRole}
+                      audienceIndustry={audienceIndustry}
+                      setAudienceIndustry={setAudienceIndustry}
+                      audiencePainPoints={audiencePainPoints}
+                      setAudiencePainPoints={setAudiencePainPoints}
+                      audienceOutcome={audienceOutcome}
+                      setAudienceOutcome={setAudienceOutcome}
+                      toneFormal={toneFormal}
+                      setToneFormal={setToneFormal}
+                      toneEnergy={toneEnergy}
+                      setToneEnergy={setToneEnergy}
+                      toneBold={toneBold}
+                      setToneBold={setToneBold}
+                      emojiUsage={emojiUsage}
+                      setEmojiUsage={setEmojiUsage}
+                      writingLength={writingLength}
+                      setWritingLength={setWritingLength}
+                      ctaStrength={ctaStrength}
+                      setCtaStrength={setCtaStrength}
+                      absoluteTruths={absoluteTruths}
+                      setAbsoluteTruths={setAbsoluteTruths}
+                      noSayRules={noSayRules}
+                      setNoSayRules={setNoSayRules}
+                      advancedPositioning={advancedPositioning}
+                      setAdvancedPositioning={setAdvancedPositioning}
+                      advancedDifferentiators={advancedDifferentiators}
+                      setAdvancedDifferentiators={setAdvancedDifferentiators}
+                      advancedPillars={advancedPillars}
+                      setAdvancedPillars={setAdvancedPillars}
+                      advancedCompetitors={advancedCompetitors}
+                      setAdvancedCompetitors={setAdvancedCompetitors}
+                      advancedProofPoints={advancedProofPoints}
+                      setAdvancedProofPoints={setAdvancedProofPoints}
+                      newCollaboratorEmail={newCollaboratorEmail}
+                      setNewCollaboratorEmail={setNewCollaboratorEmail}
+                      handleAddCollaborator={handleAddCollaborator}
+                      handleRemoveCollaborator={handleRemoveCollaborator}
+                    />
+                  }
+                />
+                <Route
+                  path="/company/:companyId/settings/team"
+                  element={
+                    <SettingsPage
+                      tab="team"
+                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+                      brandIntelligenceReady={brandIntelligenceReady}
+                      brandSetupMode={brandSetupMode}
+                      setBrandSetupMode={setBrandSetupMode}
+                      brandSetupLevel={brandSetupLevel}
+                      setBrandSetupLevel={setBrandSetupLevel}
+                      brandSetupStep={brandSetupStep}
+                      setBrandSetupStep={setBrandSetupStep}
+                      setIsEditingBrandSetup={setIsEditingBrandSetup}
+                      collaborators={collaborators}
+                      companyName={companyName}
+                      setCompanyName={setCompanyName}
+                      companyDescription={companyDescription}
+                      setCompanyDescription={setCompanyDescription}
+                      loadBrandKB={loadBrandKB}
+                      brandKbId={brandKbId}
+                      brandPack={brandPack}
+                      setBrandPack={setBrandPack}
+                      brandCapability={brandCapability}
+                      setBrandCapability={setBrandCapability}
+                      emojiRule={emojiRule}
+                      setEmojiRule={setEmojiRule}
+                      systemInstruction={systemInstruction}
+                      setSystemInstruction={setSystemInstruction}
+                      aiWriterSystemPrompt={aiWriterSystemPrompt}
+                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
+                      aiWriterUserPrompt={aiWriterUserPrompt}
+                      setAiWriterUserPrompt={setAiWriterUserPrompt}
+                      activeBrandRuleEdit={activeBrandRuleEdit}
+                      brandRuleDraft={brandRuleDraft}
+                      setBrandRuleDraft={setBrandRuleDraft}
+                      startBrandRuleEdit={startBrandRuleEdit}
+                      cancelBrandRuleEdit={cancelBrandRuleEdit}
+                      saveBrandRuleEdit={saveBrandRuleEdit}
+                      saveBrandSetup={saveBrandSetup}
+                      sendBrandWebhook={sendBrandWebhook}
+                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
+                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
+                      buildFormAnswer={buildFormAnswer}
+                      industryOptions={industryOptions}
+                      audienceRoleOptions={audienceRoleOptions}
+                      painPointOptions={painPointOptions}
+                      noSayOptions={noSayOptions}
+                      brandBasicsName={brandBasicsName}
+                      setBrandBasicsName={setBrandBasicsName}
+                      brandBasicsIndustry={brandBasicsIndustry}
+                      setBrandBasicsIndustry={setBrandBasicsIndustry}
+                      brandBasicsType={brandBasicsType}
+                      setBrandBasicsType={setBrandBasicsType}
+                      brandBasicsOffer={brandBasicsOffer}
+                      setBrandBasicsOffer={setBrandBasicsOffer}
+                      brandBasicsGoal={brandBasicsGoal}
+                      setBrandBasicsGoal={setBrandBasicsGoal}
+                      audienceRole={audienceRole}
+                      setAudienceRole={setAudienceRole}
+                      audienceIndustry={audienceIndustry}
+                      setAudienceIndustry={setAudienceIndustry}
+                      audiencePainPoints={audiencePainPoints}
+                      setAudiencePainPoints={setAudiencePainPoints}
+                      audienceOutcome={audienceOutcome}
+                      setAudienceOutcome={setAudienceOutcome}
+                      toneFormal={toneFormal}
+                      setToneFormal={setToneFormal}
+                      toneEnergy={toneEnergy}
+                      setToneEnergy={setToneEnergy}
+                      toneBold={toneBold}
+                      setToneBold={setToneBold}
+                      emojiUsage={emojiUsage}
+                      setEmojiUsage={setEmojiUsage}
+                      writingLength={writingLength}
+                      setWritingLength={setWritingLength}
+                      ctaStrength={ctaStrength}
+                      setCtaStrength={setCtaStrength}
+                      absoluteTruths={absoluteTruths}
+                      setAbsoluteTruths={setAbsoluteTruths}
+                      noSayRules={noSayRules}
+                      setNoSayRules={setNoSayRules}
+                      regulatedIndustry={regulatedIndustry}
+                      setRegulatedIndustry={setRegulatedIndustry}
+                      legalReview={legalReview}
+                      setLegalReview={setLegalReview}
+                      advancedPositioning={advancedPositioning}
+                      setAdvancedPositioning={setAdvancedPositioning}
+                      advancedDifferentiators={advancedDifferentiators}
+                      setAdvancedDifferentiators={setAdvancedDifferentiators}
+                      advancedPillars={advancedPillars}
+                      setAdvancedPillars={setAdvancedPillars}
+                      advancedCompetitors={advancedCompetitors}
+                      setAdvancedCompetitors={setAdvancedCompetitors}
+                      advancedProofPoints={advancedProofPoints}
+                      setAdvancedProofPoints={setAdvancedProofPoints}
+                      advancedRequiredPhrases={advancedRequiredPhrases}
+                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
+                      advancedForbiddenPhrases={advancedForbiddenPhrases}
+                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
+                      advancedComplianceNotes={advancedComplianceNotes}
+                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
+                      writerRulesUnlocked={writerRulesUnlocked}
+                      reviewerRulesUnlocked={reviewerRulesUnlocked}
+                      newCollaboratorEmail={newCollaboratorEmail}
+                      setNewCollaboratorEmail={setNewCollaboratorEmail}
+                      onAddCollaborator={handleAddCollaborator}
+                      onRemoveCollaborator={handleRemoveCollaborator}
+                      isEditingBrandSetup={isEditingBrandSetup}
+                      brandEditingRef={brandEditingRef}
+                      formAnswerCache={formAnswerCache}
+                    />}
+                />
+                <Route path="/company/:companyId/integrations" element={<IntegrationsPage />} />
+                <Route path="/profile" element={<ProfilePage session={session} supabase={supabase} notify={notify} />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </div>
           </div>
         </div>
 
@@ -2983,31 +2909,32 @@ function App() {
           startWaitingForImageUpdate={startWaitingForImageUpdate}
         />
 
+        {
+          toast && (
+            <div
+              className={`fixed bottom-6 right-6 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-white border shadow-premium-lg z-[9999] animate-[toast-slide-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md max-w-[400px] ${toast.tone === 'success' ? 'border-emerald-500/30 bg-emerald-50/95 text-emerald-800' :
+                toast.tone === 'error' ? 'border-rose-500/30 bg-rose-50/95 text-rose-800' :
+                  'border-brand-primary/30 bg-sky-50/95 text-brand-dark'
+                }`}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {toast.tone === 'success' && <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" aria-hidden />}
+              {toast.tone === 'error' && <XCircle className="w-5 h-5 flex-shrink-0 text-rose-500" aria-hidden />}
+              {(toast.tone === 'info' || !toast.tone) && <Info className="w-5 h-5 flex-shrink-0 text-brand-primary" aria-hidden />}
+              <span className="text-sm font-semibold leading-tight">{toast.message}</span>
+            </div>
+          )
+        }
+
+        <ConfirmModal
+          isOpen={isConfirmOpen}
+          config={confirmConfig}
+          onResolve={resolveConfirm}
+        />
       </div >
-
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-white border shadow-premium-lg z-[9999] animate-[toast-slide-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md max-w-[400px] ${toast.tone === 'success' ? 'border-emerald-500/30 bg-emerald-50/95 text-emerald-800' :
-            toast.tone === 'error' ? 'border-rose-500/30 bg-rose-50/95 text-rose-800' :
-              'border-brand-primary/30 bg-sky-50/95 text-brand-dark'
-            }`}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          {toast.tone === 'success' && <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" aria-hidden />}
-          {toast.tone === 'error' && <XCircle className="w-5 h-5 flex-shrink-0 text-rose-500" aria-hidden />}
-          {(toast.tone === 'info' || !toast.tone) && <Info className="w-5 h-5 flex-shrink-0 text-brand-primary" aria-hidden />}
-          <span className="text-sm font-semibold leading-tight">{toast.message}</span>
-        </div>
-      )}
-
-      <ConfirmModal
-        isOpen={isConfirmOpen}
-        config={confirmConfig}
-        onResolve={resolveConfirm}
-      />
-    </div >
+    </NotificationProvider>
   );
 }
 

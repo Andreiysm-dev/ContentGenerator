@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Copy, ChevronDown, ChevronUp, Settings2, Pencil } from 'lucide-react';
 
 interface ImageGenerationModalProps {
     isOpen: boolean;
@@ -62,6 +63,7 @@ export function ImageGenerationModal({
     getImageGeneratedSignature,
     startWaitingForImageUpdate,
 }: ImageGenerationModalProps) {
+    const [showAdvanced, setShowAdvanced] = useState(false);
     if (!isOpen || !selectedRow) return null;
 
     return (
@@ -102,16 +104,33 @@ export function ImageGenerationModal({
                                 <div className="flex items-center justify-between gap-3">
                                     <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">Design Mega Prompt</h3>
                                     <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            title="Copy Mega Prompt"
+                                            className="inline-flex items-center justify-center rounded-lg p-1.5 text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50"
+                                            onClick={() => {
+                                                const textToCopy = isEditingDmp ? dmpDraft : (selectedRow.dmp ?? '');
+                                                if (!textToCopy) {
+                                                    notify('Nothing to copy.', 'info');
+                                                    return;
+                                                }
+                                                navigator.clipboard.writeText(textToCopy);
+                                                notify('Mega Prompt copied to clipboard!', 'success');
+                                            }}
+                                        >
+                                            <Copy size={16} />
+                                        </button>
                                         {!isEditingDmp ? (
                                             <button
                                                 type="button"
-                                                className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-bold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50"
+                                                title="Customize Prompt"
+                                                className="inline-flex items-center justify-center rounded-lg p-1.5 text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50"
                                                 onClick={() => {
                                                     setDmpDraft(selectedRow.dmp ?? '');
                                                     setIsEditingDmp(true);
                                                 }}
                                             >
-                                                Customize
+                                                <Pencil size={14} />
                                             </button>
                                         ) : (
                                             <>
@@ -252,10 +271,112 @@ export function ImageGenerationModal({
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-end gap-3 border-t border-slate-200/60 p-6 bg-slate-50/30">
+                    <div className="flex items-center justify-end gap-3 border-t border-slate-200/60 p-6 bg-slate-50/30 overflow-x-auto">
                         <button
                             type="button"
-                            className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="mr-auto inline-flex items-center gap-2 text-xs font-bold text-brand-dark/40 hover:text-brand-dark/70 transition-colors py-2"
+                        >
+                            <Settings2 size={14} className={showAdvanced ? 'text-[#3fa9f5]' : ''} />
+                            <span>Advanced</span>
+                            {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+
+                        {showAdvanced && (
+                            <>
+                                <button
+                                    type="button"
+                                    title="Generate a fresh Design Mega Prompt text based on the caption and brand rules."
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] disabled:opacity-40 whitespace-nowrap"
+                                    disabled={isGeneratingImage}
+                                    onClick={async () => {
+                                        if (!activeCompanyId || !brandKbId) {
+                                            notify('Company/Brand information not fully loaded.', 'error');
+                                            return;
+                                        }
+                                        setIsGeneratingImage(true);
+                                        try {
+                                            const response = await authedFetch(
+                                                `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/generate-dmp`,
+                                                {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ systemInstruction }),
+                                                }
+                                            );
+                                            if (!response.ok) {
+                                                const data = await response.json().catch(() => ({}));
+                                                notify(`DMP generation failed. ${data.error || ''}`, 'error');
+                                            } else {
+                                                const result = await response.json();
+                                                setDmpDraft(result.dmp);
+                                                setSelectedRow((prev: any) => ({ ...prev, dmp: result.dmp }));
+                                                setCalendarRows((prev) => prev.map(r => r.contentCalendarId === selectedRow.contentCalendarId ? { ...r, dmp: result.dmp } : r));
+                                                notify('Fresh Design Mega Prompt generated!', 'success');
+                                            }
+                                        } catch (err) {
+                                            notify('Network error triggering DMP generation.', 'error');
+                                        } finally {
+                                            setIsGeneratingImage(false);
+                                        }
+                                    }}
+                                >
+                                    DMP Only
+                                </button>
+
+                                <button
+                                    type="button"
+                                    title="Generate a new image using the CURRENT Design Mega Prompt text shown above."
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] disabled:opacity-40 whitespace-nowrap"
+                                    disabled={isGeneratingImage || isEditingDmp}
+                                    onClick={async () => {
+                                        if (getImageGeneratedUrl(selectedRow)) {
+                                            const proceed = await requestConfirm({
+                                                title: 'Replace Image?',
+                                                description: 'Use the CURRENT prompt to generate a new image? The existing image will be replaced.',
+                                                confirmLabel: 'Generate',
+                                                cancelLabel: 'Cancel',
+                                            });
+                                            if (!proceed) return;
+                                        }
+                                        setIsGeneratingImage(true);
+                                        try {
+                                            const currentDmp = selectedRow.dmp || '';
+                                            const response = await authedFetch(
+                                                `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/generate-image-from-dmp`,
+                                                {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ dmp: currentDmp }),
+                                                }
+                                            );
+                                            if (!response.ok) {
+                                                const data = await response.json().catch(() => ({}));
+                                                notify(`Image generation failed. ${data.error || ''}`, 'error');
+                                                setIsGeneratingImage(false);
+                                            } else {
+                                                notify('Image generation started using current DMP!', 'success');
+                                                startWaitingForImageUpdate(getImageGeneratedSignature(selectedRow));
+                                                // Auto-disable generating state after a timeout or on completion
+                                                setTimeout(() => setIsGeneratingImage(false), 30000);
+                                            }
+                                        } catch (err) {
+                                            notify('Network error triggering image generation.', 'error');
+                                            setIsGeneratingImage(false);
+                                        }
+                                    }}
+                                >
+                                    Image Only
+                                </button>
+
+                                <div className="h-6 w-[1px] bg-slate-200 mx-1 hidden sm:block"></div>
+                            </>
+                        )}
+
+                        <button
+                            type="button"
+                            title="Regenerate BOTH the prompt and the image from scratch."
+                            className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
                             disabled={isGeneratingImage}
                             onClick={async () => {
                                 if (!activeCompanyId) {
@@ -336,7 +457,7 @@ export function ImageGenerationModal({
                                 }, 30000);
                             }}
                         >
-                            {isGeneratingImage ? 'Generating Image…' : 'Regenerate via AI'}
+                            {isGeneratingImage ? 'Generating...' : 'Generate'}
                             {isGeneratingImage && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>}
                         </button>
 

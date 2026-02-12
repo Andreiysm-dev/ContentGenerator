@@ -1,4 +1,5 @@
-import { Bell, LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
+import { NotificationBell } from "./NotificationBell";
 import { type Session, SupabaseClient } from "@supabase/supabase-js";
 import type { NavigateFunction } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -38,14 +39,7 @@ export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, not
         </button>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <button
-            type="button"
-            className="w-8 h-8 flex items-center justify-center rounded-full text-brand-dark/60 hover:text-brand-primary hover:bg-brand-primary/10 transition-colors"
-            onClick={() => notify("No notifications yet.", "info")}
-            title="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-          </button>
+          <NotificationBell />
 
           <button type="button" className="w-8 h-8 flex items-center justify-center rounded-full text-brand-dark/60 hover:text-brand-primary hover:bg-brand-primary/10 transition-colors" onClick={() => navigate("/profile")} title="User settings">
             <Settings className="h-4 w-4" />

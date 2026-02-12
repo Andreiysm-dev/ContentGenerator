@@ -39,6 +39,24 @@ router.get('/content-calendar/company/:companyId', getContentCalendarsByCompanyI
 // POST - /api/content-calendar/batch-generate-image
 router.post('/content-calendar/batch-generate-image', batchGenerateImages);
 
+// POST - /api/content-calendar/:contentCalendarId/generate-dmp
+router.post('/content-calendar/:contentCalendarId/generate-dmp', async (req, res) => {
+    try {
+        const { contentCalendarId } = req.params;
+        const { systemInstruction } = req.body;
+        const userId = req.user?.id;
+        const { generateDmpForCalendarRow } = await import('../services/imageGenerationService.js');
+        const result = await generateDmpForCalendarRow(contentCalendarId, { userId, systemInstruction });
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error });
+        }
+        return res.status(200).json({ dmp: result.dmp, contentCalendar: result.contentCalendar });
+    } catch (err) {
+        console.error('Generate DMP endpoint error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // POST - /api/content-calendar/:contentCalendarId/generate-image-from-dmp
 router.post('/content-calendar/:contentCalendarId/generate-image-from-dmp', async (req, res) => {
     try {

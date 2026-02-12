@@ -13,7 +13,8 @@ dotenv.config();
 
 console.log('DEBUG: Backend started');
 console.log('DEBUG: Working directory:', process.cwd());
-console.log('DEBUG: IMAGEN_MODEL from env:', process.env.IMAGEN_MODEL);
+// Image generation is hardcoded to Imagen 4.0 in imageGenerationService.js for stability
+
 
 const app = express();
 const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
