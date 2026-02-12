@@ -43,10 +43,10 @@ router.post('/content-calendar/batch-generate-image', batchGenerateImages);
 router.post('/content-calendar/:contentCalendarId/generate-dmp', async (req, res) => {
     try {
         const { contentCalendarId } = req.params;
-        const { systemInstruction } = req.body;
+        const { systemInstruction, provider, model } = req.body;
         const userId = req.user?.id;
         const { generateDmpForCalendarRow } = await import('../services/imageGenerationService.js');
-        const result = await generateDmpForCalendarRow(contentCalendarId, { userId, systemInstruction });
+        const result = await generateDmpForCalendarRow(contentCalendarId, { userId, systemInstruction, provider, model });
         if (!result.ok) {
             return res.status(result.status || 500).json({ error: result.error });
         }
@@ -61,10 +61,10 @@ router.post('/content-calendar/:contentCalendarId/generate-dmp', async (req, res
 router.post('/content-calendar/:contentCalendarId/generate-image-from-dmp', async (req, res) => {
     try {
         const { contentCalendarId } = req.params;
-        const { dmp } = req.body;
+        const { dmp, provider, model } = req.body;
         const userId = req.user?.id;
         const { generateImageFromCustomDmp } = await import('../services/imageGenerationService.js');
-        const result = await generateImageFromCustomDmp(contentCalendarId, dmp, { userId });
+        const result = await generateImageFromCustomDmp(contentCalendarId, dmp, { userId, provider, model });
         if (!result.ok) {
             return res.status(result.status || 500).json({ error: result.error });
         }

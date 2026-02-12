@@ -325,7 +325,7 @@ export const batchGenerateImages = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { rowIds, brandKbId, systemInstruction } = req.body || {};
+        const { rowIds, brandKbId, systemInstruction, provider, model } = req.body || {};
         if (!Array.isArray(rowIds) || rowIds.length === 0) {
             return res.status(400).json({ error: 'rowIds must be a non-empty array.' });
         }
@@ -376,6 +376,8 @@ export const batchGenerateImages = async (req, res) => {
                 const result = await generateImageForCalendarRow(row.contentCalendarId, {
                     userId,
                     systemInstruction: systemInstruction ?? '',
+                    provider,
+                    model,
                 });
 
                 if (result.ok) {

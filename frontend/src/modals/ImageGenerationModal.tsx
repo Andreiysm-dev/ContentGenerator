@@ -64,6 +64,15 @@ export function ImageGenerationModal({
     startWaitingForImageUpdate,
 }: ImageGenerationModalProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [provider, setProvider] = useState<'google' | 'replicate'>('google');
+    const [selectedModel, setSelectedModel] = useState('black-forest-labs/flux-dev');
+
+    const REPLICATE_MODELS = [
+        { id: 'black-forest-labs/flux-dev', name: 'Flux Dev (Premium)' },
+        { id: 'black-forest-labs/flux-schnell', name: 'Flux Schnell (Fast)' },
+        { id: 'stability-ai/sdxl', name: 'Stable Diffusion XL' },
+        { id: 'bytedance/sdxl-lightning-4step', name: 'SDXL Lightning (Ultra Fast)' },
+    ];
     if (!isOpen || !selectedRow) return null;
 
     return (
@@ -163,6 +172,8 @@ export function ImageGenerationModal({
                                                                 headers: { 'Content-Type': 'application/json' },
                                                                 body: JSON.stringify({
                                                                     dmp: trimmedDmp,
+                                                                    provider,
+                                                                    model: provider === 'replicate' ? selectedModel : undefined
                                                                 }),
                                                             });
                                                             const data = await res.json().catch(() => ({}));
@@ -189,6 +200,8 @@ export function ImageGenerationModal({
                                                                         headers: { 'Content-Type': 'application/json' },
                                                                         body: JSON.stringify({
                                                                             dmp: trimmedDmp,
+                                                                            provider,
+                                                                            model: provider === 'replicate' ? selectedModel : undefined
                                                                         }),
                                                                     }
                                                                 );
@@ -237,6 +250,43 @@ export function ImageGenerationModal({
                             {/* Preview Panel */}
                             <div className="space-y-4">
                                 <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">Preview</h3>
+
+                                {/* Options Panel */}
+                                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/30 space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Provider</label>
+                                        <div className="flex p-1 bg-slate-200/50 rounded-xl">
+                                            <button
+                                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${provider === 'google' ? 'bg-white shadow-sm text-[#3fa9f5]' : 'text-slate-500'}`}
+                                                onClick={() => setProvider('google')}
+                                            >
+                                                Google Imagen
+                                            </button>
+                                            <button
+                                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${provider === 'replicate' ? 'bg-white shadow-sm text-[#3fa9f5]' : 'text-slate-500'}`}
+                                                onClick={() => setProvider('replicate')}
+                                            >
+                                                Replicate
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {provider === 'replicate' && (
+                                        <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Model</label>
+                                            <select
+                                                className="w-full text-xs font-bold bg-white border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-[#3fa9f5]/20"
+                                                value={selectedModel}
+                                                onChange={(e) => setSelectedModel(e.target.value)}
+                                            >
+                                                {REPLICATE_MODELS.map(m => (
+                                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="aspect-square rounded-2xl border border-slate-200 bg-slate-50/50 overflow-hidden flex items-center justify-center relative shadow-inner">
                                     {getImageGeneratedUrl(selectedRow) ? (
                                         (() => {
@@ -347,7 +397,11 @@ export function ImageGenerationModal({
                                                 {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ dmp: currentDmp }),
+                                                    body: JSON.stringify({
+                                                        dmp: currentDmp,
+                                                        provider,
+                                                        model: provider === 'replicate' ? selectedModel : undefined
+                                                    }),
                                                 }
                                             );
                                             if (!response.ok) {
@@ -429,6 +483,8 @@ export function ImageGenerationModal({
                                                 rowIds: [selectedRow.contentCalendarId],
                                                 brandKbId,
                                                 systemInstruction: systemInstruction ?? '',
+                                                provider,
+                                                model: provider === 'replicate' ? selectedModel : undefined
                                             }),
                                         }
                                     );

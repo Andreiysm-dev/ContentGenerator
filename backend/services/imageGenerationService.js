@@ -1,6 +1,7 @@
 import db from '../database/db.js';
 import { IMAGE_GENERATION_SYSTEM_PROMPT, IMAGE_GENERATION_USER_PROMPT } from './prompts.js';
 import { sendNotification, sendTeamNotification } from './notificationService.js';
+import { callReplicatePredict } from './replicateService.js';
 
 const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -259,24 +260,49 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
   const { mega, negative } = parsed.value;
   const fullPrompt = negative ? `${mega}\n\nNEGATIVE: ${negative}` : mega;
 
-  // Use Imagen 4.0 (Imagen 3 has been shut down)
-  const imageModel = process.env.IMAGEN_MODEL || 'imagen-4.0-generate-001';
-  const imagenRes = await callImagenPredict({
-    model: imageModel,
-    prompt: fullPrompt,
-  });
+  const provider = opts.provider || 'google';
+  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : 'black-forest-labs/flux-dev');
 
-  if (!imagenRes.ok) {
-    return { ok: false, status: 500, error: imagenRes.error };
+  let bytes;
+  let extension = 'png';
+
+  if (provider === 'replicate') {
+    const replicateRes = await callReplicatePredict({
+      prompt: fullPrompt,
+      model: model,
+      aspectRatio: '1:1'
+    });
+
+    if (!replicateRes.ok) {
+      return { ok: false, status: 500, error: replicateRes.error };
+    }
+
+    // Fetch the image from Replicate URL
+    const imageFetch = await fetch(replicateRes.url);
+    if (!imageFetch.ok) {
+      return { ok: false, status: 500, error: 'Failed to download image from Replicate' };
+    }
+    const arrayBuffer = await imageFetch.arrayBuffer();
+    bytes = Buffer.from(arrayBuffer);
+    extension = replicateRes.url.split('.').pop().split('?')[0] || 'png';
+  } else {
+    // Default to Google Imagen
+    const imagenRes = await callImagenPredict({
+      model: model,
+      prompt: fullPrompt,
+    });
+
+    if (!imagenRes.ok) {
+      return { ok: false, status: 500, error: imagenRes.error };
+    }
+    bytes = Buffer.from(imagenRes.base64, 'base64');
   }
 
-
-  const bytes = Buffer.from(imagenRes.base64, 'base64');
   const uploadRes = await uploadGeneratedImage({
     companyId: row.companyId,
     contentCalendarId,
     imageBytes: bytes,
-    extension: 'png',
+    extension: extension,
   });
 
   if (!uploadRes.ok) {
@@ -343,22 +369,47 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     return { ok: false, status: 500, error: 'Failed to save DMP' };
   }
 
-  const imageModel = process.env.IMAGEN_MODEL || 'imagen-4.0-generate-001';
-  const imagenRes = await callImagenPredict({
-    model: imageModel,
-    prompt: dmp.trim(),
-  });
+  const provider = opts.provider || 'google';
+  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : 'black-forest-labs/flux-dev');
 
-  if (!imagenRes.ok) {
-    return { ok: false, status: 500, error: imagenRes.error };
+  let bytes;
+  let extension = 'png';
+
+  if (provider === 'replicate') {
+    const replicateRes = await callReplicatePredict({
+      prompt: dmp.trim(),
+      model: model,
+      aspectRatio: '1:1'
+    });
+
+    if (!replicateRes.ok) {
+      return { ok: false, status: 500, error: replicateRes.error };
+    }
+
+    const imageFetch = await fetch(replicateRes.url);
+    if (!imageFetch.ok) {
+      return { ok: false, status: 500, error: 'Failed to download image from Replicate' };
+    }
+    const arrayBuffer = await imageFetch.arrayBuffer();
+    bytes = Buffer.from(arrayBuffer);
+    extension = replicateRes.url.split('.').pop().split('?')[0] || 'png';
+  } else {
+    const imagenRes = await callImagenPredict({
+      model: model,
+      prompt: dmp.trim(),
+    });
+
+    if (!imagenRes.ok) {
+      return { ok: false, status: 500, error: imagenRes.error };
+    }
+    bytes = Buffer.from(imagenRes.base64, 'base64');
   }
 
-  const bytes = Buffer.from(imagenRes.base64, 'base64');
   const uploadRes = await uploadGeneratedImage({
     companyId: row.companyId,
     contentCalendarId,
     imageBytes: bytes,
-    extension: 'png',
+    extension: extension,
   });
 
   if (!uploadRes.ok) {
