@@ -19,9 +19,15 @@ export function DashboardPage({ activeCompany, activeCompanyId, dashboardStats }
   const navigate = useNavigate();
 
   return (
-    <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6 min-w-0">
-      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-brand-primary/10 to-white border-t border-l border-r border-gray-200 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
+    <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6 min-w-0 relative">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-gradient-to-br from-[#3fa9f5]/20 to-[#6fb6e8]/15 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-gradient-to-tr from-[#a78bfa]/15 to-[#e5a4e6]/12 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '700ms' }} />
+        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-gradient-to-bl from-[#81bad1]/12 to-transparent rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '1400ms' }} />
+      </div>
+      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/70 via-[#6fb6e8]/60 to-[#a78bfa]/50 border-t border-l border-r border-[#3fa9f5]/50 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
           <div>
             <h2 className="text-md md:text-xl font-bold">{activeCompany?.companyName ?? "Company"} Dashboard</h2>
             <p className="mt-1 text-sm font-medium">Monitor content performance and workflow status.</p>
@@ -29,7 +35,7 @@ export function DashboardPage({ activeCompany, activeCompanyId, dashboardStats }
 
           <button
             type="button"
-            className="btn btn-primary flex justify-center"
+            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-white text-[#3fa9f5] border border-white/80 shadow-sm ring-1 ring-inset ring-slate-900/5 transition hover:bg-slate-50 hover:border-slate-200 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => {
               if (!activeCompanyId) return;
               navigate(`/company/${encodeURIComponent(activeCompanyId)}/generate`);

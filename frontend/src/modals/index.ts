@@ -6,3 +6,4 @@ export { BulkImportModal } from './BulkImportModal';
 export { ConfirmModal } from './ConfirmModal';
 export { ViewContentModal } from './ViewContentModal';
 export { ImageGenerationModal } from './ImageGenerationModal';
+export { OnboardingModal, type OnboardingData } from './OnboardingModal';

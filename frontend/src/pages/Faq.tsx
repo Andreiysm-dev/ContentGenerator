@@ -67,11 +67,16 @@ export default function Faq() {
   ];
 
   return (
-    <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6">
-      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-        
+    <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6 relative">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-8%] left-[-4%] w-[34%] h-[34%] bg-gradient-to-br from-[#6fb6e8]/15 to-[#3fa9f5]/12 rounded-full blur-[80px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[36%] h-[36%] bg-gradient-to-tl from-[#81bad1]/13 to-[#a78bfa]/10 rounded-full blur-[85px] animate-pulse" style={{ animationDelay: '800ms' }} />
+      </div>
+      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+
         {/* Header */}
-        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-brand-primary/10 to-white border-t border-l border-r border-gray-200 rounded-t-2xl shadow-sm flex flex-col gap-4">
+        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/70 via-[#6fb6e8]/60 to-[#a78bfa]/50 border-t border-l border-r border-[#3fa9f5]/50 rounded-t-2xl shadow-sm flex flex-col gap-4">
           <div className="flex-1">
             <h2 className="text-md md:text-xl font-bold text-slate-900">
               Frequently Asked Questions
@@ -98,9 +103,8 @@ export default function Faq() {
                   return (
                     <div
                       key={itemIndex}
-                      className={`border border-slate-200 rounded-xl overflow-hidden transition-all duration-300 ${
-                        isOpen ? "shadow-md ring-1 ring-[#3fa9f5]/20" : "hover:shadow-sm"
-                      }`}
+                      className={`border border-slate-200 rounded-xl overflow-hidden transition-all duration-300 ${isOpen ? "shadow-md ring-1 ring-[#3fa9f5]/20" : "hover:shadow-sm"
+                        }`}
                     >
                       <button
                         onClick={() => toggleAccordion(id)}
@@ -109,16 +113,15 @@ export default function Faq() {
                         <div className={`text-sm md:text-md transition-colors ${isOpen ? "text-[#3fa9f5]" : "text-slate-900"}`}>
                           {item.question}
                         </div>
-                        <ChevronDown 
-                          className={`w-5 h-5 text-slate-400 transition-transform duration-300 ease-in-out ${isOpen ? "rotate-180 text-[#3fa9f5]" : ""}`} 
+                        <ChevronDown
+                          className={`w-5 h-5 text-slate-400 transition-transform duration-300 ease-in-out ${isOpen ? "rotate-180 text-[#3fa9f5]" : ""}`}
                         />
                       </button>
-                      
+
                       {/* Content Area */}
-                      <div 
-                        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                          isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-                        }`}
+                      <div
+                        className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+                          }`}
                       >
                         <div className="p-4 pt-0 text-sm md:text-md text-slate-600 leading-relaxed border-t border-slate-100/50">
                           {item.answer}

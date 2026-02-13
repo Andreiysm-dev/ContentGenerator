@@ -19,10 +19,9 @@ interface SidebarProps {
   navigate: NavigateFunction;
   activeNavKey: string | null | undefined;
   setActiveCompanyIdWithPersistence: (id: string) => void;
-  setNewCompanyName: (name: string) => void;
-  setNewCompanyDescription: (desc: string) => void;
-  setIsAddCompanyModalOpen: (open: boolean) => void;
+  setIsOnboardingOpen: (open: boolean) => void;
   notify: (message: string, type: "success" | "error" | "info") => void;
+  recentCompanies: Company[];
 }
 
 export function Sidebar({
@@ -36,10 +35,9 @@ export function Sidebar({
   navigate,
   activeNavKey,
   setActiveCompanyIdWithPersistence,
-  setNewCompanyName,
-  setNewCompanyDescription,
-  setIsAddCompanyModalOpen,
+  setIsOnboardingOpen,
   notify,
+  recentCompanies,
 }: SidebarProps) {
   const location = useLocation();
   const [isSupportOpen, setIsSupportOpen] = useState(false);
@@ -115,9 +113,7 @@ export function Sidebar({
                   <button
                     className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-bold hover:bg-blue-50 hover:text-blue-400"
                     onClick={() => {
-                      setNewCompanyName("");
-                      setNewCompanyDescription("");
-                      setIsAddCompanyModalOpen(true);
+                      setIsOnboardingOpen(true);
                       setIsCompanyDropdownOpen(false);
                     }}
                   >
@@ -129,34 +125,65 @@ export function Sidebar({
             </div>
           </div>
 
-          {/* NAVIGATION */}
-          <nav className="flex flex-col gap-1 mt-4">
-            {[
-              { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "dashboard" },
-              { key: "generate", label: "Create", icon: Wand2, path: "generate" },
-              { key: "calendar", label: "Calendar", icon: CalendarDays, path: "calendar" },
-              { key: "drafts", label: "Drafts", icon: FileText, path: "drafts" },
-              { key: "settings", label: "Company Settings", icon: Settings, path: "settings/overview" },
-            ].map((item) => {
-              const Icon = item.icon;
-              const isActive = activeNavKey === item.key;
 
-              return (
-                <button
-                  key={item.key}
-                  className={`flex items-center gap-2.5 py-2.5 px-2 rounded-r-xl font-bold transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500 rounded-xl" : "hover:bg-blue-50 hover:text-blue-400"}`}
-                  onClick={() => {
-                    if (!activeCompanyId) return;
-                    navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
-                    if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
-                  }}
-                >
-                  <Icon size={18} />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
+
+          {/* NAVIGATION */}
+          {activeCompany && (
+            <nav className="flex flex-col gap-1 mt-4">
+              {[
+                { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "dashboard", tourId: "dashboard" },
+                { key: "generate", label: "Create", icon: Wand2, path: "generate", tourId: "create" },
+                { key: "calendar", label: "Calendar", icon: CalendarDays, path: "calendar", tourId: "calendar" },
+                { key: "drafts", label: "Drafts", icon: FileText, path: "drafts", tourId: "drafts" },
+                { key: "settings", label: "Company Settings", icon: Settings, path: "settings/overview", tourId: "company-settings" },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeNavKey === item.key;
+
+                return (
+                  <button
+                    key={item.key}
+                    data-tour={item.tourId}
+                    className={`flex items-center gap-2.5 py-2.5 px-2 rounded-r-xl font-medium transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500 rounded-xl" : "hover:bg-blue-50 hover:text-blue-400"}`}
+                    onClick={() => {
+                      if (!activeCompanyId) return;
+                      navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
+                      if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
+                    }}
+                  >
+                    <Icon size={18} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+          )}
+
+          {/* RECENT SHORTCUTS */}
+          {recentCompanies.length > 0 && (
+            <div className="flex flex-col gap-1 mt-4 px-1.5">
+              <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold px-2 mb-1">Your shortcuts</div>
+              {recentCompanies.map((company) => {
+                const isActive = company.companyId === activeCompanyId;
+                return (
+                  <button
+                    key={company.companyId}
+                    className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-blue-100 text-blue-400" : "text-brand-dark/70 hover:bg-brand-primary/[0.06] hover:text-brand-primary"}`}
+                    onClick={() => {
+                      setActiveCompanyIdWithPersistence(company.companyId);
+                      navigate(`/company/${encodeURIComponent(company.companyId)}/dashboard`);
+                      if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
+                    }}
+                  >
+                    <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${isActive ? "bg-blue-200" : "bg-brand-primary/10"}`}>
+                      <span className={`text-[10px] font-bold ${isActive ? "text-blue-500" : "text-brand-primary"}`}>{company.companyName.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <span className="truncate text-left">{company.companyName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 px-1.5 mt-auto">
@@ -165,13 +192,13 @@ export function Sidebar({
               navigate("/faq");
               if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
             }}
-            className={`flex items-center gap-2 py-2 px-2 rounded-xl font-bold transition ${location.pathname.startsWith("/faq") ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
+            className={`flex items-center gap-2 py-2 px-2 rounded-xl font-medium transition ${location.pathname.startsWith("/faq") ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
           >
             <HelpCircle size={18} />
             FAQ
           </button>
 
-          <button onClick={() => setShowSupport(true)} className="flex items-center gap-2 py-2 px-2 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-400 transition">
+          <button onClick={() => setShowSupport(true)} className="flex items-center gap-2 py-2 px-2 rounded-xl font-medium hover:bg-blue-50 hover:text-blue-400 transition">
             <Headphones size={18} />
             Contact Support
           </button>

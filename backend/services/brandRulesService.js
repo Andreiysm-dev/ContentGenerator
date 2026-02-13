@@ -103,54 +103,53 @@ export async function generateBrandRulesSystem(payload = {}) {
 
   const brandCapability = (capRes.content || '').trim();
 
-  // 3) Generate Writer Agent Prompt
-  const writerSystem = WRITER_AGENT_SYSTEM_PROMPT;
+  // 3) Generate Writer Agent, Reviewer Agent, and Visual Identity in PARALLEL
+  // They all depend on Brand Pack & Capabilities, but not on each other.
 
-  const writerUser = WRITER_AGENT_USER_PROMPT;
-
-  const writerRes = await callOpenAIText({
-    systemPrompt: writerSystem,
-    userPrompt: writerUser.replaceAll('{{BRAND_PACK}}', brandPack).replaceAll('{{BRAND_CAP}}', brandCapability),
+  const writerPromise = callOpenAIText({
+    systemPrompt: WRITER_AGENT_SYSTEM_PROMPT,
+    userPrompt: WRITER_AGENT_USER_PROMPT
+      .replaceAll('{{BRAND_PACK}}', brandPack)
+      .replaceAll('{{BRAND_CAP}}', brandCapability),
     temperature: 1,
   });
 
-  if (!writerRes.ok) {
-    return { ok: false, status: 500, error: writerRes.error };
-  }
-
-  const writerAgent = (writerRes.content || '').trim();
-
-  // 4) Generate Reviewer Prompt
-  const reviewerSystem = REVIEWER_AGENT_SYSTEM_PROMPT;
-
-  const reviewerUser = REVIEWER_AGENT_USER_PROMPT;
-
-  const reviewerRes = await callOpenAIText({
-    systemPrompt: reviewerSystem,
-    userPrompt: reviewerUser.replaceAll('{{BRAND_PACK}}', brandPack).replaceAll('{{BRAND_CAP}}', brandCapability),
+  const reviewerPromise = callOpenAIText({
+    systemPrompt: REVIEWER_AGENT_SYSTEM_PROMPT,
+    userPrompt: REVIEWER_AGENT_USER_PROMPT
+      .replaceAll('{{BRAND_PACK}}', brandPack)
+      .replaceAll('{{BRAND_CAP}}', brandCapability),
     temperature: 1,
   });
 
-  if (!reviewerRes.ok) {
-    return { ok: false, status: 500, error: reviewerRes.error };
-  }
-
-  const reviewPrompt1 = (reviewerRes.content || '').trim();
-
-  // 5) Generate Visual Identity Rule (systemInstruction)
-  const visualSystem = VISUAL_IDENTITY_SYSTEM_PROMPT;
-
-  const visualUser = VISUAL_IDENTITY_USER_PROMPT;
-
-  const visualRes = await callOpenAIText({
-    systemPrompt: visualSystem,
-    userPrompt: visualUser
+  const visualPromise = callOpenAIText({
+    systemPrompt: VISUAL_IDENTITY_SYSTEM_PROMPT,
+    userPrompt: VISUAL_IDENTITY_USER_PROMPT
       .replaceAll('{{BRAND_PACK}}', brandPack)
       .replaceAll('{{BRAND_CAP}}', brandCapability)
       .replaceAll('{{FORM_ANSWER}}', formAnswerText),
     temperature: 1,
   });
 
+  const [writerRes, reviewerRes, visualRes] = await Promise.all([
+    writerPromise,
+    reviewerPromise,
+    visualPromise,
+  ]);
+
+  if (!writerRes.ok) {
+    return { ok: false, status: 500, error: `Writer Agent failed: ${writerRes.error}` };
+  }
+  const writerAgent = (writerRes.content || '').trim();
+
+  if (!reviewerRes.ok) {
+    return { ok: false, status: 500, error: `Reviewer Agent failed: ${reviewerRes.error}` };
+  }
+  const reviewPrompt1 = (reviewerRes.content || '').trim();
+
+  // Visual identity is technically optional if it fails, but better to be consistent
+  // The current logic allowed it to be null if failed? Let's check original code.
+  // Original: const systemInstruction = visualRes.ok ? (visualRes.content || '').trim() : null;
   const systemInstruction = visualRes.ok ? (visualRes.content || '').trim() : null;
 
   const emojiRule =

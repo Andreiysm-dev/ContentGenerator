@@ -22,6 +22,7 @@ export type CompanySettingsShellProps = {
   setCompanyDescription: (value: string) => void;
   loadBrandKB: (resetDefaults?: boolean, preserveEdits?: boolean) => Promise<void>;
   brandKbId: string | null;
+  onDeleteCompany: () => Promise<void>;
   brandPack: string;
   setBrandPack: (value: string) => void;
   brandCapability: string;
@@ -130,7 +131,7 @@ const TabLink = ({ to, id, children, pressedTab, onClick }: { to: string; id: Co
   </NavLink>
 );
 
-const Card = ({ title, subtitle, action, children, className = "" }: { title?: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) => (
+export const Card = ({ title, subtitle, action, children, className = "" }: { title?: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) => (
   <div className={"rounded-2xl border border-slate-200/70 bg-white shadow-[0_10px_22px_rgba(11,38,65,0.08)] " + "p-4 sm:p-5 " + className}>
     {(title || subtitle || action) && (
       <div className="mb-4 flex items-start justify-between gap-4">
@@ -145,30 +146,30 @@ const Card = ({ title, subtitle, action, children, className = "" }: { title?: s
   </div>
 );
 
-const SectionTitle = ({ children }: { children: React.ReactNode }) => <div className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">{children}</div>;
+export const SectionTitle = ({ children }: { children: React.ReactNode }) => <div className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500">{children}</div>;
 
-const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+export const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
   <input
     {...props}
     className={"w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 " + "shadow-sm outline-none transition focus:border-[#3fa9f5]/50 focus:ring-2 focus:ring-[#3fa9f5]/15 " + (props.className ?? "")}
   />
 );
 
-const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
+export const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
   <textarea
     {...props}
     className={"w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 " + "shadow-sm outline-none transition focus:border-[#3fa9f5]/50 focus:ring-2 focus:ring-[#3fa9f5]/15 " + (props.className ?? "")}
   />
 );
 
-const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
+export const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
   <select
     {...props}
     className={"w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 " + "shadow-sm outline-none transition focus:border-[#3fa9f5]/50 focus:ring-2 focus:ring-[#3fa9f5]/15 " + (props.className ?? "")}
   />
 );
 
-const Pill = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
+export const Pill = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
   <button
     type="button"
     onClick={onClick}
@@ -181,10 +182,12 @@ const Pill = ({ active, onClick, children }: { active: boolean; onClick: () => v
   </button>
 );
 
-const StatusPill = ({ tone, children }: { tone: "positive" | "warning" | "muted"; children: React.ReactNode }) => {
+export const StatusPill = ({ tone, children }: { tone: "positive" | "warning" | "muted"; children: React.ReactNode }) => {
   const cls = tone === "positive" ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-900" : tone === "warning" ? "border-amber-500/30 bg-amber-500/10 text-amber-900" : "border-slate-300/60 bg-slate-100 text-slate-700";
   return <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cls}`}>{children}</span>;
 };
+
+import { BrandCoreTab } from "./settings/BrandCoreTab";
 
 export function SettingsPage(props: CompanySettingsShellProps) {
   const {
@@ -205,6 +208,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     setCompanyDescription,
     loadBrandKB,
     brandKbId,
+    onDeleteCompany,
     brandPack,
     setBrandPack,
     brandCapability,
@@ -379,6 +383,25 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                           </div>
                         </div>
                       </Card>
+
+                      {/* Danger Zone */}
+                      <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6 shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-red-900">Danger Zone</div>
+                            <div className="mt-1 text-xs text-red-700">
+                              Permanently delete this company and all its data. This action cannot be undone.
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={onDeleteCompany}
+                            className="btn bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 transition-colors text-sm font-semibold px-4 py-2 rounded-lg"
+                          >
+                            Delete Company
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <aside className="hidden xl:flex xl:flex-col xl:gap-3 xl:sticky xl:top-[4.5rem]">
@@ -419,651 +442,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
               )}
 
               {tab === "brand-intelligence" && (
-                <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)]">
-                  {/* Header */}
-                  <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                    <div>
-                      <div className="text-md md:text-xl font-bold">Brand</div>
-                      <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Controls AI behavior for this company—tone, brand rules, and compliance guardrails. Designed to be guided and reversible.</p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
-                      <StatusPill tone={hasBrandIntelligenceConfigured ? "positive" : "warning"}>{hasBrandIntelligenceConfigured ? "Configured" : "Not configured"}</StatusPill>
-
-                      {hasBrandIntelligenceConfigured && (
-                        <>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            type="button"
-                            onClick={() => {
-                              setBrandSetupMode(resolvedBrandSetupType === "custom" ? "custom" : resolvedBrandSetupType || "quick");
-                              setBrandSetupStep(1);
-                              setIsEditingBrandSetup(true);
-                            }}
-                          >
-                            Answer again
-                          </button>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            type="button"
-                            onClick={async () => {
-                              await sendBrandWebhook(buildFormAnswer());
-                            }}
-                          >
-                            Regenerate
-                          </button>
-                        </>
-                      )}
-
-                      <button className="btn btn-secondary btn-sm" type="button" onClick={() => loadBrandKB(false, true)}>
-                        Refresh
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-                    <div className="space-y-4">
-                      {brandKbId && !brandIntelligenceReady && !brandSetupMode && (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_8px_18px_rgba(11,38,65,0.06)]">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Generation</div>
-                            <div className="mt-2">
-                              <StatusPill tone="warning">In progress</StatusPill>
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_8px_18px_rgba(11,38,65,0.06)]">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next</div>
-                            <div className="mt-2 text-sm font-semibold text-slate-900">Wait for generation, then refresh</div>
-                          </div>
-                        </div>
-                      )}
-
-                      {brandIntelligenceReady && !brandSetupMode && (
-                        <div className="space-y-4">
-                          {/* Rules grid */}
-                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            {/* Brand Pack */}
-                            <Card
-                              title="Brand Pack"
-                              subtitle="High-level identity, voice, and positioning."
-                              action={
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => startBrandRuleEdit("pack")}>
-                                  Edit
-                                </button>
-                              }
-                            >
-                              {activeBrandRuleEdit === "pack" ? (
-                                <>
-                                  <Textarea rows={8} value={brandRuleDraft.pack} onChange={(e) => setBrandRuleDraft((prev) => ({ ...prev, pack: e.target.value }))} />
-                                  <div className="mt-3 flex justify-end gap-2">
-                                    <button className="btn btn-secondary btn-sm" type="button" onClick={cancelBrandRuleEdit}>
-                                      Cancel
-                                    </button>
-                                    <button className="btn btn-primary btn-sm" type="button" onClick={saveBrandRuleEdit}>
-                                      Save
-                                    </button>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-wrap max-h-72 overflow-y-auto">{brandPack || "—"}</div>
-                              )}
-                            </Card>
-
-                            {/* Capabilities */}
-                            <Card
-                              title="Capabilities"
-                              subtitle="What we can claim, do, and emphasize."
-                              action={
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => startBrandRuleEdit("capabilities")}>
-                                  Edit
-                                </button>
-                              }
-                            >
-                              {activeBrandRuleEdit === "capabilities" ? (
-                                <>
-                                  <Textarea rows={8} value={brandRuleDraft.capabilities} onChange={(e) => setBrandRuleDraft((prev) => ({ ...prev, capabilities: e.target.value }))} />
-                                  <div className="mt-3 flex justify-end gap-2">
-                                    <button className="btn btn-secondary btn-sm" type="button" onClick={cancelBrandRuleEdit}>
-                                      Cancel
-                                    </button>
-                                    <button className="btn btn-primary btn-sm" type="button" onClick={saveBrandRuleEdit}>
-                                      Save
-                                    </button>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-wrap max-h-72 overflow-y-auto">{brandCapability || "—"}</div>
-                              )}
-                            </Card>
-
-                            {/* Writer prompt */}
-                            <Card
-                              title="Writer prompt"
-                              subtitle="System instructions used for generation."
-                              action={
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => startBrandRuleEdit("writer")}>
-                                  Edit
-                                </button>
-                              }
-                            >
-                              {activeBrandRuleEdit === "writer" ? (
-                                <>
-                                  <Textarea rows={8} value={brandRuleDraft.writer} onChange={(e) => setBrandRuleDraft((prev) => ({ ...prev, writer: e.target.value }))} />
-                                  <div className="mt-3 flex justify-end gap-2">
-                                    <button className="btn btn-secondary btn-sm" type="button" onClick={cancelBrandRuleEdit}>
-                                      Cancel
-                                    </button>
-                                    <button className="btn btn-primary btn-sm" type="button" onClick={saveBrandRuleEdit}>
-                                      Save
-                                    </button>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-wrap max-h-72 overflow-y-auto">{aiWriterSystemPrompt || "—"}</div>
-                              )}
-                            </Card>
-
-                            {/* Reviewer prompt */}
-                            <Card
-                              title="Reviewer prompt"
-                              subtitle="Used for review and QA."
-                              action={
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => startBrandRuleEdit("reviewer")}>
-                                  Edit
-                                </button>
-                              }
-                            >
-                              {activeBrandRuleEdit === "reviewer" ? (
-                                <>
-                                  <Textarea rows={8} value={brandRuleDraft.reviewer} onChange={(e) => setBrandRuleDraft((prev) => ({ ...prev, reviewer: e.target.value }))} />
-                                  <div className="mt-3 flex justify-end gap-2">
-                                    <button className="btn btn-secondary btn-sm" type="button" onClick={cancelBrandRuleEdit}>
-                                      Cancel
-                                    </button>
-                                    <button className="btn btn-primary btn-sm" type="button" onClick={saveBrandRuleEdit}>
-                                      Save
-                                    </button>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-wrap max-h-72 overflow-y-auto">{aiWriterUserPrompt || "—"}</div>
-                              )}
-                            </Card>
-                          </div>
-
-                          {/* Divider */}
-                          <div className="my-6 h-px w-full bg-slate-200/70" />
-
-                          {/* Visual rules */}
-                          <div className="mb-2">
-                            <div className="text-base font-extrabold text-slate-900">Visual &amp; Image Rules</div>
-                            <div className="mt-1 text-sm text-slate-600">Controls how AI generates images for this company.</div>
-                          </div>
-
-                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            <div className="lg:col-span-2">
-                              <Card
-                                title="Visual Identity"
-                                subtitle="Describe the colors, lighting, and design guardrails for AI image generation."
-                                action={
-                                  <button className="btn btn-secondary btn-sm" type="button" onClick={() => startBrandRuleEdit("visual")}>
-                                    Edit
-                                  </button>
-                                }
-                              >
-                                {activeBrandRuleEdit === "visual" ? (
-                                  <>
-                                    <Textarea rows={8} value={brandRuleDraft.visual} onChange={(e) => setBrandRuleDraft((prev) => ({ ...prev, visual: e.target.value }))} />
-                                    <div className="mt-3 flex justify-end gap-2">
-                                      <button className="btn btn-secondary btn-sm" type="button" onClick={cancelBrandRuleEdit}>
-                                        Cancel
-                                      </button>
-                                      <button className="btn btn-primary btn-sm" type="button" onClick={saveBrandRuleEdit}>
-                                        Save
-                                      </button>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-wrap max-h-72 overflow-y-auto">{systemInstruction || "—"}</div>
-                                )}
-                              </Card>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {!hasBrandIntelligenceConfigured && !brandSetupMode && (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                          {[
-                            { k: "Safe defaults", v: "Enabled" },
-                            { k: "Impact", v: "Writing + review prompts" },
-                            { k: "Reversible", v: "Edit inputs anytime" },
-                          ].map((x) => (
-                            <div key={x.k} className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_8px_18px_rgba(11,38,65,0.06)]">
-                              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{x.k}</div>
-                              <div className="mt-2 text-sm font-extrabold text-slate-900">{x.v}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {!isEditingBrandSetup && !brandSetupMode && !brandIntelligenceReady && (
-                        <Card title="Set up your brand intelligence" subtitle="Choose how detailed you want to be. You can refine this anytime." className="bg-white">
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            <button
-                              type="button"
-                              className="rounded-2xl border border-[#3fa9f5]/50 bg-white p-4 text-left shadow-[0_14px_30px_rgba(63,169,245,0.18)] transition hover:-translate-y-[2px] hover:shadow-[0_14px_30px_rgba(11,38,65,0.12)]"
-                              onClick={() => {
-                                setBrandSetupMode("quick");
-                                setBrandSetupLevel("quick");
-                                setBrandSetupStep(1);
-                                setIsEditingBrandSetup(true);
-                              }}
-                            >
-                              <div className="text-sm font-extrabold text-slate-900">Quick Setup (Recommended)</div>
-                              <div className="mt-1 text-xs text-slate-600">5–7 minutes · Best for agencies &amp; multi-brand managers</div>
-                              <div className="mt-1 text-sm text-slate-700">Safe defaults + smart inference</div>
-                              <div className="mt-3 text-xs font-bold text-[#2f97e6]">Start Quick Setup</div>
-                            </button>
-
-                            <button
-                              type="button"
-                              className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-[2px] hover:border-[#3fa9f5]/45 hover:shadow-[0_14px_30px_rgba(11,38,65,0.12)]"
-                              onClick={() => {
-                                setBrandSetupMode("advanced");
-                                setBrandSetupLevel("advanced");
-                                setBrandSetupStep(1);
-                                setIsEditingBrandSetup(true);
-                              }}
-                            >
-                              <div className="text-sm font-extrabold text-slate-900">Advanced Setup</div>
-                              <div className="mt-1 text-xs text-slate-600">15–20 minutes · Full control for regulated brands</div>
-                              <div className="mt-1 text-sm text-slate-700">Unlock audience segments, pillars, CTA matrices</div>
-                              <div className="mt-3 text-xs font-bold text-[#2f97e6]">Start Advanced Setup</div>
-                            </button>
-
-                            <button
-                              type="button"
-                              className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-[2px] hover:border-[#3fa9f5]/45 hover:shadow-[0_14px_30px_rgba(11,38,65,0.12)]"
-                              onClick={() => {
-                                setBrandSetupMode("custom");
-                                setBrandSetupLevel("custom");
-                                setBrandSetupStep(0);
-                                setIsEditingBrandSetup(true);
-                              }}
-                            >
-                              <div className="text-sm font-extrabold text-slate-900">Custom (Provide Your Own)</div>
-                              <div className="mt-1 text-xs text-slate-600">Direct megaprompt control</div>
-                              <div className="mt-1 text-sm text-slate-700">Paste your Brand Pack, Capabilities, Writer &amp; Reviewer rules.</div>
-                              <div className="mt-3 text-xs font-bold text-[#2f97e6]">Use Custom Setup</div>
-                            </button>
-                          </div>
-                        </Card>
-                      )}
-
-                      {brandSetupMode === "custom" && (
-                        <Card title="Custom Brand Intelligence" subtitle="Provide your own prompts and rules." action={<StatusPill tone="muted">Manual</StatusPill>}>
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Brand Pack</label>
-                              <Textarea rows={4} value={brandPack} onChange={(e) => setBrandPack(e.target.value)} />
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Brand Capability</label>
-                              <Textarea rows={4} value={brandCapability} onChange={(e) => setBrandCapability(e.target.value)} />
-                            </div>
-
-                            <div className="space-y-1.5 sm:col-span-2">
-                              <label className="text-xs font-bold text-slate-700">Emoji Rule</label>
-                              <Input value={emojiRule} onChange={(e) => setEmojiRule(e.target.value)} />
-                            </div>
-
-                            <div className="space-y-1.5 sm:col-span-2">
-                              <label className="text-xs font-bold text-slate-700">System Instruction</label>
-                              <Textarea rows={4} value={systemInstruction} onChange={(e) => setSystemInstruction(e.target.value)} />
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Writer System Prompt</label>
-                              <Textarea rows={4} value={aiWriterSystemPrompt} onChange={(e) => setAiWriterSystemPrompt(e.target.value)} />
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Reviewer Prompt</label>
-                              <Textarea rows={4} value={aiWriterUserPrompt} onChange={(e) => setAiWriterUserPrompt(e.target.value)} />
-                            </div>
-                          </div>
-
-                          <div className="mt-4 flex justify-end">
-                            <button
-                              className="btn btn-secondary btn-sm"
-                              type="button"
-                              onClick={async () => {
-                                await saveBrandSetup();
-                                setBrandSetupMode(null);
-                                setIsEditingBrandSetup(false);
-                              }}
-                            >
-                              Save &amp; Exit
-                            </button>
-                          </div>
-                        </Card>
-                      )}
-
-                      {brandSetupMode && brandSetupMode !== "custom" && (
-                        <div className="space-y-4">
-                          {/* Step 1 */}
-                          {brandSetupMode && brandSetupStep === 1 && (
-                            <Card
-                              title="Brand Snapshot"
-                              subtitle={`Step 1 of ${brandSetupMode === "advanced" ? 4 : 3} · Estimated time: ~2 minutes`}
-                              action={<StatusPill tone="muted">{brandSetupMode === "advanced" ? "Advanced Setup" : "Quick Setup"}</StatusPill>}
-                            >
-                              <div className="rounded-2xl border border-[#3fa9f5]/20 bg-white p-4">
-                                <div className="text-sm font-extrabold text-slate-900">Brand Basics</div>
-
-                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700">Brand Name</label>
-                                    <Input value={brandBasicsName} onChange={(e) => setBrandBasicsName(e.target.value)} />
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700">Industry</label>
-                                    <Select value={brandBasicsIndustry} onChange={(e) => setBrandBasicsIndustry(e.target.value)}>
-                                      <option value="">Select industry</option>
-                                      {!!brandBasicsIndustry && !industryOptions.includes(brandBasicsIndustry) && <option value={brandBasicsIndustry}>{brandBasicsIndustry}</option>}
-                                      {industryOptions.map((option) => (
-                                        <option key={option} value={option}>
-                                          {option}
-                                        </option>
-                                      ))}
-                                    </Select>
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700">Business Type</label>
-                                    <div className="flex flex-wrap gap-2">
-                                      {["B2B", "B2C", "Both"].map((option) => (
-                                        <Pill key={option} active={brandBasicsType === option} onClick={() => setBrandBasicsType(option)}>
-                                          {option}
-                                        </Pill>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700">Primary Offer</label>
-                                    <Input value={brandBasicsOffer} onChange={(e) => setBrandBasicsOffer(e.target.value)} />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 flex justify-end gap-2">
-                                <button
-                                  className="btn btn-secondary btn-sm"
-                                  type="button"
-                                  onClick={async () => {
-                                    const saved = await saveBrandSetup();
-                                    if (!saved) return;
-                                    setBrandSetupMode(null);
-                                    setIsEditingBrandSetup(false);
-                                  }}
-                                >
-                                  Save &amp; Exit
-                                </button>
-                                <button className="btn btn-primary btn-sm" type="button" onClick={() => setBrandSetupStep(2)}>
-                                  Continue
-                                </button>
-                              </div>
-                            </Card>
-                          )}
-
-                          {/* Step 2 */}
-                          {brandSetupMode && brandSetupStep === 2 && (
-                            <Card
-                              title="Audience & outcomes"
-                              subtitle={`Step 2 of ${brandSetupMode === "advanced" ? 5 : 3} · Estimated time: ~2 minutes`}
-                              action={<StatusPill tone="muted">{brandSetupMode === "advanced" ? "Advanced Setup" : "Quick Setup"}</StatusPill>}
-                            >
-                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Primary audience role</label>
-                                  <Input value={audienceRole} onChange={(e) => setAudienceRole(e.target.value)} placeholder="e.g., Marketing Manager, Founder, HR Lead" />
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Audience industry (optional)</label>
-                                  <Input value={audienceIndustry} onChange={(e) => setAudienceIndustry(e.target.value)} placeholder="e.g., Healthcare, SaaS, Retail" />
-                                </div>
-
-                                <div className="space-y-1.5 sm:col-span-2">
-                                  <label className="text-xs font-bold text-slate-700">Pain points</label>
-                                  <div className="flex flex-wrap gap-2">
-                                    {painPointOptions.map((opt) => {
-                                      const active = audiencePainPoints.includes(opt);
-                                      return (
-                                        <Pill key={opt} active={active} onClick={() => setAudiencePainPoints((prev) => (active ? prev.filter((v) => v !== opt) : [...prev, opt]))}>
-                                          {opt}
-                                        </Pill>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                <div className="space-y-1.5 sm:col-span-2">
-                                  <label className="text-xs font-bold text-slate-700">Desired outcome</label>
-                                  <Input value={audienceOutcome} onChange={(e) => setAudienceOutcome(e.target.value)} placeholder="e.g., book a tour, request a demo, follow for tips" />
-                                </div>
-                              </div>
-
-                              <div className="mt-4 flex justify-end gap-2">
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => setBrandSetupStep(1)}>
-                                  Back
-                                </button>
-                                <button className="btn btn-primary btn-sm" type="button" onClick={() => setBrandSetupStep(3)}>
-                                  Continue
-                                </button>
-                              </div>
-                            </Card>
-                          )}
-
-                          {/* Step 3 */}
-                          {brandSetupMode && brandSetupStep === 3 && (
-                            <Card
-                              title="Voice & guardrails"
-                              subtitle={`Step ${brandSetupMode === "advanced" ? 3 : 3} of ${brandSetupMode === "advanced" ? 5 : 3} · Estimated time: ~3 minutes`}
-                              action={<StatusPill tone="muted">{brandSetupMode === "advanced" ? "Advanced Setup" : "Quick Setup"}</StatusPill>}
-                            >
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {[
-                                  { label: "Formal", value: toneFormal, set: setToneFormal },
-                                  { label: "Energy", value: toneEnergy, set: setToneEnergy },
-                                  { label: "Boldness", value: toneBold, set: setToneBold },
-                                ].map((s) => (
-                                  <div key={s.label} className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-700">{s.label}</label>
-                                    <input type="range" min={0} max={100} value={s.value} onChange={(e) => s.set(Number(e.target.value))} className="w-full" />
-                                  </div>
-                                ))}
-
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Emoji usage</label>
-                                  <Select value={emojiUsage} onChange={(e) => setEmojiUsage(e.target.value)}>
-                                    <option value="None">None</option>
-                                    <option value="Light">Light</option>
-                                    <option value="Medium">Medium</option>
-                                    <option value="Heavy">Heavy</option>
-                                  </Select>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Length</label>
-                                  <Select value={writingLength} onChange={(e) => setWritingLength(e.target.value)}>
-                                    <option value="Short">Short</option>
-                                    <option value="Balanced">Balanced</option>
-                                    <option value="Long">Long</option>
-                                  </Select>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">CTA strength</label>
-                                  <Select value={ctaStrength} onChange={(e) => setCtaStrength(e.target.value)}>
-                                    <option value="Soft">Soft</option>
-                                    <option value="Medium">Medium</option>
-                                    <option value="Strong">Strong</option>
-                                  </Select>
-                                </div>
-
-                                <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-                                  <label className="text-xs font-bold text-slate-700">Absolute truths</label>
-                                  <Textarea rows={3} value={absoluteTruths} onChange={(e) => setAbsoluteTruths(e.target.value)} />
-                                </div>
-
-                                <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-                                  <label className="text-xs font-bold text-slate-700">No-say rules</label>
-                                  <div className="flex flex-wrap gap-2">
-                                    {noSayOptions.map((opt) => {
-                                      const active = noSayRules.includes(opt);
-                                      return (
-                                        <Pill key={opt} active={active} onClick={() => setNoSayRules((prev) => (active ? prev.filter((v) => v !== opt) : [...prev, opt]))}>
-                                          {opt}
-                                        </Pill>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 flex justify-end gap-2">
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => setBrandSetupStep(2)}>
-                                  Back
-                                </button>
-                                {brandSetupMode === "advanced" ? (
-                                  <button className="btn btn-primary btn-sm" type="button" onClick={() => setBrandSetupStep(4)}>
-                                    Continue
-                                  </button>
-                                ) : (
-                                  <button
-                                    className="btn btn-primary btn-sm"
-                                    type="button"
-                                    onClick={async () => {
-                                      const saved = await saveBrandSetup();
-                                      if (!saved) return;
-                                      await sendBrandWebhook(buildFormAnswer());
-                                      setBrandSetupMode(null);
-                                      setIsEditingBrandSetup(false);
-                                    }}
-                                  >
-                                    Save &amp; Generate
-                                  </button>
-                                )}
-                              </div>
-                            </Card>
-                          )}
-
-                          {/* Step 4 */}
-                          {brandSetupMode === "advanced" && brandSetupStep === 4 && (
-                            <Card title="Advanced positioning" subtitle="Step 4 of 5 · Estimated time: ~4 minutes" action={<StatusPill tone="muted">Advanced Setup</StatusPill>}>
-                              <div className="grid grid-cols-1 gap-3">
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Positioning</label>
-                                  <Textarea rows={3} value={advancedPositioning} onChange={(e) => setAdvancedPositioning(e.target.value)} />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Differentiators</label>
-                                  <Textarea rows={3} value={advancedDifferentiators} onChange={(e) => setAdvancedDifferentiators(e.target.value)} />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Pillars</label>
-                                  <Textarea rows={3} value={advancedPillars} onChange={(e) => setAdvancedPillars(e.target.value)} />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Competitors</label>
-                                  <Textarea rows={3} value={advancedCompetitors} onChange={(e) => setAdvancedCompetitors(e.target.value)} />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700">Proof points</label>
-                                  <Textarea rows={3} value={advancedProofPoints} onChange={(e) => setAdvancedProofPoints(e.target.value)} />
-                                </div>
-                              </div>
-
-                              <div className="mt-4 flex justify-end gap-2">
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => setBrandSetupStep(3)}>
-                                  Back
-                                </button>
-                                <button className="btn btn-primary btn-sm" type="button" onClick={() => setBrandSetupStep(5)}>
-                                  Continue
-                                </button>
-                              </div>
-                            </Card>
-                          )}
-
-                          {/* Step 5 */}
-                          {brandSetupMode === "advanced" && brandSetupStep === 5 && (
-                            <Card title="Visual & image identity" subtitle="Step 5 of 5 · Estimated time: ~2 minutes" action={<StatusPill tone="muted">Advanced Setup</StatusPill>}>
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-700">Visual Brand Identity (Image Guidelines)</label>
-                                <Textarea
-                                  rows={8}
-                                  value={systemInstruction}
-                                  onChange={(e) => setSystemInstruction(e.target.value)}
-                                  placeholder="Describe the visual style, colors, lighting, and mood for your brand images. AI will use this to generate all photos/illustrations."
-                                />
-                              </div>
-
-                              <div className="mt-4 flex justify-end gap-2">
-                                <button className="btn btn-secondary btn-sm" type="button" onClick={() => setBrandSetupStep(4)}>
-                                  Back
-                                </button>
-                                <button
-                                  className="btn btn-primary btn-sm"
-                                  type="button"
-                                  onClick={async () => {
-                                    const saved = await saveBrandSetup();
-                                    if (!saved) return;
-                                    await sendBrandWebhook(buildFormAnswer());
-                                    setBrandSetupMode(null);
-                                    setIsEditingBrandSetup(false);
-                                  }}
-                                >
-                                  Save &amp; Generate
-                                </button>
-                              </div>
-                            </Card>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right rail */}
-                    <aside className="hidden xl:flex xl:flex-col xl:gap-3 xl:sticky xl:top-[4.5rem]">
-                      <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_8px_18px_rgba(11,38,65,0.06)]">
-                        <div className="text-sm font-extrabold text-slate-900">Safety + control</div>
-                        <div className="mt-2 text-sm text-slate-600">
-                          This configuration affects all AI outputs for this company.
-                          <ul className="mt-3 list-disc pl-5 space-y-1">
-                            <li>Use safe defaults to get started</li>
-                            <li>Edit inputs any time</li>
-                            <li>Regeneration is rate-limited</li>
-                          </ul>
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_8px_18px_rgba(11,38,65,0.06)]">
-                        <div className="text-sm font-extrabold text-slate-900">Recommended order</div>
-                        <div className="mt-2 text-sm text-slate-600">
-                          <ul className="mt-3 list-disc pl-5 space-y-1">
-                            <li>Brand snapshot + audience</li>
-                            <li>Guardrails + compliance</li>
-                            <li>Generate and review outputs</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </aside>
-                  </div>
-                </div>
+                <BrandCoreTab {...props} />
               )}
 
               {tab === "team" && (
@@ -1128,7 +507,6 @@ export function SettingsPage(props: CompanySettingsShellProps) {
         </div>
       </main>
 
-      {/* local keyframes */}
       <style>{`
         @keyframes panelFade {
           from { opacity: 0; transform: translateY(6px); }

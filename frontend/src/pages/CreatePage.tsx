@@ -27,9 +27,14 @@ interface CreatePageProps {
 
 export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkText, setBulkPreview, setShowPreview, setIsBulkModalOpen }: CreatePageProps) {
   return (
-    <main className="flex-1 overflow-y-auto p-2.5 md:p-6 ">
-      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-brand-primary/10 to-white border-t border-l border-r border-gray-200 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
+    <main className="flex-1 overflow-y-auto p-2.5 md:p-6 relative">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-15%] right-[-8%] w-[45%] h-[45%] bg-gradient-to-bl from-[#3fa9f5]/22 to-[#a78bfa]/18 rounded-full blur-[110px] animate-pulse" />
+        <div className="absolute bottom-[-12%] left-[-6%] w-[42%] h-[42%] bg-gradient-to-tr from-[#e5a4e6]/16 to-[#6fb6e8]/14 rounded-full blur-[105px] animate-pulse" style={{ animationDelay: '500ms' }} />
+      </div>
+      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/70 via-[#6fb6e8]/60 to-[#a78bfa]/50 border-t border-l border-r border-[#3fa9f5]/50 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
           <div>
             <h2 className="text-md md:text-xl font-bold">Content Generator</h2>
             <p className="mt-1 text-sm font-medium">Create captions and content drafts for your calendar.</p>
@@ -37,7 +42,7 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
           <div>
             <button
               type="button"
-              className="w-full flex justify-center btn btn-primary"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-white text-[#3fa9f5] border border-white/80 shadow-sm ring-1 ring-inset ring-slate-900/5 transition hover:bg-slate-50 hover:border-slate-200 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2"
               onClick={() => {
                 setBulkText("");
                 setBulkPreview([]);

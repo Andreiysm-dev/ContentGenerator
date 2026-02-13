@@ -1,4 +1,4 @@
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User, RefreshCw } from "lucide-react";
 import { NotificationBell } from "./NotificationBell";
 import { type Session, SupabaseClient } from "@supabase/supabase-js";
 import type { NavigateFunction } from "react-router-dom";
@@ -17,9 +17,10 @@ interface HeaderProps {
   navigate: NavigateFunction;
   session: Session | null;
   supabase: SupabaseClient | null;
+  onLogout: () => void;
 }
 
-export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, notify, navigate, session, supabase }: HeaderProps) {
+export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, notify, navigate, session, supabase, onLogout }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-[rgba(56,89,128,0.18)] shadow-[0_4px_20px_rgba(11,38,65,0.06)] px-4 sm:px-6 h-[80px] flex items-center justify-between">
       <div className="flex items-center justify-between w-full gap-2 sm:gap-4">
@@ -56,10 +57,11 @@ export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, not
                 <User size={20} className="mr-2" />
                 Profile
               </DropdownMenuItem>
+
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={async () => {
-                  await supabase?.auth.signOut();
+                  onLogout();
                 }}
               >
                 <LogOut size={20} className="mr-2 text-red-500" />
@@ -79,10 +81,11 @@ export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, not
                 <User size={20} className="mr-2" />
                 Profile
               </DropdownMenuItem>
+
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={async () => {
-                  await supabase?.auth.signOut();
+                  onLogout();
                 }}
               >
                 <LogOut size={20} className="mr-2 text-red-500" />

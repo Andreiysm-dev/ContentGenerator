@@ -126,11 +126,16 @@ export function CalendarPage(props: CalendarPageProps) {
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden min-h-0">
-      <main className="flex-1 bg-gray-50/50 p-2.5 md:p-6 min-h-0">
+      <main className="flex-1 bg-gray-50/50 p-2.5 md:p-6 min-h-0 relative">
+        {/* Background Ambience */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-12%] left-[5%] w-[38%] h-[38%] bg-gradient-to-br from-[#6fb6e8]/18 to-[#81bad1]/14 rounded-full blur-[95px] animate-pulse" />
+          <div className="absolute bottom-[-8%] right-[8%] w-[35%] h-[35%] bg-gradient-to-tl from-[#a78bfa]/14 to-[#3fa9f5]/12 rounded-full blur-[90px] animate-pulse" style={{ animationDelay: '900ms' }} />
+        </div>
         <section
-          className="w-full max-w-[1100px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm flex flex-col h-[calc(100vh-130px)] overflow-hidden"
+          className="w-full max-w-[1100px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm flex flex-col h-[calc(100vh-130px)] overflow-hidden relative z-10"
         >
-          <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-brand-primary/10 to-white border-t border-l border-r border-gray-200 rounded-t-2xl shadow-sm flex flex-col gap-4">
+          <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/70 via-[#6fb6e8]/60 to-[#a78bfa]/50 border-t border-l border-r border-[#3fa9f5]/50 rounded-t-2xl shadow-sm flex flex-col gap-4">
             <div className="flex-1">
               <h2 className="text-md md:text-xl font-bold">Content Calendar</h2>
               <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Plan, generate, review, and track content status.</p>

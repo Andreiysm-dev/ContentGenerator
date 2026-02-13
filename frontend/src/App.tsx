@@ -51,9 +51,12 @@ import {
   ConfirmModal,
   ViewContentModal,
   ImageGenerationModal,
+  OnboardingModal,
+  type OnboardingData,
 } from '@/modals';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
+import { ProductTour } from '@/components/ProductTour';
 import './App.css';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 
@@ -94,6 +97,9 @@ function App() {
   const location = useLocation();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any | null>(null);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [showProductTour, setShowProductTour] = useState(false);
 
   const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
@@ -161,6 +167,27 @@ function App() {
       notify('Failed to load collaborators.', 'error');
     }
   };
+
+  // Check if user just completed onboarding to trigger product tour
+  useEffect(() => {
+    if (!userProfile?.id) return;
+
+    // Key tour completion by user ID so multiple users on same device get it
+    const STORAGE_KEY = `productTourCompleted_${userProfile.id}`;
+    const tourCompleted = localStorage.getItem(STORAGE_KEY);
+    const justOnboarded = sessionStorage.getItem('justCompletedOnboarding');
+
+    // Only start tour if onboarding is NOT open
+    if (justOnboarded && !tourCompleted && !isOnboardingOpen) {
+      // Small delay to ensure navigation/animations complete
+      const timer = setTimeout(() => {
+        setShowProductTour(true);
+        sessionStorage.removeItem('justCompletedOnboarding');
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, userProfile?.id, isOnboardingOpen]);
 
   const handleAddCollaborator = async () => {
     if (!newCollaboratorEmail || !activeCompanyId) return;
@@ -346,11 +373,41 @@ function App() {
       listener?.subscription?.unsubscribe();
     };
   }, []);
+
+  // Fetch user profile
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!session) return;
+      try {
+        const res = await authedFetch(`${backendBaseUrl}/api/profile`);
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        setUserProfile(data.profile || null);
+
+        // Show onboarding if not completed
+        if (data.profile && !data.profile.onboarding_completed) {
+          setIsOnboardingOpen(true);
+        }
+      } catch (err) {
+        console.error('Error loading profile:', err);
+      }
+    };
+
+    loadProfile();
+  }, [session]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState<string | undefined>(() => {
     // Try to get from localStorage first, fallback to defaultCompanyId
     const saved = localStorage.getItem('activeCompanyId');
     return saved || defaultCompanyId;
+  });
+  const [recentCompanyIds, setRecentCompanyIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('recentCompanyIds');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   // Custom setter for activeCompanyId that persists to localStorage
@@ -373,6 +430,17 @@ function App() {
     if (routeCompanyId === activeCompanyId) return;
     setActiveCompanyIdWithPersistence(routeCompanyId);
   }, [routeCompanyId, activeCompanyId]);
+
+  // Update recent companies when activeCompanyId changes
+  useEffect(() => {
+    if (!activeCompanyId) return;
+    setRecentCompanyIds((prev) => {
+      const filtered = prev.filter((id) => id !== activeCompanyId);
+      const next = [activeCompanyId, ...filtered].slice(0, 3);
+      localStorage.setItem('recentCompanyIds', JSON.stringify(next));
+      return next;
+    });
+  }, [activeCompanyId]);
 
   useEffect(() => {
     const isTeamRoute = /^\/company\/[^/]+\/settings\/team\/?$/.test(location.pathname);
@@ -2301,6 +2369,210 @@ function App() {
     }
   };
 
+  const handleOnboardingComplete = async (data: OnboardingData | null) => {
+    try {
+      // Handle skip
+      if (!data) {
+        // Just mark onboarding as complete without creating company
+        const profileRes = await authedFetch(`${backendBaseUrl}/api/profile`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            onboarding_completed: true,
+          }),
+        });
+
+        if (profileRes.ok) {
+          setIsOnboardingOpen(false);
+          setUserProfile((prev: any) => ({ ...prev, onboarding_completed: true }));
+          notify('You can create a company anytime from the sidebar!', 'info');
+        }
+        return;
+      }
+
+      // 1. Update profile with role and mark onboarding as complete
+      const profileRes = await authedFetch(`${backendBaseUrl}/api/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: data.role,
+          onboarding_completed: true,
+        }),
+      });
+
+      if (!profileRes.ok) {
+        notify('Failed to save profile. Please try again.', 'error');
+        return;
+      }
+
+      // 2. Check if company with same name already exists
+      const existingCompany = companies.find(
+        (c) => c.companyName?.toLowerCase() === data.companyName.toLowerCase()
+      );
+
+      if (existingCompany) {
+        // Company already exists, just close onboarding and navigate
+        setIsOnboardingOpen(false);
+        setUserProfile((prev: any) => ({ ...prev, onboarding_completed: true }));
+        setActiveCompanyIdWithPersistence(existingCompany.companyId);
+        notify('Welcome back! Using your existing company.', 'success');
+        navigate(`/company/${encodeURIComponent(existingCompany.companyId)}/dashboard`);
+        return;
+      }
+
+      // 3. Create company
+      const companyRes = await authedFetch(`${backendBaseUrl}/api/company`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: data.companyName,
+          companyDescription: data.companyDescription,
+        }),
+      });
+
+      const companyData = await companyRes.json().catch(() => ({}));
+      if (!companyRes.ok) {
+        notify(companyData.error || 'Failed to create company.', 'error');
+        return;
+      }
+
+      const newCompanyId = companyData.company?.companyId;
+
+      // 4. Initialize Brand Intelligence
+      if (newCompanyId) {
+        const brandPayload = {
+          companyId: newCompanyId,
+          form_answer: {
+            brandBasics: {
+              name: data.companyName,
+              industry: data.industry,
+              type: data.businessType,
+              offer: data.companyDescription,
+              goal: data.primaryGoal,
+            },
+            // Audience data from onboarding
+            audience: {
+              role: data.audienceRole || '',
+              industry: data.audienceIndustry || '',
+              painPoints: data.audiencePainPoints?.join(', ') || '',
+              outcome: data.audienceOutcome || '',
+            },
+            // Tone data from onboarding
+            tone: {
+              formal: data.toneFormal || 5,
+              energy: data.toneEnergy || 5,
+              bold: data.toneBold || 5,
+              emojiUsage: data.emojiUsage || 'Sometimes',
+              writingLength: data.writingLength || 'Medium',
+              ctaStrength: data.ctaStrength || 'Moderate',
+            },
+            // Include enhanced brand data if extracted from website (for additional context)
+            ...(data.targetAudience && {
+              extractedAudience: {
+                role: data.targetAudience.role,
+                painPoints: data.targetAudience.painPoints?.join(', ') || '',
+                outcomes: data.targetAudience.outcomes?.join(', ') || '',
+              },
+            }),
+            ...(data.brandVoice && {
+              extractedTone: {
+                formality: data.brandVoice.formality,
+                energy: data.brandVoice.energy,
+                confidence: data.brandVoice.confidence,
+              },
+            }),
+            ...(data.visualIdentity && {
+              visualIdentity: {
+                colors: data.visualIdentity.primaryColors?.join(', ') || '',
+              },
+            }),
+          },
+        };
+
+        await authedFetch(`${backendBaseUrl}/api/brandkb`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(brandPayload),
+        });
+
+        // Update local state - only add if not already in list
+        setCompanies((prev) => {
+          const exists = prev.some((c) => c.companyId === newCompanyId);
+          return exists ? prev : [companyData.company, ...prev];
+        });
+        setActiveCompanyIdWithPersistence(newCompanyId);
+      }
+
+      // 5. Close onboarding and update profile state
+      setIsOnboardingOpen(false);
+      setUserProfile((prev: any) => ({ ...prev, onboarding_completed: true }));
+      notify('Welcome to Moonshot Generator! 🎉', 'success');
+
+      // Mark that user just completed onboarding to trigger tour
+      sessionStorage.setItem('justCompletedOnboarding', 'true');
+
+      // Navigate to dashboard
+      if (newCompanyId) {
+        navigate(`/company/${encodeURIComponent(newCompanyId)}/dashboard`);
+      }
+    } catch (err) {
+      notify('Failed to complete onboarding. Please try again.', 'error');
+    }
+  };
+
+  const handleLogout = async () => {
+    setActiveCompanyIdWithPersistence(undefined);
+    await supabase?.auth.signOut();
+    navigate('/');
+  };
+
+  const handleDeleteCompany = async (companyId: string) => {
+    try {
+      const companyToDelete = companies.find((c) => c.companyId === companyId);
+      const confirmed = await requestConfirm({
+        title: 'Delete Company?',
+        description: `Are you sure you want to delete "${companyToDelete?.companyName}"? This action cannot be undone and all data will be lost.`,
+        confirmLabel: 'Delete Company',
+        cancelLabel: 'Cancel',
+        confirmVariant: 'danger',
+      });
+
+      if (!confirmed) return;
+
+      const res = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete company');
+      }
+
+      notify('Company deleted successfully', 'success');
+
+      // Update local state
+      const updatedCompanies = companies.filter((c) => c.companyId !== companyId);
+      setCompanies(updatedCompanies);
+
+      // If deleted company was active, switch to another or clear
+      if (activeCompanyId === companyId) {
+        if (updatedCompanies.length > 0) {
+          const nextCompanyId = updatedCompanies[0].companyId;
+          setActiveCompanyIdWithPersistence(nextCompanyId);
+          navigate(`/company/${encodeURIComponent(nextCompanyId)}/dashboard`);
+        } else {
+          setActiveCompanyIdWithPersistence('');
+          navigate('/');
+        }
+      }
+    } catch (err: any) {
+      console.error('Error deleting company:', err);
+      notify(err.message || 'Failed to delete company', 'error');
+    }
+  };
+
+
+
   const parseBulkText = (text: string): string[][] => {
     if (!text.trim()) return [];
     const lines = text
@@ -2342,6 +2614,7 @@ function App() {
           navigate={navigate}
           session={session}
           supabase={supabase}
+          onLogout={handleLogout}
         />
 
         <div className="flex min-h-[calc(100vh-80px)] relative">
@@ -2356,10 +2629,9 @@ function App() {
             navigate={navigate}
             activeNavKey={activeNavKey}
             setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-            setNewCompanyName={setNewCompanyName}
-            setNewCompanyDescription={setNewCompanyDescription}
-            setIsAddCompanyModalOpen={setIsAddCompanyModalOpen}
+            setIsOnboardingOpen={setIsOnboardingOpen}
             notify={notify}
+            recentCompanies={companies.filter((c) => recentCompanyIds.includes(c.companyId))}
           />
 
           <div className="flex-1 ml-0 lg:ml-[264px] overflow-y-auto h-[calc(100vh-80px)] bg-gray-50">
@@ -2587,8 +2859,13 @@ function App() {
                       setNewCollaboratorEmail={setNewCollaboratorEmail}
                       onAddCollaborator={handleAddCollaborator}
                       onRemoveCollaborator={handleRemoveCollaborator}
+                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                     />
                   }
+                />
+                <Route
+                  path="/company/:companyId/settings"
+                  element={<Navigate to="brand-intelligence" replace />}
                 />
                 <Route
                   path="/company/:companyId/settings/brand-intelligence"
@@ -2630,6 +2907,7 @@ function App() {
                       cancelBrandRuleEdit={cancelBrandRuleEdit}
                       saveBrandRuleEdit={saveBrandRuleEdit}
                       saveBrandSetup={saveBrandSetup}
+                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       sendBrandWebhook={sendBrandWebhook}
                       buildFormAnswer={buildFormAnswer}
                       brandBasicsGoal={brandBasicsGoal}
@@ -2812,6 +3090,7 @@ function App() {
                       setNewCollaboratorEmail={setNewCollaboratorEmail}
                       onAddCollaborator={handleAddCollaborator}
                       onRemoveCollaborator={handleRemoveCollaborator}
+                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       isEditingBrandSetup={isEditingBrandSetup}
                       brandEditingRef={brandEditingRef}
                       formAnswerCache={formAnswerCache}
@@ -2824,6 +3103,14 @@ function App() {
             </div>
           </div>
         </div>
+
+
+
+        <OnboardingModal
+          isOpen={isOnboardingOpen}
+          onComplete={handleOnboardingComplete}
+          notify={notify}
+        />
 
         <AddCompanyModal
           isOpen={isAddCompanyModalOpen}
@@ -2971,6 +3258,25 @@ function App() {
           config={confirmConfig}
           onResolve={resolveConfirm}
         />
+
+        {/* Product Tour */}
+        {showProductTour && (
+          <ProductTour
+            companyId={activeCompanyId || ''}
+            onComplete={() => {
+              setShowProductTour(false);
+              if (userProfile?.id) {
+                localStorage.setItem(`productTourCompleted_${userProfile.id}`, 'true');
+              }
+            }}
+            onSkip={() => {
+              setShowProductTour(false);
+              if (userProfile?.id) {
+                localStorage.setItem(`productTourCompleted_${userProfile.id}`, 'true');
+              }
+            }}
+          />
+        )}
       </div >
     </NotificationProvider>
   );
