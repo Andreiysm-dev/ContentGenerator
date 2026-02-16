@@ -76,7 +76,7 @@ export default function Faq() {
       <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
 
         {/* Header */}
-        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/70 via-[#6fb6e8]/60 to-[#a78bfa]/50 border-t border-l border-r border-[#3fa9f5]/50 rounded-t-2xl shadow-sm flex flex-col gap-4">
+        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl shadow-sm flex flex-col gap-4">
           <div className="flex-1">
             <h2 className="text-md md:text-xl font-bold text-slate-900">
               Frequently Asked Questions

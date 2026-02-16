@@ -1349,11 +1349,13 @@ function App() {
   useEffect(() => {
     const isBrandIntelligenceRoute =
       /^\/company\/[^/]+\/(brand-intelligence|brand)\/?$/.test(location.pathname) ||
-      /^\/company\/[^/]+\/settings\/brand-intelligence\/?$/.test(location.pathname);
+      /^\/company\/[^/]+\/settings/.test(location.pathname); // Match all settings routes
     if (!isBrandIntelligenceRoute) return;
     if (!activeCompanyId || !session) return;
     if (brandEditingRef.current) return;
-    if (brandIntelligenceReady && !brandSetupMode) return;
+    // Only auto-refresh when brand intelligence is actively being generated (during cooldown)
+    // This prevents form interference when users are just filling out settings
+    if (!isBrandWebhookCoolingDown && (brandIntelligenceReady && !brandSetupMode)) return;
     let canceled = false;
     const poll = async () => {
       if (canceled) return;

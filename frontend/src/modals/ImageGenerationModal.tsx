@@ -64,7 +64,7 @@ export function ImageGenerationModal({
     startWaitingForImageUpdate,
 }: ImageGenerationModalProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [provider, setProvider] = useState<'google' | 'replicate'>('google');
+    const [provider, setProvider] = useState<'google' | 'replicate' | 'fal'>('google');
     const [selectedModel, setSelectedModel] = useState('black-forest-labs/flux-dev');
 
     const REPLICATE_MODELS = [
@@ -72,6 +72,13 @@ export function ImageGenerationModal({
         { id: 'black-forest-labs/flux-schnell', name: 'Flux Schnell (Fast)' },
         { id: 'stability-ai/sdxl', name: 'Stable Diffusion XL' },
         { id: 'bytedance/sdxl-lightning-4step', name: 'SDXL Lightning (Ultra Fast)' },
+    ];
+
+    const FAL_MODELS = [
+        { id: 'fal-ai/flux-pro/v1.1', name: 'Flux Pro 1.1 (High Quality)' },
+        { id: 'fal-ai/flux-pro', name: 'Flux Pro (Standard)' },
+        { id: 'fal-ai/flux/dev', name: 'Flux Dev' },
+        { id: 'fal-ai/flux/schnell', name: 'Flux Schnell (Speed)' },
     ];
     if (!isOpen || !selectedRow) return null;
 
@@ -173,7 +180,7 @@ export function ImageGenerationModal({
                                                                 body: JSON.stringify({
                                                                     dmp: trimmedDmp,
                                                                     provider,
-                                                                    model: provider === 'replicate' ? selectedModel : undefined
+                                                                    model: (provider === 'replicate' || provider === 'fal') ? selectedModel : undefined
                                                                 }),
                                                             });
                                                             const data = await res.json().catch(() => ({}));
@@ -201,7 +208,7 @@ export function ImageGenerationModal({
                                                                         body: JSON.stringify({
                                                                             dmp: trimmedDmp,
                                                                             provider,
-                                                                            model: provider === 'replicate' ? selectedModel : undefined
+                                                                            model: (provider === 'replicate' || provider === 'fal') ? selectedModel : undefined
                                                                         }),
                                                                     }
                                                                 );
@@ -268,10 +275,19 @@ export function ImageGenerationModal({
                                             >
                                                 Replicate
                                             </button>
+                                            <button
+                                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${provider === 'fal' ? 'bg-white shadow-sm text-[#3fa9f5]' : 'text-slate-500'}`}
+                                                onClick={() => {
+                                                    setProvider('fal');
+                                                    setSelectedModel('fal-ai/flux-pro/v1.1');
+                                                }}
+                                            >
+                                                Fal.ai
+                                            </button>
                                         </div>
                                     </div>
 
-                                    {provider === 'replicate' && (
+                                    {(provider === 'replicate' || provider === 'fal') && (
                                         <div className="animate-in fade-in slide-in-from-top-2 duration-200">
                                             <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Model</label>
                                             <select
@@ -279,7 +295,10 @@ export function ImageGenerationModal({
                                                 value={selectedModel}
                                                 onChange={(e) => setSelectedModel(e.target.value)}
                                             >
-                                                {REPLICATE_MODELS.map(m => (
+                                                {provider === 'replicate' && REPLICATE_MODELS.map(m => (
+                                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                                ))}
+                                                {provider === 'fal' && FAL_MODELS.map(m => (
                                                     <option key={m.id} value={m.id}>{m.name}</option>
                                                 ))}
                                             </select>
@@ -400,7 +419,7 @@ export function ImageGenerationModal({
                                                     body: JSON.stringify({
                                                         dmp: currentDmp,
                                                         provider,
-                                                        model: provider === 'replicate' ? selectedModel : undefined
+                                                        model: (provider === 'replicate' || provider === 'fal') ? selectedModel : undefined
                                                     }),
                                                 }
                                             );
@@ -484,7 +503,7 @@ export function ImageGenerationModal({
                                                 brandKbId,
                                                 systemInstruction: systemInstruction ?? '',
                                                 provider,
-                                                model: provider === 'replicate' ? selectedModel : undefined
+                                                model: (provider === 'replicate' || provider === 'fal') ? selectedModel : undefined
                                             }),
                                         }
                                     );

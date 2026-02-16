@@ -2,6 +2,7 @@ import db from '../database/db.js';
 import { IMAGE_GENERATION_SYSTEM_PROMPT, IMAGE_GENERATION_USER_PROMPT } from './prompts.js';
 import { sendNotification, sendTeamNotification } from './notificationService.js';
 import { callReplicatePredict } from './replicateService.js';
+import { callFalAiPredict } from './falService.js';
 
 const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -261,7 +262,7 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
   const fullPrompt = negative ? `${mega}\n\nNEGATIVE: ${negative}` : mega;
 
   const provider = opts.provider || 'google';
-  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : 'black-forest-labs/flux-dev');
+  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : (provider === 'fal' ? 'fal-ai/flux-pro/v1.1' : 'black-forest-labs/flux-dev'));
 
   let bytes;
   let extension = 'png';
@@ -285,6 +286,26 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     const arrayBuffer = await imageFetch.arrayBuffer();
     bytes = Buffer.from(arrayBuffer);
     extension = replicateRes.url.split('.').pop().split('?')[0] || 'png';
+  } else if (provider === 'fal') {
+    const falRes = await callFalAiPredict({
+      prompt: fullPrompt,
+      model: model,
+      aspectRatio: 'square'
+    });
+
+    if (!falRes.ok) {
+      return { ok: false, status: 500, error: falRes.error };
+    }
+
+    // Fetch the image from Fal.ai URL
+    const imageFetch = await fetch(falRes.url);
+    if (!imageFetch.ok) {
+      return { ok: false, status: 500, error: 'Failed to download image from Fal.ai' };
+    }
+    const arrayBuffer = await imageFetch.arrayBuffer();
+    bytes = Buffer.from(arrayBuffer);
+    extension = falRes.url.split('.').pop().split('?')[0] || 'jpg';
+    if (extension === 'jpeg') extension = 'jpg';
   } else {
     // Default to Google Imagen
     const imagenRes = await callImagenPredict({
@@ -370,7 +391,7 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
   }
 
   const provider = opts.provider || 'google';
-  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : 'black-forest-labs/flux-dev');
+  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : (provider === 'fal' ? 'fal-ai/flux-pro/v1.1' : 'black-forest-labs/flux-dev'));
 
   let bytes;
   let extension = 'png';
@@ -393,6 +414,25 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     const arrayBuffer = await imageFetch.arrayBuffer();
     bytes = Buffer.from(arrayBuffer);
     extension = replicateRes.url.split('.').pop().split('?')[0] || 'png';
+  } else if (provider === 'fal') {
+    const falRes = await callFalAiPredict({
+      prompt: dmp.trim(),
+      model: model,
+      aspectRatio: 'square'
+    });
+
+    if (!falRes.ok) {
+      return { ok: false, status: 500, error: falRes.error };
+    }
+
+    const imageFetch = await fetch(falRes.url);
+    if (!imageFetch.ok) {
+      return { ok: false, status: 500, error: 'Failed to download image from Fal.ai' };
+    }
+    const arrayBuffer = await imageFetch.arrayBuffer();
+    bytes = Buffer.from(arrayBuffer);
+    extension = falRes.url.split('.').pop().split('?')[0] || 'jpg';
+    if (extension === 'jpeg') extension = 'jpg';
   } else {
     const imagenRes = await callImagenPredict({
       model: model,

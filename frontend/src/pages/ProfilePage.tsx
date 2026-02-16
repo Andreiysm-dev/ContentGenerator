@@ -152,7 +152,7 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
           </div>
         </div>
         <div className="w-full max-w-[1200px] mx-auto bg-white border-slate-200/60 not-[]:shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/70 via-[#6fb6e8]/60 to-[#a78bfa]/50 border-t border-l border-r border-[#3fa9f5]/50 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
+          <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
             <div>
               <h2 className="text-xl font-bold text-gray-900 tracking-tight">Account Credentials</h2>
               <p className="text-sm text-gray-500 font-medium">Manage your login email and password.</p>
