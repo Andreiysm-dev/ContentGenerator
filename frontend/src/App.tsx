@@ -2573,6 +2573,47 @@ function App() {
     }
   };
 
+  const handleTransferOwnership = async (newOwnerId: string) => {
+    if (!activeCompanyId) return;
+
+    try {
+      const company = companies.find((c) => c.companyId === activeCompanyId);
+      const collaborator = collaborators.find((c: any) => c.id === newOwnerId);
+
+      const confirmed = await requestConfirm({
+        title: 'Transfer Ownership?',
+        description: `Are you sure you want to transfer ownership of "${company?.companyName}" to ${collaborator?.email || 'this user'}? You will become a collaborator with limited permissions.`,
+        confirmLabel: 'Transfer Ownership',
+        cancelLabel: 'Cancel',
+        confirmVariant: 'danger',
+      });
+
+      if (!confirmed) return;
+
+      const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}/transfer-ownership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newOwnerId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to transfer ownership');
+      }
+
+      const responseData = await res.json();
+      notify(responseData.message || 'Ownership transferred successfully', 'success');
+
+      // Navigate to dashboard to trigger natural reload of companies and collaborators
+      navigate(`/company/${encodeURIComponent(activeCompanyId)}/dashboard`);
+      // Force a page refresh to ensure all state updates
+      window.location.reload();
+
+    } catch (err: any) {
+      console.error('Error transferring ownership:', err);
+      notify(err.message || 'Failed to transfer ownership', 'error');
+    }
+  };
 
 
   const parseBulkText = (text: string): string[][] => {
@@ -2981,6 +3022,8 @@ function App() {
                       setNewCollaboratorEmail={setNewCollaboratorEmail}
                       onAddCollaborator={handleAddCollaborator}
                       onRemoveCollaborator={handleRemoveCollaborator}
+                      onTransferOwnership={handleTransferOwnership}
+                      isOwner={activeCompany?.user_id === session?.user?.id}
                     />
                   }
                 />
@@ -3092,6 +3135,8 @@ function App() {
                       setNewCollaboratorEmail={setNewCollaboratorEmail}
                       onAddCollaborator={handleAddCollaborator}
                       onRemoveCollaborator={handleRemoveCollaborator}
+                      onTransferOwnership={handleTransferOwnership}
+                      isOwner={activeCompany?.user_id === session?.user?.id}
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       isEditingBrandSetup={isEditingBrandSetup}
                       brandEditingRef={brandEditingRef}

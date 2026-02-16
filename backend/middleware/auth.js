@@ -7,6 +7,11 @@ const getTokenFromHeader = (req) => {
 };
 
 const authMiddleware = async (req, res, next) => {
+  // Allow preflight requests to pass through
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   try {
     const token = getTokenFromHeader(req);
     if (!token) {

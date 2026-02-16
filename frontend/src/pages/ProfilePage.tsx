@@ -111,9 +111,86 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
     }
   };
 
+  const [ownedCompanies, setOwnedCompanies] = useState<{ companyId: string; companyName: string }[]>([]);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const handleDeleteAccount = async () => {
-    notify("Account deletion is a sensitive action. Please contact support to proceed.", "info");
-    setShowDelete(false);
+    if (!supabase) return;
+
+    try {
+      // Fetch owned companies
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) {
+        notify("Please log in to continue", "error");
+        return;
+      }
+
+      // Use relative path - Vite proxy handles forwarding to backend
+      const res = await fetch('/api/account/companies', {
+        headers: {
+          'Authorization': `Bearer ${currentSession.access_token}`
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch owned companies');
+      }
+
+      const data = await res.json();
+      setOwnedCompanies(data.companies || []);
+      setShowDelete(true);
+    } catch (err: any) {
+      notify(err.message || "Failed to load company information", "error");
+      setShowDelete(false);
+    }
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!supabase) return;
+
+    if (deleteConfirmText !== "DELETE") {
+      notify("Please type DELETE to confirm", "error");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) {
+        notify("Session expired, please log in again", "error");
+        return;
+      }
+
+      // Use relative path - Vite proxy will handle forwarding to backend in dev
+      // In production, this falls back to same origin which is correct
+      const res = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${currentSession.access_token}`
+        }
+      });
+
+      if (!res.ok) {
+        console.error('Delete account failed status:', res.status, res.statusText);
+        const errorData = await res.json().catch(e => {
+          console.error('Failed to parse error JSON:', e);
+          return {};
+        });
+        console.error('Delete account error data:', errorData);
+        throw new Error(errorData.error || `Failed to delete account (${res.status})`);
+      }
+
+      notify("Account deleted successfully. Logging out...", "success");
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        window.location.href = '/';
+      }, 1500);
+    } catch (err: any) {
+      console.error('Delete account exception:', err);
+      notify(err.message || "Failed to delete account", "error");
+      setIsDeleting(false);
+    }
   };
 
   const userDisplayName = `${firstName} ${lastName}`.trim() || session?.user?.email || "User";
@@ -136,7 +213,7 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
             <button onClick={() => setShowEdit(true)} className="btn btn-primary btn-sm">
               Edit Profile
             </button>
-            <button onClick={() => setShowDelete(true)} className="btn btn-danger btn-sm">
+            <button onClick={handleDeleteAccount} className="btn btn-danger btn-sm">
               Delete Account
             </button>
           </div>
@@ -293,19 +370,63 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
               </button>
             </div>
 
-            <div className="p-6 space-y-6 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-50 text-rose-500 mb-2">
+            <div className="p-6 space-y-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-50 text-rose-500 mx-auto mb-2">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <p className="text-sm text-slate-600 font-medium">This action is permanent. Are you sure you want to delete your account?</p>
-              <div className="flex justify-end gap-3 pt-4">
-                <button onClick={handleDeleteAccount} className="btn btn-danger btn-sm">
-                  Yes, Delete
+
+              <div className="space-y-3">
+                <h4 className="text-lg font-bold text-slate-900 text-center">Permanent Account Deletion</h4>
+                <p className="text-sm text-slate-600 text-center">This action cannot be undone.</p>
+
+                {ownedCompanies.length > 0 && (
+                  <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 space-y-2">
+                    <p className="text-sm font-bold text-rose-900">
+                      ⚠️ You own {ownedCompanies.length} {ownedCompanies.length === 1 ? 'company' : 'companies'} that will be permanently deleted:
+                    </p>
+                    <ul className="text-sm text-rose-800 space-y-1 pl-4">
+                      {ownedCompanies.map(company => (
+                        <li key={company.companyId} className="list-disc">{company.companyName}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-rose-700 italic mt-2">
+                      All content calendars, brand intelligence, and data for these companies will be lost forever.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2 pt-2">
+                  <label className="text-sm font-bold text-slate-700">Type "DELETE" to confirm</label>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-rose-500/20 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowDelete(false);
+                    setDeleteConfirmText("");
+                    setOwnedCompanies([]);
+                  }}
+                  className="btn btn-secondary btn-sm"
+                  disabled={isDeleting}
+                >
+                  Cancel
                 </button>
-                <button onClick={() => setShowDelete(false)} className="btn btn-primary btn-sm">
-                  No, Keep My Account
+                <button
+                  onClick={confirmDeleteAccount}
+                  className="btn btn-danger btn-sm"
+                  disabled={deleteConfirmText !== "DELETE" || isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete Account Forever"}
                 </button>
               </div>
             </div>

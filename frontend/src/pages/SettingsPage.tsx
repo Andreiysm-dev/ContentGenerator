@@ -108,6 +108,8 @@ export type CompanySettingsShellProps = {
   setNewCollaboratorEmail: (value: string) => void;
   onAddCollaborator: () => void;
   onRemoveCollaborator: (id: string) => void;
+  onTransferOwnership?: (newOwnerId: string) => void;
+  isOwner?: boolean;
   isBrandWebhookCoolingDown: boolean;
   brandWebhookCooldownSecondsLeft: number;
   isEditingBrandSetup: boolean;
@@ -477,7 +479,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                     <div className="truncate text-sm font-semibold text-slate-900">{c.email}</div>
                                     <div className="mt-1 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-700">{c.role}</div>
                                   </div>
-                                  {c.role !== "owner" && (
+                                  {props.isOwner && c.role !== "owner" && (
                                     <button className="btn btn-danger btn-sm self-start sm:self-auto" type="button" onClick={() => onRemoveCollaborator(c.id)}>
                                       Remove
                                     </button>
@@ -490,6 +492,47 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                       </div>
                     </div>
                   </Card>
+
+                  {/* Transfer Ownership Section */}
+                  {props.isOwner && (
+                    <Card className="bg-white border-amber-200" title="Transfer Ownership" subtitle="Transfer this company to another team member.">
+                      <div className="space-y-4">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                          <p className="text-sm text-amber-900 font-medium">
+                            ⚠️ Transferring ownership will make you a collaborator with limited permissions.
+                          </p>
+                        </div>
+
+                        {collaborators.filter((c: any) => c.role !== "owner").length > 0 ? (
+                          <div className="space-y-3">
+                            <label className="text-xs font-bold text-slate-700">Select new owner</label>
+                            <Select
+                              value=""
+                              onChange={(e) => {
+                                if (e.target.value && props.onTransferOwnership) {
+                                  props.onTransferOwnership(e.target.value);
+                                }
+                              }}
+                              className="w-full"
+                            >
+                              <option value="">— Select a collaborator —</option>
+                              {collaborators
+                                .filter((c: any) => c.role !== "owner")
+                                .map((c: any) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.email}
+                                  </option>
+                                ))}
+                            </Select>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-600">
+                            Add collaborators first before you can transfer ownership.
+                          </p>
+                        )}
+                      </div>
+                    </Card>
+                  )}
                 </div>
               )}
 

@@ -8,6 +8,7 @@ import storageRoutes from "./routes/storageRoutes.js";
 import collaboratorRoutes from './routes/collaboratorRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import websiteAnalyzerRoutes from './routes/websiteAnalyzerRoutes.js';
+import accountRoutes from './routes/accountRoutes.js';
 import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
@@ -20,7 +21,16 @@ console.log('DEBUG: Working directory:', process.cwd());
 const app = express();
 const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
 
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+  origin: true, // Reflect the request origin
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Note the leading slash in mount paths
@@ -32,6 +42,7 @@ app.use("/api", companyKbRoutes);
 app.use("/api", storageRoutes);
 app.use("/api", collaboratorRoutes);
 app.use("/api", profileRoutes);
+app.use("/api", accountRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
