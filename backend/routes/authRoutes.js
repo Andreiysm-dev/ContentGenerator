@@ -13,8 +13,9 @@ const getRedirectUri = () => {
 };
 
 const LINKEDIN_SCOPES = ['profile', 'email', 'w_member_social', 'openid'];
-
-// --- Facebook Configuration ---
+const LINKEDIN_AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
+const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
+const LINKEDIN_PROFILE_URL = 'https://api.linkedin.com/v2/userinfo';
 const FACEBOOK_AUTH_URL = 'https://www.facebook.com/v18.0/dialog/oauth';
 const FACEBOOK_TOKEN_URL = 'https://graph.facebook.com/v18.0/oauth/access_token';
 const FACEBOOK_PAGE_ACCOUNTS_URL = 'https://graph.facebook.com/v18.0/me/accounts';

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 
 export type CompanySettingsTab = "overview" | "brand-intelligence" | "team" | "integrations";
 
@@ -118,6 +119,8 @@ export type CompanySettingsShellProps = {
   connectedAccounts: any[];
   onConnectLinkedIn: () => void;
   onConnectFacebook: () => void;
+  onDisconnectAccount: (accountId: string) => Promise<void>;
+  onRefreshAccounts?: () => Promise<void>;
 };
 
 const TabLink = ({ to, id, children, pressedTab, onClick }: { to: string; id: CompanySettingsTab; children: React.ReactNode; pressedTab: string | null; onClick: () => void }) => (
@@ -302,7 +305,40 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     connectedAccounts,
     onConnectLinkedIn,
     onConnectFacebook,
+    onDisconnectAccount,
   } = props;
+
+  const { companyId } = useParams<{ companyId: string }>();
+  const [localAccounts, setLocalAccounts] = useState<any[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  const fetchAccounts = async () => {
+    if (!companyId || !supabase) return;
+    setLoadingAccounts(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const backendBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+      const res = await fetch(`${backendBaseUrl}/api/social/${companyId}/accounts`, {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLocalAccounts(data.accounts || []);
+      }
+    } catch (error) {
+      console.error('Error fetching accounts in SettingsPage:', error);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "integrations") {
+      fetchAccounts();
+    }
+  }, [tab, companyId]);
 
   const navigate = useNavigate();
   const params = useParams();
@@ -339,6 +375,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
       window.history.replaceState({}, '', window.location.pathname);
     } else if (success === 'linkedin_connected') {
       alert('LinkedIn connected successfully!');
+      fetchAccounts();
       window.history.replaceState({}, '', window.location.pathname);
     } else if (error === 'facebook_auth_failed') {
       alert('Failed to connect Facebook. Please try again.');
@@ -348,6 +385,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
       window.history.replaceState({}, '', window.location.pathname);
     } else if (success === 'facebook_connected') {
       alert('Facebook Pages connected successfully!');
+      fetchAccounts();
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -581,11 +619,13 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                   <div className="grid grid-cols-1 gap-4">
                     <Card title="Social Accounts" subtitle="Connect your social media profiles to enable auto-publishing.">
                       <div className="space-y-4">
-                        {connectedAccounts.length === 0 ? (
+                        {(localAccounts.length === 0 && !loadingAccounts) ? (
                           <p className="text-sm text-slate-500 italic">No accounts connected yet.</p>
+                        ) : loadingAccounts ? (
+                          <p className="text-sm text-slate-500 animate-pulse">Loading accounts...</p>
                         ) : (
                           <div className="space-y-2">
-                            {connectedAccounts.map(acc => (
+                            {localAccounts.map(acc => (
                               <div key={acc.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-slate-50">
                                 <div className="flex items-center gap-3">
                                   {acc.profile_picture ? (
@@ -600,8 +640,17 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                     <div className="text-xs text-slate-600">{acc.profile_name || 'Connected'}</div>
                                   </div>
                                 </div>
-                                <div className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded-full border border-green-200">
-                                  Active
+                                <div className="flex items-center gap-2">
+                                  <div className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded-full border border-green-200">
+                                    Active
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDisconnectAccount(acc.id)}
+                                    className="text-xs font-bold text-slate-400 hover:text-red-600 transition-colors uppercase tracking-wider"
+                                  >
+                                    Disconnect
+                                  </button>
                                 </div>
                               </div>
                             ))}

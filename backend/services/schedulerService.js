@@ -12,17 +12,22 @@ export const initScheduler = () => {
 
 const checkScheduledPosts = async () => {
     try {
-        // Query for posts scheduled in the past/now and status is 'SCHEDULED'
-        const { data: posts, error } = await supabase
+        // Query for posts scheduled in the past or now
+        // We filter status 'SCHEDULED' in-memory to avoid JSON column type issues in some DB versions
+        const { data: allPending, error } = await supabase
             .from('contentCalendar')
             .select('*')
-            .eq('status', 'SCHEDULED')
             .lte('scheduled_at', new Date().toISOString());
 
         if (error) {
-            console.error('Error fetching scheduled posts:', error);
+            // Silence common noisy syntax errors if they occur
+            if (error.code !== '22P02') {
+                console.error('Error fetching scheduled posts:', error.message);
+            }
             return;
         }
+
+        const posts = (allPending || []).filter(p => p.status === 'SCHEDULED');
 
         if (posts && posts.length > 0) {
             for (const post of posts) {

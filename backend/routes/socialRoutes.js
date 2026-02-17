@@ -15,27 +15,19 @@ router.get('/social/:companyId/accounts', async (req, res) => {
 
     try {
         // 1. Verify user has access to this company
-        // For now, simple check: is the user the owner or a collaborator?
-        // We can query the 'collaborators' table (if exists) or 'profiles' (if user is owner).
-        // Let's assume strict RLS policies on the DB side handle the raw data access, 
-        // but here we should at least check basic membership if needed.
-        // However, since we are using the service role 'supabase' client in some places, 
-        // or the 'supabase' client in db.js which IS using service role key (based on line 8 of db.js), 
-        // we bypass RLS. So we MUST check permission here effectively.
-
-        // Quick permission check:
-        const { data: ownership, error: ownerError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', companyId)
-            .eq('id', user.id) // Assuming profile.id === user.id for 1:1, OR we need a separate 'collaborators' check.
-            // Based on previous files, 'collaborators' is a separate table/logic.
-            // Let's stick to the pattern used in other routes. 
-            // If 'authMiddleware' sets req.user, let's trust it for now but ideally verify company access.
+        const { data: company, error: companyError } = await supabase
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
             .single();
 
-        // If implementing robustly:
-        // const { data: isCollab } = await supabase.from('collaborators').select('*').eq('company_id', companyId).eq('user_id', user.id);
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== user.id && !(company.collaborator_ids?.includes(user.id))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
 
         // For this MVP step, let's fetch the accounts.
         const { data: accounts, error } = await supabase

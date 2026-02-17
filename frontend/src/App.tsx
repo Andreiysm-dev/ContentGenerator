@@ -502,12 +502,44 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    const isIntegrationsRoute = /^\/company\/[^/]+\/settings\/integrations\/?$/.test(location.pathname);
-    if (!isIntegrationsRoute) return;
+  const handleDisconnectAccount = async (accountId: string) => {
     if (!activeCompanyId) return;
+
+    try {
+      const confirmed = await requestConfirm({
+        title: 'Disconnect Account?',
+        description: 'Are you sure you want to disconnect this social account? You will need to reconnect it to publish content again.',
+        confirmLabel: 'Disconnect',
+        cancelLabel: 'Cancel',
+        confirmVariant: 'danger',
+      });
+
+      if (!confirmed) return;
+
+      const res = await authedFetch(`${backendBaseUrl}/api/social/${activeCompanyId}/accounts/${accountId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to disconnect account');
+      }
+
+      notify('Account disconnected successfully', 'success');
+      setConnectedAccounts((prev) => prev.filter((acc) => acc.id !== accountId));
+    } catch (err: any) {
+      console.error('Error disconnecting account:', err);
+      notify(err.message || 'Failed to disconnect account', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (!activeCompanyId) {
+      setConnectedAccounts([]);
+      return;
+    }
     fetchConnectedAccounts(activeCompanyId);
-  }, [location.pathname, activeCompanyId]);
+  }, [activeCompanyId]);
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [newCompanyDescription, setNewCompanyDescription] = useState('');
@@ -3021,6 +3053,7 @@ function App() {
                       connectedAccounts={connectedAccounts}
                       onConnectLinkedIn={handleConnectLinkedIn}
                       onConnectFacebook={handleConnectFacebook}
+                      onDisconnectAccount={handleDisconnectAccount}
                     />
                   }
                 />
@@ -3157,6 +3190,7 @@ function App() {
                       onRemoveCollaborator={handleRemoveCollaborator}
                       onTransferOwnership={handleTransferOwnership}
                       isOwner={activeCompany?.user_id === session?.user?.id}
+                      onDisconnectAccount={handleDisconnectAccount}
                     />
                   }
                 />
@@ -3276,6 +3310,7 @@ function App() {
                       onConnectFacebook={handleConnectFacebook}
                       isEditingBrandSetup={isEditingBrandSetup}
                       brandEditingRef={brandEditingRef}
+                      onDisconnectAccount={handleDisconnectAccount}
                       formAnswerCache={formAnswerCache}
                     />}
                 />
@@ -3395,10 +3430,10 @@ function App() {
                       onConnectFacebook={handleConnectFacebook}
                       isEditingBrandSetup={isEditingBrandSetup}
                       brandEditingRef={brandEditingRef}
+                      onDisconnectAccount={handleDisconnectAccount}
                       formAnswerCache={formAnswerCache}
                     />}
                 />
-                <Route path="/company/:companyId/integrations" element={<IntegrationsPage />} />
                 <Route path="/profile" element={<ProfilePage session={session} supabase={supabase} notify={notify} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
