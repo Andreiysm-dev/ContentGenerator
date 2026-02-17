@@ -58,7 +58,7 @@ router.get('/social/:companyId/accounts', async (req, res) => {
 router.post('/social/:companyId/publish', async (req, res) => {
     // Note: companyId is now expected in req.body as well, overriding the param if present.
     // The instruction implies companyId should be taken from the body.
-    const { companyId, provider, content, contentCalendarId } = req.body;
+    const { companyId, provider, content, contentCalendarId, accountId } = req.body;
 
     if (!companyId || !provider || !content) {
         return res.status(400).json({ error: 'companyId, provider, and content are required' });
@@ -71,9 +71,9 @@ router.post('/social/:companyId/publish', async (req, res) => {
     try {
         let result;
         if (provider === 'linkedin') {
-            result = await postToLinkedIn(companyId, content);
+            result = await postToLinkedIn(companyId, content, accountId);
         } else if (provider === 'facebook') {
-            result = await postToFacebookPage(companyId, content);
+            result = await postToFacebookPage(companyId, content, accountId);
         } else {
             return res.status(400).json({ error: 'Unsupported provider' });
         }
@@ -94,7 +94,8 @@ router.post('/social/:companyId/publish', async (req, res) => {
         res.json({ success: true, result });
     } catch (error) {
         console.error('Publish error:', error);
-        res.status(500).json({ error: error.message });
+        const errorMessage = error.response?.data?.error?.message || error.message;
+        res.status(500).json({ error: errorMessage });
     }
 });
 

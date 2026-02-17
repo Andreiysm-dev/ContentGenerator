@@ -145,10 +145,6 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
             if (res.ok) {
                 const data = await res.json();
                 setConnectedAccounts(data.accounts || []);
-                // Default select all if it's a new post or based on existing platform
-                if (data.accounts?.length > 0 && selectedAccountIds.length === 0) {
-                    setSelectedAccountIds(data.accounts.map((a: any) => a.id));
-                }
             }
         } catch (error) {
             console.error('Error fetching accounts:', error);
@@ -221,6 +217,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                         body: JSON.stringify({
                             companyId: activeCompanyId, // Explicitly pass companyId
                             provider: account.provider,
+                            accountId: account.id,
                             contentCalendarId: savedId,
                             content: {
                                 text: [caption, hashtags].filter(Boolean).join('\n\n'),

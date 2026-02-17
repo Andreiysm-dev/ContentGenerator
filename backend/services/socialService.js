@@ -3,16 +3,21 @@ import { supabase } from '../database/db.js';
 
 const LINKEDIN_API_URL = 'https://api.linkedin.com/v2';
 
-export const postToLinkedIn = async (companyId, content) => {
+export const postToLinkedIn = async (companyId, content, accountId = null) => {
     const { text, url, visibility = 'PUBLIC' } = content;
 
     // 1. Get Access Token
-    const { data: account, error } = await supabase
+    let query = supabase
         .from('social_accounts')
         .select('provider_account_id, access_token')
         .eq('company_id', companyId)
-        .eq('provider', 'linkedin')
-        .single();
+        .eq('provider', 'linkedin');
+
+    if (accountId) {
+        query = query.eq('id', accountId);
+    }
+
+    const { data: account, error } = await query.single();
 
     if (error || !account) {
         throw new Error('LinkedIn account not connected.');
@@ -113,16 +118,21 @@ export const postToLinkedIn = async (companyId, content) => {
  * @param {string} companyId 
  * @param {object} content { text, url }
  */
-export const postToFacebookPage = async (companyId, content) => {
+export const postToFacebookPage = async (companyId, content, accountId = null) => {
     const { text, url } = content;
 
     // 1. Get Page Access Token and Page ID from DB
-    const { data: account, error } = await supabase
+    let query = supabase
         .from('social_accounts')
         .select('provider_account_id, access_token')
         .eq('company_id', companyId)
-        .eq('provider', 'facebook')
-        .single(); // Note: If multiple pages are allowed, this needs adjustment or selection logic.
+        .eq('provider', 'facebook');
+
+    if (accountId) {
+        query = query.eq('id', accountId);
+    }
+
+    const { data: account, error } = await query.single();
     // For now, assuming the single() match for MVP, or we pass the specific provider_account_id if needed.
 
     if (error || !account) {
