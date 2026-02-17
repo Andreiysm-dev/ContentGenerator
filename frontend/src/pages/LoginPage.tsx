@@ -10,6 +10,9 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Error State
+  const [authError, setAuthError] = useState<string | null>(null);
+
   // Login State
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -21,14 +24,19 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
   const [signUpPassword, setSignUpPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const clearError = () => {
+    if (authError) setAuthError(null);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null); // Clear previous errors
     if (!supabase) {
-      notify("Supabase is not configured.", "error");
+      setAuthError("System configuration error: Supabase not found.");
       return;
     }
     if (!loginEmail || !loginPassword) {
-      notify("Please enter valid email and password.", "error");
+      setAuthError("Please enter both email and password.");
       return;
     }
 
@@ -40,12 +48,14 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
       });
 
       if (error) {
-        notify(error.message, "error");
+        console.error("Login error:", error);
+        setAuthError(error.message || "Invalid login credentials.");
       } else {
         // App.tsx auth listener will handle redirection
       }
     } catch (err) {
-      notify("An unexpected error occurred during login.", "error");
+      console.error("Unexpected login error:", err);
+      setAuthError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -53,16 +63,17 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!supabase) {
-      notify("Supabase is not configured.", "error");
+      setAuthError("Supabase is not configured.");
       return;
     }
     if (!signUpEmail || !signUpPassword) {
-      notify("Please enter email and password.", "error");
+      setAuthError("Please enter email and password.");
       return;
     }
     if (signUpPassword !== confirmPassword) {
-      notify("Passwords do not match.", "error");
+      setAuthError("Passwords do not match.");
       return;
     }
 
@@ -80,13 +91,13 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
       });
 
       if (error) {
-        notify(error.message, "error");
+        setAuthError(error.message);
       } else {
         notify("Account created! Check your email to confirm.", "success");
-        setIsSignUp(false); // Switch back to login view or let them know what to do
+        setIsSignUp(false);
       }
     } catch (err) {
-      notify("An unexpected error occurred during sign up.", "error");
+      setAuthError("An unexpected error occurred during sign up.");
     } finally {
       setLoading(false);
     }
@@ -99,21 +110,36 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
           <>
             <div className="text-3xl sm:text-md font-bold text-brand-dark uppercase pb-5 mb-2 font-body">Welcome Back</div>
 
+            {authError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm text-left flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <span>{authError}</span>
+              </div>
+            )}
+
             <form className="flex flex-col gap-3 mb-4" onSubmit={handleLogin}>
               <input
                 type="email"
                 placeholder="Email"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${authError ? 'border-red-300 focus:ring-red-200' : 'border-gray-300 focus:ring-brand-primary'}`}
                 value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
+                onChange={(e) => {
+                  setLoginEmail(e.target.value);
+                  clearError();
+                }}
                 required
               />
               <input
                 type="password"
                 placeholder="Password"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${authError ? 'border-red-300 focus:ring-red-200' : 'border-gray-300 focus:ring-brand-primary'}`}
                 value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
+                onChange={(e) => {
+                  setLoginPassword(e.target.value);
+                  clearError();
+                }}
                 required
               />
 
