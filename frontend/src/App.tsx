@@ -2945,6 +2945,8 @@ function App() {
                       onAddCollaborator={handleAddCollaborator}
                       onRemoveCollaborator={handleRemoveCollaborator}
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
+                      connectedAccounts={connectedAccounts}
+                      onConnectLinkedIn={handleConnectLinkedIn}
                     />
                   }
                 />
@@ -2992,6 +2994,8 @@ function App() {
                       cancelBrandRuleEdit={cancelBrandRuleEdit}
                       saveBrandRuleEdit={saveBrandRuleEdit}
                       saveBrandSetup={saveBrandSetup}
+                      connectedAccounts={connectedAccounts}
+                      onConnectLinkedIn={handleConnectLinkedIn}
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       sendBrandWebhook={sendBrandWebhook}
                       buildFormAnswer={buildFormAnswer}
@@ -3180,11 +3184,11 @@ function App() {
                       onTransferOwnership={handleTransferOwnership}
                       isOwner={activeCompany?.user_id === session?.user?.id}
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
+                      connectedAccounts={connectedAccounts}
+                      onConnectLinkedIn={handleConnectLinkedIn}
                       isEditingBrandSetup={isEditingBrandSetup}
                       brandEditingRef={brandEditingRef}
                       formAnswerCache={formAnswerCache}
-                      connectedAccounts={connectedAccounts}
-                      onConnectLinkedIn={handleConnectLinkedIn}
                     />}
                 />
                 <Route path="/company/:companyId/integrations" element={<IntegrationsPage />} />
