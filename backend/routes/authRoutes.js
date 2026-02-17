@@ -120,7 +120,7 @@ router.get('/auth/linkedin/callback', async (req, res) => {
         }
 
         // Redirect back to settings
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/settings?success=linkedin_connected`);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/company/${companyId}/settings/integrations?success=linkedin_connected`);
 
     } catch (err) {
         console.error('LinkedIn Callback Error:', err.response?.data || err.message);
@@ -187,7 +187,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
 
         if (!pages || pages.length === 0) {
             console.warn('No Facebook Pages found for user');
-            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/settings?error=facebook_no_pages`);
+            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/company/${companyId}/settings/integrations?error=facebook_no_pages`);
         }
 
         // C. Save each page to index. 
@@ -210,7 +210,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
             }
         }
 
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/settings?success=facebook_connected`);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/company/${companyId}/settings/integrations?success=facebook_connected`);
 
     } catch (err) {
         console.error('Facebook Callback Error:', err.response?.data || err.message);
