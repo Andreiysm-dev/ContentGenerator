@@ -54,10 +54,7 @@ router.get('/social/:companyId/accounts', async (req, res) => {
 });
 
 // POST /api/social/:companyId/publish
-// Body: { provider: 'linkedin', content: { text: "...", ... } }
 router.post('/social/:companyId/publish', async (req, res) => {
-    // Note: companyId is now expected in req.body as well, overriding the param if present.
-    // The instruction implies companyId should be taken from the body.
     const { companyId, provider, content, contentCalendarId, accountId } = req.body;
 
     if (!companyId || !provider || !content) {
@@ -126,6 +123,43 @@ router.get('/social/facebook/insights/:id', async (req, res) => {
     } catch (error) {
         console.error('Insights error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE /api/social/:companyId/accounts/:accountId - Disconnect an account
+router.delete('/social/:companyId/accounts/:accountId', async (req, res) => {
+    const { companyId, accountId } = req.params;
+    const user = req.user;
+
+    try {
+        // 1. Verify user has access to this company
+        const { data: company, error: companyError } = await supabase
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== user.id && !(company.collaborator_ids?.includes(user.id))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        // 2. Delete the account
+        const { error: deleteError } = await supabase
+            .from('social_accounts')
+            .delete()
+            .eq('id', accountId)
+            .eq('company_id', companyId);
+
+        if (deleteError) throw deleteError;
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error disconnecting social account:', error);
+        res.status(500).json({ error: 'Failed to disconnect social account' });
     }
 });
 

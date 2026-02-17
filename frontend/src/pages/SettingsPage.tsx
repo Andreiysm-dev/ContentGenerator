@@ -646,7 +646,10 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => onDisconnectAccount(acc.id)}
+                                    onClick={async () => {
+                                      await onDisconnectAccount(acc.id);
+                                      fetchAccounts();
+                                    }}
                                     className="text-xs font-bold text-slate-400 hover:text-red-600 transition-colors uppercase tracking-wider"
                                   >
                                     Disconnect
