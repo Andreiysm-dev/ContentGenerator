@@ -13,12 +13,10 @@ export const initScheduler = () => {
 const checkScheduledPosts = async () => {
     try {
         // Query for posts scheduled in the past/now and status is 'SCHEDULED'
-        // Note: If status is a text column, use 'SCHEDULED'. If JSONB, use '"SCHEDULED"'.
-        // The error 'Token "SCHEDULED" is invalid' suggests it's treating it as JSON, so let's try double quotes.
         const { data: posts, error } = await supabase
             .from('contentCalendar')
             .select('*')
-            .eq('status', '"SCHEDULED"')
+            .eq('status', 'SCHEDULED')
             .lte('scheduled_at', new Date().toISOString());
 
         if (error) {
@@ -37,11 +35,6 @@ const checkScheduledPosts = async () => {
 };
 
 const processPost = async (post) => {
-
-    // Optimistic update to prevent double processing? 
-    // Ideally use explicit locking if scale is high, but for now simple update.
-    // However, status update happens at end. 
-    // To be safe, we could mark as 'PROCESSING' first?
     if (post.contentCalendarId) {
         await updateStatus(post.contentCalendarId, 'PROCESSING');
     }
@@ -64,7 +57,7 @@ const processPost = async (post) => {
             result = await postToFacebookPage(post.companyId, content);
             provider = 'facebook';
         } else {
-            // Default to LinkedIn for now
+            // Default to LinkedIn
             result = await postToLinkedIn(post.companyId, content);
             provider = 'linkedin';
         }
@@ -87,9 +80,6 @@ const processPost = async (post) => {
 };
 
 const updateStatus = async (id, status, extraData = {}) => {
-    // If status is a string, ensure it's treated as such. 
-    // If column is JSONB, simple string update might work if Supabase handles it, 
-    // or we might need to wrap it. Let's try standard update first.
     const { error } = await supabase
         .from('contentCalendar')
         .update({ status, ...extraData })

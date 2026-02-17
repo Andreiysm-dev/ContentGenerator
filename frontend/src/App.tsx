@@ -23,6 +23,7 @@ import {
   Download,
 } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { LegalPage } from './pages/LegalPage';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -2702,7 +2703,14 @@ function App() {
 
 
   if (!session) {
-    return <LoginPage supabase={supabase} notify={notify} />;
+    return (
+      <Routes>
+        <Route path="/privacy" element={<LegalPage type="privacy" />} />
+        <Route path="/terms" element={<LegalPage type="terms" />} />
+        <Route path="/deletion" element={<LegalPage type="deletion" />} />
+        <Route path="*" element={<LoginPage supabase={supabase} notify={notify} />} />
+      </Routes>
+    );
   }
 
   return (
@@ -2761,6 +2769,9 @@ function App() {
                 />
 
                 <Route path="/faq" element={<Faq />} />
+                <Route path="/privacy" element={<LegalPage type="privacy" />} />
+                <Route path="/terms" element={<LegalPage type="terms" />} />
+                <Route path="/deletion" element={<LegalPage type="deletion" />} />
                 <Route
                   path="/company/:companyId/dashboard"
                   element={
