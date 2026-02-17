@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 
 interface ViewContentModalProps {
     isOpen: boolean;
@@ -59,6 +60,33 @@ export function ViewContentModal({
     setSystemInstruction,
 }: ViewContentModalProps) {
     const [isManualApproving, setIsManualApproving] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [scheduledDate, setScheduledDate] = useState('');
+    const [analytics, setAnalytics] = useState<{ reach: number; likes: number; comments: number } | null>(null);
+    const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+
+    React.useEffect(() => {
+        if (isOpen && selectedRow && selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook') {
+            fetchAnalytics();
+        } else {
+            setAnalytics(null);
+        }
+    }, [isOpen, selectedRow?.contentCalendarId]);
+
+    const fetchAnalytics = async () => {
+        setIsLoadingAnalytics(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/social/facebook/insights/${selectedRow.contentCalendarId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setAnalytics(data);
+            }
+        } catch (err) {
+            console.error('Error fetching analytics:', err);
+        } finally {
+            setIsLoadingAnalytics(false);
+        }
+    };
 
     if (!isOpen || !selectedRow) return null;
 
@@ -85,65 +113,8 @@ export function ViewContentModal({
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px]"
-                                onClick={async () => {
-                                    if (!selectedRow?.finalCaption) {
-                                        notify('Add a final caption first.', 'error');
-                                        return;
-                                    }
 
-                                    // Check for LinkedIn connection
-                                    // Ideally we should have this state passed down or fetch it.
-                                    // For MVP, letting them Try to publish and handling error is one way, 
-                                    // OR we fetch accounts when modal opens.
-                                    // Since we don't have 'connectedAccounts' here easily without prop drilling from App -> ViewContentModal,
-                                    // let's try to Publish and if it fails saying "No account", we tell them.
 
-                                    const proceed = await requestConfirm({
-                                        title: 'Publish to LinkedIn?',
-                                        description: 'This will post the Final Caption immediately to your connected LinkedIn account.',
-                                        confirmLabel: 'Post Now',
-                                        cancelLabel: 'Cancel'
-                                    });
-
-                                    if (!proceed) return;
-
-                                    try {
-                                        const res = await authedFetch(`${backendBaseUrl}/api/social/${activeCompanyId}/publish`, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                provider: 'linkedin',
-                                                content: {
-                                                    text: [selectedRow.finalCaption, selectedRow.finalHashtags].filter(Boolean).join('\n\n')
-                                                    // TODO: Add Image URL here once supported
-                                                }
-                                            })
-                                        });
-
-                                        const data = await res.json();
-
-                                        if (!res.ok) {
-                                            throw new Error(data.error || 'Failed to publish');
-                                        }
-
-                                        notify('Published to LinkedIn successfully!', 'success');
-
-                                        // Update status to 'Published' locally or refetch
-                                        // await refreshCalendarRow(selectedRow.contentCalendarId);
-
-                                    } catch (e: any) {
-                                        console.error(e);
-                                        notify(`Failed to publish: ${e.message}. Go to Settings > Integrations to connect LinkedIn.`, 'error');
-                                    }
-                                }}
-                            >
-                                {/* LinkedIn Icon or Generic Publish Icon */}
-                                <svg className="w-4 h-4 mr-2" fill="#0077b5" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
-                                Publish to LinkedIn
-                            </button>
 
                             <button
                                 type="button"
@@ -386,6 +357,54 @@ export function ViewContentModal({
                                 </div>
                             </div>
                         </div>
+
+                        {/* Section: Analytics */}
+                        {selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook' && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">
+                                        Post Performance
+                                    </h3>
+                                    <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
+                                    {selectedRow.social_post_id && (
+                                        <a
+                                            href={`https://facebook.com/${selectedRow.social_post_id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3fa9f5] hover:underline"
+                                            title="View this post on Facebook in a new tab"
+                                        >
+                                            <ExternalLink className="h-3 w-3" />
+                                            View Post
+                                        </a>
+                                    )}
+                                    <span className="text-xs text-brand-dark/50 italic">
+                                        Live metrics from Facebook
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="p-4 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col items-center justify-center text-center">
+                                        <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">Reach</div>
+                                        <div className="text-2xl font-bold text-brand-dark">
+                                            {isLoadingAnalytics ? '...' : analytics?.reach ?? '0'}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col items-center justify-center text-center">
+                                        <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">Likes</div>
+                                        <div className="text-2xl font-bold text-brand-dark">
+                                            {isLoadingAnalytics ? '...' : analytics?.likes ?? '0'}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col items-center justify-center text-center">
+                                        <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">Comments</div>
+                                        <div className="text-2xl font-bold text-brand-dark">
+                                            {isLoadingAnalytics ? '...' : analytics?.comments ?? '0'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Section: System Metadata (Expandable) */}
                         <details className="group border border-slate-200/60 rounded-xl bg-slate-50/30 overflow-hidden">

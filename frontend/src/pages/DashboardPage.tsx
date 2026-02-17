@@ -10,6 +10,7 @@ interface DashboardProps {
     review: number;
     generate: number;
     draft: number;
+    scheduled: number;
     upcoming7: number;
     approvalRate: number;
   };
@@ -91,6 +92,18 @@ export function DashboardPage({ activeCompany, activeCompanyId, dashboardStats }
               <div className="text-xs text-brand-dark/60 flex items-center justify-between font-medium">
                 Active AI jobs
                 <span className="inline-flex items-center text-[0.72rem] font-bold px-1.5 py-0.5 rounded-md text-brand-dark/40">Stable</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm hover:border-brand-primary/20 hover:shadow-md hover:-translate-y-px transition-all duration-200 flex flex-col gap-1.5 group">
+              <div className="text-[0.7rem] uppercase tracking-wider font-bold text-brand-dark/50">Scheduled</div>
+              <div className="text-[1.6rem] font-bold text-brand-dark font-display leading-tight">{dashboardStats.scheduled}</div>
+              <div className="text-xs text-brand-dark/60 flex items-center justify-between font-medium">
+                Ready to publish
+                <span className="inline-flex items-center text-[0.72rem] font-bold px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-600">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  +3%
+                </span>
               </div>
             </div>
 

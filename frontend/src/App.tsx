@@ -34,7 +34,8 @@ import {
 import { CalendarTableSkeleton, AuthLoadingSkeleton } from '@/components/LoadingState';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { CreatePage } from '@/pages/CreatePage';
-import { DraftsPage } from '@/pages/DraftsPage';
+import { StudioEditorPage } from '@/pages/StudioEditorPage';
+import { StudioPage } from '@/pages/StudioPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { SettingsPage, type CompanySettingsTab } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
@@ -479,6 +480,24 @@ function App() {
     } catch (e) {
       console.error('LinkedIn connect error:', e);
       notify('Failed to connect LinkedIn.', 'error');
+    }
+  };
+
+  const handleConnectFacebook = async () => {
+    if (!activeCompanyId) return;
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/auth/facebook/connect?companyId=${activeCompanyId}`);
+      if (!res.ok) {
+        notify('Failed to initiate Facebook connection.', 'error');
+        return;
+      }
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (e) {
+      console.error('Facebook connection error', e);
+      notify('An error occurred. Please try again.', 'error');
     }
   };
 
@@ -1421,11 +1440,26 @@ function App() {
   ]);
 
   const filteredCalendarRows = useMemo(() => {
+    // Detect mode from URL
+    const isPublishedTab = location.pathname.includes('/calendar/published');
     const search = calendarSearch.trim().toLowerCase();
     const statusFilter = calendarStatusFilter.toLowerCase();
+
     const filtered = calendarRows.filter((row) => {
       const statusValue = getStatusValue(row.status).toLowerCase();
+      const isPublished = statusValue === 'published';
+
+      // Filter by tab mode
+      if (isPublishedTab) {
+        if (!isPublished) return false;
+      } else {
+        if (isPublished) return false;
+      }
+
+      // Filter by status dropdown
       if (statusFilter !== 'all' && statusValue !== statusFilter) return false;
+
+      // Filter by search
       if (!search) return true;
       const haystack = [
         row.brandHighlight,
@@ -1438,6 +1472,7 @@ function App() {
         row.cta,
         row.promoType,
         row.date,
+        row.finalCaption,
       ]
         .filter(Boolean)
         .join(' ')
@@ -1447,43 +1482,24 @@ function App() {
 
     // Sort by date chronologically (earliest first)
     return filtered.sort((a, b) => {
-      // Helper function to parse various date formats
       const parseDate = (row: any): number => {
-        // Try parsing the date field first
         if (row.date) {
           const dateStr = row.date.toString().trim();
-
-          // Try parsing as full ISO date (e.g., "2024-02-17")
           let parsedDate = new Date(dateStr);
-          if (!isNaN(parsedDate.getTime())) {
-            return parsedDate.getTime();
-          }
-
-          // Try parsing short format like "Feb 17" by adding current year
+          if (!isNaN(parsedDate.getTime())) return parsedDate.getTime();
           const currentYear = new Date().getFullYear();
           parsedDate = new Date(`${dateStr} ${currentYear}`);
-          if (!isNaN(parsedDate.getTime())) {
-            return parsedDate.getTime();
-          }
+          if (!isNaN(parsedDate.getTime())) return parsedDate.getTime();
         }
-
-        // Fallback to created_at timestamp
         if (row.created_at) {
           const createdDate = new Date(row.created_at);
-          if (!isNaN(createdDate.getTime())) {
-            return createdDate.getTime();
-          }
+          if (!isNaN(createdDate.getTime())) return createdDate.getTime();
         }
-
-        // If all else fails, return 0 (will be sorted to beginning)
         return 0;
       };
-
-      const dateA = parseDate(a);
-      const dateB = parseDate(b);
-      return dateA - dateB;
+      return parseDate(a) - parseDate(b);
     });
-  }, [calendarRows, calendarSearch, calendarStatusFilter]);
+  }, [calendarRows, calendarSearch, calendarStatusFilter, location.pathname]);
 
   const calendarStatusOptions = useMemo(() => {
     const base = statusOptions.filter((opt) => opt && opt.trim());
@@ -1834,7 +1850,7 @@ function App() {
     if (/^\/company\/[^/]+\/dashboard(?:\/|$)/.test(path)) return 'dashboard';
     if (/^\/company\/[^/]+\/generate(?:\/|$)/.test(path)) return 'generate';
     if (/^\/company\/[^/]+\/calendar(?:\/|$)/.test(path)) return 'calendar';
-    if (/^\/company\/[^/]+\/drafts(?:\/|$)/.test(path)) return 'drafts';
+    if (/^\/company\/[^/]+\/studio(?:\/|$)/.test(path)) return 'studio';
     if (/^\/company\/[^/]+\/integrations(?:\/|$)/.test(path)) return 'integrations';
     if (/^\/company\/[^/]+\/settings(?:\/|$)/.test(path)) return 'settings';
     return null;
@@ -1847,6 +1863,7 @@ function App() {
       review: 0,
       generate: 0,
       draft: 0,
+      scheduled: 0, // Initialize scheduled count
       upcoming7: 0,
     };
     const now = new Date();
@@ -1858,6 +1875,7 @@ function App() {
       if (status === 'approved') counts.approved += 1;
       else if (status === 'review') counts.review += 1;
       else if (status === 'generate') counts.generate += 1;
+      else if (status === 'scheduled') counts.scheduled += 1; // Count scheduled items
       else counts.draft += 1;
 
       if (row.date) {
@@ -2774,6 +2792,7 @@ function App() {
                   path="/company/:companyId/calendar"
                   element={
                     <CalendarPage
+                      viewMode="drafts"
                       calendarSearch={calendarSearch}
                       setCalendarSearch={setCalendarSearch}
                       calendarStatusFilter={calendarStatusFilter}
@@ -2806,14 +2825,57 @@ function App() {
                       page={page}
                       setPage={setPage}
                       currentPageRows={currentPageRows}
+                      getImageGeneratedUrl={getImageGeneratedUrl}
                     />
                   }
                 />
 
                 <Route
-                  path="/company/:companyId/drafts"
+                  path="/company/:companyId/calendar/published"
                   element={
-                    <DraftsPage
+                    <CalendarPage
+                      viewMode="published"
+                      calendarSearch={calendarSearch}
+                      setCalendarSearch={setCalendarSearch}
+                      calendarStatusFilter={calendarStatusFilter}
+                      setCalendarStatusFilter={setCalendarStatusFilter}
+                      calendarStatusOptions={calendarStatusOptions}
+                      selectedIds={selectedIds}
+                      isBatchGenerating={isBatchGenerating}
+                      isBatchReviewing={isBatchReviewing}
+                      isBatchGeneratingImages={isBatchGeneratingImages}
+                      handleBatchGenerate={handleBatchGenerate}
+                      handleBatchReview={handleBatchReview}
+                      handleBatchGenerateImages={handleBatchGenerateImages}
+                      openCsvModal={openCsvModal}
+                      openCopyModal={openCopyModal}
+                      handleDeleteSelected={handleDeleteSelected}
+                      isBackendWaking={isBackendWaking}
+                      calendarError={calendarError}
+                      isLoadingCalendar={isLoadingCalendar}
+                      calendarRows={calendarRows}
+                      filteredCalendarRows={filteredCalendarRows}
+                      activeCompanyId={activeCompanyId}
+                      isPageFullySelected={isPageFullySelected}
+                      toggleSelectAllOnPage={toggleSelectAllOnPage}
+                      toggleSelectOne={toggleSelectOne}
+                      getStatusValue={getStatusValue}
+                      setSelectedRow={setSelectedRow}
+                      setIsViewModalOpen={setIsViewModalOpen}
+                      pageSize={pageSize}
+                      setPageSize={setPageSize}
+                      page={page}
+                      setPage={setPage}
+                      currentPageRows={currentPageRows}
+                      getImageGeneratedUrl={getImageGeneratedUrl}
+                    />
+                  }
+                />
+
+                <Route
+                  path="/company/:companyId/studio"
+                  element={
+                    <StudioPage
                       calendarRows={calendarRows}
                       getStatusValue={getStatusValue}
                       getImageGeneratedUrl={getImageGeneratedUrl}
@@ -2947,6 +3009,19 @@ function App() {
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       connectedAccounts={connectedAccounts}
                       onConnectLinkedIn={handleConnectLinkedIn}
+                      onConnectFacebook={handleConnectFacebook}
+                    />
+                  }
+                />
+                <Route
+                  path="/company/:companyId/studio/:contentId"
+                  element={
+                    <StudioEditorPage
+                      activeCompanyId={activeCompanyId || ''}
+                      backendBaseUrl={backendBaseUrl}
+                      authedFetch={authedFetch}
+                      notify={notify}
+                      getImageGeneratedUrl={getImageGeneratedUrl}
                     />
                   }
                 />
@@ -2996,6 +3071,7 @@ function App() {
                       saveBrandSetup={saveBrandSetup}
                       connectedAccounts={connectedAccounts}
                       onConnectLinkedIn={handleConnectLinkedIn}
+                      onConnectFacebook={handleConnectFacebook}
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       sendBrandWebhook={sendBrandWebhook}
                       buildFormAnswer={buildFormAnswer}
@@ -3186,6 +3262,126 @@ function App() {
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       connectedAccounts={connectedAccounts}
                       onConnectLinkedIn={handleConnectLinkedIn}
+                      onConnectFacebook={handleConnectFacebook}
+                      isEditingBrandSetup={isEditingBrandSetup}
+                      brandEditingRef={brandEditingRef}
+                      formAnswerCache={formAnswerCache}
+                    />}
+                />
+                <Route
+                  path="/company/:companyId/settings/integrations"
+                  element={
+                    <SettingsPage
+                      tab="integrations"
+                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+                      brandIntelligenceReady={brandIntelligenceReady}
+                      brandSetupMode={brandSetupMode}
+                      setBrandSetupMode={setBrandSetupMode}
+                      brandSetupLevel={brandSetupLevel}
+                      setBrandSetupLevel={setBrandSetupLevel}
+                      brandSetupStep={brandSetupStep}
+                      setBrandSetupStep={setBrandSetupStep}
+                      setIsEditingBrandSetup={setIsEditingBrandSetup}
+                      collaborators={collaborators}
+                      companyName={companyName}
+                      setCompanyName={setCompanyName}
+                      companyDescription={companyDescription}
+                      setCompanyDescription={setCompanyDescription}
+                      loadBrandKB={loadBrandKB}
+                      brandKbId={brandKbId}
+                      brandPack={brandPack}
+                      setBrandPack={setBrandPack}
+                      brandCapability={brandCapability}
+                      setBrandCapability={setBrandCapability}
+                      emojiRule={emojiRule}
+                      setEmojiRule={setEmojiRule}
+                      systemInstruction={systemInstruction}
+                      setSystemInstruction={setSystemInstruction}
+                      aiWriterSystemPrompt={aiWriterSystemPrompt}
+                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
+                      aiWriterUserPrompt={aiWriterUserPrompt}
+                      setAiWriterUserPrompt={setAiWriterUserPrompt}
+                      activeBrandRuleEdit={activeBrandRuleEdit}
+                      brandRuleDraft={brandRuleDraft}
+                      setBrandRuleDraft={setBrandRuleDraft}
+                      startBrandRuleEdit={startBrandRuleEdit}
+                      cancelBrandRuleEdit={cancelBrandRuleEdit}
+                      saveBrandRuleEdit={saveBrandRuleEdit}
+                      saveBrandSetup={saveBrandSetup}
+                      sendBrandWebhook={sendBrandWebhook}
+                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
+                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
+                      buildFormAnswer={buildFormAnswer}
+                      industryOptions={industryOptions}
+                      audienceRoleOptions={audienceRoleOptions}
+                      painPointOptions={painPointOptions}
+                      noSayOptions={noSayOptions}
+                      brandBasicsName={brandBasicsName}
+                      setBrandBasicsName={setBrandBasicsName}
+                      brandBasicsIndustry={brandBasicsIndustry}
+                      setBrandBasicsIndustry={setBrandBasicsIndustry}
+                      brandBasicsType={brandBasicsType}
+                      setBrandBasicsType={setBrandBasicsType}
+                      brandBasicsOffer={brandBasicsOffer}
+                      setBrandBasicsOffer={setBrandBasicsOffer}
+                      brandBasicsGoal={brandBasicsGoal}
+                      setBrandBasicsGoal={setBrandBasicsGoal}
+                      audienceRole={audienceRole}
+                      setAudienceRole={setAudienceRole}
+                      audienceIndustry={audienceIndustry}
+                      setAudienceIndustry={setAudienceIndustry}
+                      audiencePainPoints={audiencePainPoints}
+                      setAudiencePainPoints={setAudiencePainPoints}
+                      audienceOutcome={audienceOutcome}
+                      setAudienceOutcome={setAudienceOutcome}
+                      toneFormal={toneFormal}
+                      setToneFormal={setToneFormal}
+                      toneEnergy={toneEnergy}
+                      setToneEnergy={setToneEnergy}
+                      toneBold={toneBold}
+                      setToneBold={setToneBold}
+                      emojiUsage={emojiUsage}
+                      setEmojiUsage={setEmojiUsage}
+                      writingLength={writingLength}
+                      setWritingLength={setWritingLength}
+                      ctaStrength={ctaStrength}
+                      setCtaStrength={setCtaStrength}
+                      absoluteTruths={absoluteTruths}
+                      setAbsoluteTruths={setAbsoluteTruths}
+                      noSayRules={noSayRules}
+                      setNoSayRules={setNoSayRules}
+                      regulatedIndustry={regulatedIndustry}
+                      setRegulatedIndustry={setRegulatedIndustry}
+                      legalReview={legalReview}
+                      setLegalReview={setLegalReview}
+                      advancedPositioning={advancedPositioning}
+                      setAdvancedPositioning={setAdvancedPositioning}
+                      advancedDifferentiators={advancedDifferentiators}
+                      setAdvancedDifferentiators={setAdvancedDifferentiators}
+                      advancedPillars={advancedPillars}
+                      setAdvancedPillars={setAdvancedPillars}
+                      advancedCompetitors={advancedCompetitors}
+                      setAdvancedCompetitors={setAdvancedCompetitors}
+                      advancedProofPoints={advancedProofPoints}
+                      setAdvancedProofPoints={setAdvancedProofPoints}
+                      advancedRequiredPhrases={advancedRequiredPhrases}
+                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
+                      advancedForbiddenPhrases={advancedForbiddenPhrases}
+                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
+                      advancedComplianceNotes={advancedComplianceNotes}
+                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
+                      writerRulesUnlocked={writerRulesUnlocked}
+                      reviewerRulesUnlocked={reviewerRulesUnlocked}
+                      newCollaboratorEmail={newCollaboratorEmail}
+                      setNewCollaboratorEmail={setNewCollaboratorEmail}
+                      onAddCollaborator={handleAddCollaborator}
+                      onRemoveCollaborator={handleRemoveCollaborator}
+                      onTransferOwnership={handleTransferOwnership}
+                      isOwner={activeCompany?.user_id === session?.user?.id}
+                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
+                      connectedAccounts={connectedAccounts}
+                      onConnectLinkedIn={handleConnectLinkedIn}
+                      onConnectFacebook={handleConnectFacebook}
                       isEditingBrandSetup={isEditingBrandSetup}
                       brandEditingRef={brandEditingRef}
                       formAnswerCache={formAnswerCache}

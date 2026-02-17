@@ -12,6 +12,11 @@ const authMiddleware = async (req, res, next) => {
     return next();
   }
 
+  // Allow OAuth callbacks to pass through (browser redirect doesn't have auth header)
+  if (req.path === '/auth/linkedin/callback' || req.path === '/auth/facebook/callback') {
+    return next();
+  }
+
   try {
     const token = getTokenFromHeader(req);
     if (!token) {

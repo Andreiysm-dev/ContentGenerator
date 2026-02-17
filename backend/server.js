@@ -15,9 +15,10 @@ import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
 
-console.log('DEBUG: Backend started');
-console.log('DEBUG: Working directory:', process.cwd());
 // Image generation is hardcoded to Imagen 4.0 in imageGenerationService.js for stability
+import { initScheduler } from './services/schedulerService.js';
+
+initScheduler();
 
 
 const app = express();
@@ -48,6 +49,4 @@ app.use("/api", accountRoutes);
 app.use("/api", authRoutes);
 app.use("/api", socialRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+app.listen(PORT, () => { });

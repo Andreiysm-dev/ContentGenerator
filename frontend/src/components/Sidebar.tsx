@@ -134,8 +134,8 @@ export function Sidebar({
                 { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "dashboard", tourId: "dashboard" },
                 { key: "generate", label: "Create", icon: Wand2, path: "generate", tourId: "create" },
                 { key: "calendar", label: "Calendar", icon: CalendarDays, path: "calendar", tourId: "calendar" },
-                { key: "drafts", label: "Drafts", icon: FileText, path: "drafts", tourId: "drafts" },
-                { key: "settings", label: "Company Settings", icon: Settings, path: "settings/overview", tourId: "company-settings" },
+                { key: "studio", label: "Studio", icon: FileText, path: "studio", tourId: "studio" },
+                { key: "settings", label: "Settings", icon: Settings, path: "settings/overview", tourId: "company-settings" },
               ].map((item) => {
                 const Icon = item.icon;
                 const isActive = activeNavKey === item.key;
