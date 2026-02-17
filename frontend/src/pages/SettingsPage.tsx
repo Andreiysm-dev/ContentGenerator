@@ -115,6 +115,8 @@ export type CompanySettingsShellProps = {
   isEditingBrandSetup: boolean;
   brandEditingRef: React.RefObject<boolean>;
   formAnswerCache: any;
+  connectedAccounts: any[];
+  onConnectLinkedIn: () => void;
 };
 
 const TabLink = ({ to, id, children, pressedTab, onClick }: { to: string; id: CompanySettingsTab; children: React.ReactNode; pressedTab: string | null; onClick: () => void }) => (
@@ -296,6 +298,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     isEditingBrandSetup,
     brandEditingRef,
     formAnswerCache,
+    connectedAccounts,
+    onConnectLinkedIn,
   } = props;
 
   const navigate = useNavigate();
@@ -305,6 +309,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   const hasBrandIntelligenceConfigured = !!brandIntelligenceReady;
   const resolvedBrandSetupType = brandSetupLevel || brandSetupMode || null;
   const [pressedTab, setPressedTab] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (decodedId) {
@@ -317,6 +322,27 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     const timeout = window.setTimeout(() => setPressedTab(null), 220);
     return () => window.clearTimeout(timeout);
   }, [pressedTab]);
+
+
+
+  // Handle OAuth Redirect Params
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const error = searchParams.get('error');
+    const success = searchParams.get('success');
+
+    if (error === 'linkedin_auth_failed') {
+      alert('Failed to connect LinkedIn. Please try again.');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (success === 'linkedin_connected') {
+      alert('LinkedIn connected successfully!');
+      window.history.replaceState({}, '', window.location.pathname);
+      // Refresh accounts
+    }
+  }, []);
+
+
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
@@ -542,7 +568,49 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                     <div className="text-md md:text-xl font-bold">Integrations</div>
                     <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Connect services used for publishing, approvals, and automation.</p>
                   </div>
-                  <div className="text-sm text-slate-500 py-4">Coming soon.</div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <Card title="Social Accounts" subtitle="Connect your social media profiles to enable auto-publishing.">
+                      <div className="space-y-4">
+                        {connectedAccounts.length === 0 ? (
+                          <p className="text-sm text-slate-500 italic">No accounts connected yet.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {connectedAccounts.map(acc => (
+                              <div key={acc.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-slate-50">
+                                <div className="flex items-center gap-3">
+                                  {acc.profile_picture ? (
+                                    <img src={acc.profile_picture} alt={acc.provider} className="w-10 h-10 rounded-full" />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold">
+                                      {acc.provider[0].toUpperCase()}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="text-sm font-bold text-slate-900 capitalize">{acc.provider}</div>
+                                    <div className="text-xs text-slate-600">{acc.profile_name || 'Connected'}</div>
+                                  </div>
+                                </div>
+                                <div className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded-full border border-green-200">
+                                  Active
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={onConnectLinkedIn}
+                            className="flex items-center gap-2 px-4 py-2 bg-[#0077b5] text-white rounded-lg font-semibold text-sm hover:bg-[#006097] transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
+                            Connect LinkedIn
+                          </button>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
                 </div>
               )}
             </div>

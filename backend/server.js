@@ -9,6 +9,8 @@ import collaboratorRoutes from './routes/collaboratorRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import websiteAnalyzerRoutes from './routes/websiteAnalyzerRoutes.js';
 import accountRoutes from './routes/accountRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import socialRoutes from './routes/socialRoutes.js';
 import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
@@ -43,6 +45,8 @@ app.use("/api", storageRoutes);
 app.use("/api", collaboratorRoutes);
 app.use("/api", profileRoutes);
 app.use("/api", accountRoutes);
+app.use("/api", authRoutes);
+app.use("/api", socialRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

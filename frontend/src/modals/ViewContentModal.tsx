@@ -84,27 +84,65 @@ export function ViewContentModal({
                                 Review inputs, generated outputs, and final approvals.
                             </p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-brand-dark/70 border border-slate-200/60">
-                                {getStatusValue(selectedRow.status) || 'Draft'}
-                            </span>
-
+                        <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2"
-                                onClick={() => {
+                                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px]"
+                                onClick={async () => {
                                     if (!selectedRow?.finalCaption) {
-                                        notify(
-                                            'Add a final caption before preparing this content for publishing.',
-                                            'error',
-                                        );
+                                        notify('Add a final caption first.', 'error');
                                         return;
                                     }
-                                    setDraftPublishIntent('draft');
-                                    setIsDraftModalOpen(true);
+
+                                    // Check for LinkedIn connection
+                                    // Ideally we should have this state passed down or fetch it.
+                                    // For MVP, letting them Try to publish and handling error is one way, 
+                                    // OR we fetch accounts when modal opens.
+                                    // Since we don't have 'connectedAccounts' here easily without prop drilling from App -> ViewContentModal,
+                                    // let's try to Publish and if it fails saying "No account", we tell them.
+
+                                    const proceed = await requestConfirm({
+                                        title: 'Publish to LinkedIn?',
+                                        description: 'This will post the Final Caption immediately to your connected LinkedIn account.',
+                                        confirmLabel: 'Post Now',
+                                        cancelLabel: 'Cancel'
+                                    });
+
+                                    if (!proceed) return;
+
+                                    try {
+                                        const res = await authedFetch(`${backendBaseUrl}/api/social/${activeCompanyId}/publish`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                provider: 'linkedin',
+                                                content: {
+                                                    text: [selectedRow.finalCaption, selectedRow.finalHashtags].filter(Boolean).join('\n\n')
+                                                    // TODO: Add Image URL here once supported
+                                                }
+                                            })
+                                        });
+
+                                        const data = await res.json();
+
+                                        if (!res.ok) {
+                                            throw new Error(data.error || 'Failed to publish');
+                                        }
+
+                                        notify('Published to LinkedIn successfully!', 'success');
+
+                                        // Update status to 'Published' locally or refetch
+                                        // await refreshCalendarRow(selectedRow.contentCalendarId);
+
+                                    } catch (e: any) {
+                                        console.error(e);
+                                        notify(`Failed to publish: ${e.message}. Go to Settings > Integrations to connect LinkedIn.`, 'error');
+                                    }
                                 }}
                             >
-                                Draft &amp; Publish
+                                {/* LinkedIn Icon or Generic Publish Icon */}
+                                <svg className="w-4 h-4 mr-2" fill="#0077b5" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
+                                Publish to LinkedIn
                             </button>
 
                             <button

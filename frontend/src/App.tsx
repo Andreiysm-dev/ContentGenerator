@@ -152,6 +152,7 @@ function App() {
   const [csvScope, setCsvScope] = useState<'selected' | 'all'>('selected');
 
   const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: 'owner' | 'collaborator' }>>([]);
+  const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
 
   const fetchCollaborators = async (companyId: string) => {
@@ -447,6 +448,45 @@ function App() {
     if (!isTeamRoute) return;
     if (!activeCompanyId) return;
     fetchCollaborators(activeCompanyId);
+  }, [location.pathname, activeCompanyId]);
+
+  const fetchConnectedAccounts = async (companyId: string) => {
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/social/${companyId}/accounts`);
+      const data = await res.json();
+      if (!res.ok) {
+        // notify(data.error || 'Failed to load social accounts.', 'error');
+        return;
+      }
+      setConnectedAccounts(data.accounts || []);
+    } catch (err) {
+      console.error('Failed to load social accounts.', err);
+    }
+  };
+
+  const handleConnectLinkedIn = async () => {
+    if (!activeCompanyId) return;
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/auth/linkedin/connect?companyId=${activeCompanyId}`);
+      if (!res.ok) {
+        notify('Failed to initiate LinkedIn connection.', 'error');
+        return;
+      }
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (e) {
+      console.error('LinkedIn connect error:', e);
+      notify('Failed to connect LinkedIn.', 'error');
+    }
+  };
+
+  useEffect(() => {
+    const isIntegrationsRoute = /^\/company\/[^/]+\/settings\/integrations\/?$/.test(location.pathname);
+    if (!isIntegrationsRoute) return;
+    if (!activeCompanyId) return;
+    fetchConnectedAccounts(activeCompanyId);
   }, [location.pathname, activeCompanyId]);
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
@@ -2059,6 +2099,8 @@ function App() {
           rowIds: validRows.map((row) => row.contentCalendarId),
           brandKbId,
           systemInstruction: systemInstruction ?? '',
+          provider: 'fal',
+          model: 'fal-ai/nano-banana-pro',
         }),
       });
       if (!res.ok) {
@@ -3141,6 +3183,8 @@ function App() {
                       isEditingBrandSetup={isEditingBrandSetup}
                       brandEditingRef={brandEditingRef}
                       formAnswerCache={formAnswerCache}
+                      connectedAccounts={connectedAccounts}
+                      onConnectLinkedIn={handleConnectLinkedIn}
                     />}
                 />
                 <Route path="/company/:companyId/integrations" element={<IntegrationsPage />} />
