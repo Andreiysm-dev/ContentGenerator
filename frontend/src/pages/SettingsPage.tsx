@@ -648,7 +648,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                     type="button"
                                     onClick={async () => {
                                       await onDisconnectAccount(acc.id);
-                                      fetchAccounts();
+                                      setLocalAccounts(prev => prev.filter(a => a.id !== acc.id));
                                     }}
                                     className="text-xs font-bold text-slate-400 hover:text-red-600 transition-colors uppercase tracking-wider"
                                   >
