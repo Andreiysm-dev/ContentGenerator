@@ -64,21 +64,14 @@ export function ImageGenerationModal({
     startWaitingForImageUpdate,
 }: ImageGenerationModalProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [provider, setProvider] = useState<'google' | 'replicate' | 'fal'>('google');
-    const [selectedModel, setSelectedModel] = useState('black-forest-labs/flux-dev');
+    const [showModelSelection, setShowModelSelection] = useState(false);
+    const [provider, setProvider] = useState<'google' | 'replicate' | 'fal'>('fal');
+    const [selectedModel, setSelectedModel] = useState('fal-ai/nano-banana-pro');
 
-    const REPLICATE_MODELS = [
-        { id: 'black-forest-labs/flux-dev', name: 'Flux Dev (Premium)' },
-        { id: 'black-forest-labs/flux-schnell', name: 'Flux Schnell (Fast)' },
-        { id: 'stability-ai/sdxl', name: 'Stable Diffusion XL' },
-        { id: 'bytedance/sdxl-lightning-4step', name: 'SDXL Lightning (Ultra Fast)' },
-    ];
-
-    const FAL_MODELS = [
-        { id: 'fal-ai/flux-pro/v1.1', name: 'Flux Pro 1.1 (High Quality)' },
-        { id: 'fal-ai/flux-pro', name: 'Flux Pro (Standard)' },
-        { id: 'fal-ai/flux/dev', name: 'Flux Dev' },
-        { id: 'fal-ai/flux/schnell', name: 'Flux Schnell (Speed)' },
+    const ALL_MODELS = [
+        { id: 'fal-ai/nano-banana-pro', name: 'Google Nano Banana Pro', provider: 'fal', group: 'Fal.ai' },
+        { id: 'google-imagen', name: 'Google Imagen', provider: 'google', group: 'Google' },
+        { id: 'imagineart/imagineart-1.5-preview/text-to-image', name: 'Imagine Art', provider: 'fal', group: 'Fal.ai' },
     ];
     if (!isOpen || !selectedRow) return null;
 
@@ -259,49 +252,57 @@ export function ImageGenerationModal({
                                 <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">Preview</h3>
 
                                 {/* Options Panel */}
-                                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/30 space-y-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Provider</label>
-                                        <div className="flex p-1 bg-slate-200/50 rounded-xl">
+                                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4">
+                                    {!showModelSelection ? (
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Model</label>
+                                                <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                                    {ALL_MODELS.find(m => m.id === selectedModel)?.name || 'Unknown Model'}
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#3fa9f5]/10 text-[#3fa9f5] border border-[#3fa9f5]/20">Active</span>
+                                                </div>
+                                            </div>
                                             <button
-                                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${provider === 'google' ? 'bg-white shadow-sm text-[#3fa9f5]' : 'text-slate-500'}`}
-                                                onClick={() => setProvider('google')}
+                                                onClick={() => setShowModelSelection(true)}
+                                                className="text-xs font-bold text-[#3fa9f5] hover:text-[#2f97e6] hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
                                             >
-                                                Google Imagen
-                                            </button>
-                                            <button
-                                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${provider === 'replicate' ? 'bg-white shadow-sm text-[#3fa9f5]' : 'text-slate-500'}`}
-                                                onClick={() => setProvider('replicate')}
-                                            >
-                                                Replicate
-                                            </button>
-                                            <button
-                                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${provider === 'fal' ? 'bg-white shadow-sm text-[#3fa9f5]' : 'text-slate-500'}`}
-                                                onClick={() => {
-                                                    setProvider('fal');
-                                                    setSelectedModel('fal-ai/flux-pro/v1.1');
-                                                }}
-                                            >
-                                                Fal.ai
+                                                Change Model
                                             </button>
                                         </div>
-                                    </div>
-
-                                    {(provider === 'replicate' || provider === 'fal') && (
-                                        <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Model</label>
-                                            <select
-                                                className="w-full text-xs font-bold bg-white border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-[#3fa9f5]/20"
-                                                value={selectedModel}
-                                                onChange={(e) => setSelectedModel(e.target.value)}
-                                            >
-                                                {provider === 'replicate' && REPLICATE_MODELS.map(m => (
-                                                    <option key={m.id} value={m.id}>{m.name}</option>
-                                                ))}
-                                                {provider === 'fal' && FAL_MODELS.map(m => (
-                                                    <option key={m.id} value={m.id}>{m.name}</option>
-                                                ))}
-                                            </select>
+                                    ) : (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Provider</label>
+                                                <button
+                                                    onClick={() => setShowModelSelection(false)}
+                                                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-2 py-1 rounded hover:bg-slate-200/50 transition-colors"
+                                                >
+                                                    Done
+                                                </button>
+                                            </div>
+                                            <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Model</label>
+                                                <select
+                                                    className="w-full text-xs font-bold bg-white border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-[#3fa9f5]/20"
+                                                    value={selectedModel}
+                                                    onChange={(e) => {
+                                                        const newModelId = e.target.value;
+                                                        const modelData = ALL_MODELS.find(m => m.id === newModelId);
+                                                        if (modelData) {
+                                                            setSelectedModel(newModelId);
+                                                            setProvider(modelData.provider as any);
+                                                        }
+                                                    }}
+                                                >
+                                                    {Array.from(new Set(ALL_MODELS.map(m => m.group))).map(group => (
+                                                        <optgroup key={group} label={group}>
+                                                            {ALL_MODELS.filter(m => m.group === group).map(m => (
+                                                                <option key={m.id} value={m.id}>{m.name}</option>
+                                                            ))}
+                                                        </optgroup>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         </div>
                                     )}
                                 </div>

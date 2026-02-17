@@ -233,7 +233,7 @@ export const updateContentCalendar = async (req, res) => {
         const access = await verifyCompanyAccess(userId, existing.companyId);
         if (!access.ok) return res.status(access.status).json({ error: 'Forbidden' });
 
-        const { contentCalendarId, companyId, created_at, ...updateData } = req.body;
+        const { contentCalendarId, companyId, created_at, provider, model, ...updateData } = req.body;
         if (Object.keys(updateData).length === 0) return res.status(400).json({ error: 'No fields to update' });
 
         const { data: row, error } = await db

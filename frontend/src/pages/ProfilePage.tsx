@@ -8,6 +8,7 @@ interface ProfilePageProps {
 }
 
 export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
+  const backendBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
@@ -126,8 +127,8 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
         return;
       }
 
-      // Use relative path - Vite proxy handles forwarding to backend
-      const res = await fetch('/api/account/companies', {
+      // Use configurable backend URL (relative in dev via proxy, absolute in prod)
+      const res = await fetch(`${backendBaseUrl}/api/account/companies`, {
         headers: {
           'Authorization': `Bearer ${currentSession.access_token}`
         }
@@ -164,7 +165,8 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
 
       // Use relative path - Vite proxy will handle forwarding to backend in dev
       // In production, this falls back to same origin which is correct
-      const res = await fetch('/api/account', {
+      // Use configurable backend URL
+      const res = await fetch(`${backendBaseUrl}/api/account`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${currentSession.access_token}`
