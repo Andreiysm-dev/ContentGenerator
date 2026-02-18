@@ -3785,7 +3785,7 @@ function App() {
           onRefresh={refreshAppData}
           isOpen={isAiAssistantOpen}
           setIsOpen={setIsAiAssistantOpen}
-          onApplyPlan={(plan) => {
+          onApplyPlan={(plan: any[]) => {
             setPreDefinedPlan(plan);
             if (activeCompanyId) {
               navigate(`/company/${activeCompanyId}/plan`);
