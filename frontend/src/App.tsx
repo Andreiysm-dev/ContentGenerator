@@ -3792,6 +3792,7 @@ function App() {
               notify("Strategy applied to planner. Review and push to calendar!", "success");
             }
           }}
+          backendBaseUrl={backendBaseUrl}
         />
       </div >
     </NotificationProvider>

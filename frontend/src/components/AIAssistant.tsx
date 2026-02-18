@@ -23,6 +23,7 @@ interface AIAssistantProps {
     isOpen: boolean;
     setIsOpen: (open: boolean) => void;
     onApplyPlan?: (plan: any[]) => void;
+    backendBaseUrl: string;
 }
 
 export function AIAssistant({
@@ -34,7 +35,8 @@ export function AIAssistant({
     onRefresh,
     isOpen,
     setIsOpen,
-    onApplyPlan
+    onApplyPlan,
+    backendBaseUrl
 }: AIAssistantProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -132,7 +134,7 @@ export function AIAssistant({
         setIsTyping(true);
 
         try {
-            const res = await authedFetch(`/api/assistant/chat`, {
+            const res = await authedFetch(`${backendBaseUrl}/api/assistant/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
