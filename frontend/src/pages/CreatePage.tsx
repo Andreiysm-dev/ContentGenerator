@@ -33,11 +33,11 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
         <div className="absolute top-[-15%] right-[-8%] w-[45%] h-[45%] bg-gradient-to-bl from-[#3fa9f5]/22 to-[#a78bfa]/18 rounded-full blur-[110px] animate-pulse" />
         <div className="absolute bottom-[-12%] left-[-6%] w-[42%] h-[42%] bg-gradient-to-tr from-[#e5a4e6]/16 to-[#6fb6e8]/14 rounded-full blur-[105px] animate-pulse" style={{ animationDelay: '500ms' }} />
       </div>
-      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
-        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
+      <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+        <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
           <div>
-            <h2 className="text-md md:text-xl font-bold">Content Generator</h2>
-            <p className="mt-1 text-sm font-medium">Create captions and content drafts for your calendar.</p>
+            <h2 className="text-sm md:text-lg font-bold">Content Generator</h2>
+            <p className="mt-0.5 text-xs font-medium">Create captions and content drafts for your calendar.</p>
           </div>
           <div>
             <button

@@ -395,10 +395,10 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
       <main className="flex-1 flex flex-col overflow-hidden p-2.5 md:p-6">
-        <div className="w-full max-w-[1200px] mx-auto bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+        <div className="w-full bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
           {/* Tabs Navigation */}
-          <div className="z-30 bg-white px-4 md:px-6 pt-4 md:pt-6 pb-2">
-            <div className="relative flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-slate-200/70 bg-white p-2 shadow-sm">
+          <div className="z-30 bg-white px-4 md:px-6 pt-1 md:pt-2 pb-1.5">
+            <div className="relative flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-white p-1 shadow-sm">
               <TabLink to={`${companyUrlBase}/overview`} id="overview" pressedTab={pressedTab} onClick={() => setPressedTab("overview")}>
                 Overview
               </TabLink>

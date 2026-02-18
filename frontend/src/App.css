@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
+html {
+  font-size: 15px;
+}
+
 :root {
   color-scheme: light;
   --font-display: 'Helvetica Now', 'Helvetica Neue', Helvetica, Arial, 'Poppins', sans-serif;
@@ -19,7 +23,7 @@
   --status-complete: #a78bfa;
   --status-draft: #385980;
   --status-generating: #81bad1;
-    --danger-500: #ef4444;
+  --danger-500: #ef4444;
   --danger-400: #f87171;
 }
 
@@ -38,8 +42,9 @@
 input,
 select,
 textarea {
-  
-  outline: none; /* remove default outline */
+
+  outline: none;
+  /* remove default outline */
   transition: border 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -49,7 +54,8 @@ input:focus,
 select:focus,
 textarea:focus,
 input[type="file"]:focus {
-  border-color: #3fa9f5; /* darker blue on focus */
+  border-color: #3fa9f5;
+  /* darker blue on focus */
   box-shadow: 0 0 0 2px rgba(63, 169, 245, 0.2);
 }
 
@@ -60,6 +66,11 @@ body {
   background: var(--surface-raise);
   font-family: var(--font-body);
   color: var(--ink-900);
+  /* Normalize text rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
 }
 
 
@@ -124,3 +135,12 @@ body {
   font-size: 0.8rem;
 }
 
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

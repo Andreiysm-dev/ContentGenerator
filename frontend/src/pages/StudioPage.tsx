@@ -36,11 +36,11 @@ export function StudioPage({ calendarRows, getStatusValue, getImageGeneratedUrl,
         <div className="absolute top-[-10%] right-[-6%] w-[36%] h-[36%] bg-gradient-to-bl from-[#81bad1]/16 to-[#6fb6e8]/12 rounded-full blur-[85px] animate-pulse" />
         <div className="absolute bottom-[-12%] left-[-4%] w-[38%] h-[38%] bg-gradient-to-tr from-[#e5a4e6]/12 to-[#a78bfa]/10 rounded-full blur-[90px] animate-pulse" style={{ animationDelay: '600ms' }} />
       </div>
-      <div className="w-full max-w-[1200px] mx-auto flex flex-col gap-6 relative z-10">
-        <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
+      <div className="w-full flex flex-col gap-6 relative z-10">
+        <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+          <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
             <div>
-              <div className="text-md md:text-xl font-bold">Studio</div>
+              <div className="text-sm md:text-lg font-bold">Studio</div>
 
               <p className="mt-1 text-sm font-medium flex flex-wrap items-center gap-2">
                 {draftCount > 0 ? (

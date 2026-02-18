@@ -41,7 +41,9 @@ import { ProfilePage } from '@/pages/ProfilePage';
 import { SettingsPage, type CompanySettingsTab } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
+import { PostInsightsPage } from '@/pages/PostInsightsPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { MediaLibraryPage } from '@/pages/MediaLibraryPage';
 import Faq from "@/pages/Faq";
 
 import {
@@ -1882,9 +1884,12 @@ function App() {
     const path = location.pathname;
     if (/^\/company\/[^/]+\/dashboard(?:\/|$)/.test(path)) return 'dashboard';
     if (/^\/company\/[^/]+\/generate(?:\/|$)/.test(path)) return 'generate';
+    if (/^\/company\/[^/]+\/calendar\/published(?:\/|$)/.test(path)) return 'published';
     if (/^\/company\/[^/]+\/calendar(?:\/|$)/.test(path)) return 'calendar';
     if (/^\/company\/[^/]+\/studio(?:\/|$)/.test(path)) return 'studio';
     if (/^\/company\/[^/]+\/integrations(?:\/|$)/.test(path)) return 'integrations';
+    if (/^\/company\/[^/]+\/insights(?:\/|$)/.test(path)) return 'insights';
+    if (/^\/company\/[^/]+\/library(?:\/|$)/.test(path)) return 'library';
     if (/^\/company\/[^/]+\/settings(?:\/|$)/.test(path)) return 'settings';
     return null;
   }, [location.pathname]);
@@ -2926,6 +2931,31 @@ function App() {
                       setSelectedRow={setSelectedRow}
                       setIsViewModalOpen={setIsViewModalOpen}
                       notify={notify}
+                      activeCompanyId={activeCompanyId}
+                    />
+                  }
+                />
+
+                <Route
+                  path="/company/:companyId/library"
+                  element={
+                    <MediaLibraryPage
+                      calendarRows={calendarRows}
+                      getImageGeneratedUrl={getImageGeneratedUrl}
+                      getAttachedDesignUrls={getAttachedDesignUrls}
+                      setSelectedRow={setSelectedRow}
+                      setIsViewModalOpen={setIsViewModalOpen}
+                      activeCompanyId={activeCompanyId}
+                    />
+                  }
+                />
+
+                <Route
+                  path="/company/:companyId/insights"
+                  element={
+                    <PostInsightsPage
+                      calendarRows={calendarRows}
+                      getStatusValue={getStatusValue}
                       activeCompanyId={activeCompanyId}
                     />
                   }

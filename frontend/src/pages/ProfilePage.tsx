@@ -204,11 +204,11 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
         <div className="absolute top-[-10%] right-[-7%] w-[40%] h-[40%] bg-gradient-to-bl from-[#3fa9f5]/17 to-[#6fb6e8]/13 rounded-full blur-[95px] animate-pulse" />
         <div className="absolute bottom-[-12%] left-[-5%] w-[38%] h-[38%] bg-gradient-to-tr from-[#a78bfa]/13 to-[#e5a4e6]/10 rounded-full blur-[90px] animate-pulse" style={{ animationDelay: '700ms' }} />
       </div>
-      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
-        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-blue-50 via-blue-50/50 to-white border-t border-l border-r border-blue-100 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
+      <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+        <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-blue-50 via-blue-50/50 to-white border-t border-l border-r border-blue-100 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
           <div>
-            <h2 className="text-md md:text-xl font-bold">Personal Information</h2>
-            <p className="mt-1 text-sm font-medium">Manage your personal details.</p>
+            <h2 className="text-sm md:text-lg font-bold">Personal Information</h2>
+            <p className="mt-0.5 text-xs font-medium">Manage your personal details.</p>
           </div>
 
           <div className="flex gap-3">
@@ -230,11 +230,11 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
             <p className="text-gray-500 text-sm">{session?.user?.email}</p>
           </div>
         </div>
-        <div className="w-full max-w-[1200px] mx-auto bg-white border-slate-200/60 not-[]:shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 md:gap-0 shadow-sm">
+        <div className="w-full bg-white border-slate-200/60 not-[]:shadow-sm overflow-hidden flex flex-col h-full">
+          <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 tracking-tight">Account Credentials</h2>
-              <p className="text-sm text-gray-500 font-medium">Manage your login email and password.</p>
+              <h2 className="text-sm md:text-lg font-bold text-gray-900 tracking-tight">Account Credentials</h2>
+              <p className="text-xs text-gray-500 font-medium">Manage your login email and password.</p>
             </div>
 
             <div className="flex inline-flex">

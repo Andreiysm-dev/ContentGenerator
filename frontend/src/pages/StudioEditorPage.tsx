@@ -320,7 +320,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
 
                 {/* 2. Editor (40%) */}
                 <div className="flex-1 min-w-[400px] overflow-y-auto border-r border-slate-200 bg-white p-6">
-                    <div className="max-w-xl mx-auto space-y-6">
+                    <div className="space-y-6">
 
                         {/* Platform Select */}
                         <div>

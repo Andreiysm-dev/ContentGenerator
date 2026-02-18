@@ -1,4 +1,4 @@
-import { Building2, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, LayoutDashboard, Plus, Settings, Wand2 } from "lucide-react";
+import { BarChart3, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, Image, LayoutDashboard, Plus, Settings, Wand2 } from "lucide-react";
 import type { NavigateFunction } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -57,8 +57,8 @@ export function Sidebar({
 
       <aside
         className={`
-    fixed top-[80px] left-0 z-50
-    h-[calc(100vh-80px)]
+    fixed top-[64px] left-0 z-50
+    h-[calc(100vh-64px)]
     w-[264px] p-3.5
     bg-white text-brand-dark border-r border-[rgba(56,89,128,0.18)]
     flex flex-col
@@ -69,7 +69,7 @@ export function Sidebar({
         aria-label="Primary navigation"
       >
         {/* CONTENT ABOVE SUPPORT BUTTONS */}
-        <div className="flex-1 flex flex-col gap-3 overflow-y-auto lg:overflow-y-visible">
+        <div className="flex-1 flex flex-col gap-3 overflow-y-auto no-scrollbar pb-6">
           {/* COMPANY SELECTOR */}
           <div className="flex flex-col gap-2 px-1.5">
             <div className="text-[0.7rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold">Company</div>
@@ -129,34 +129,115 @@ export function Sidebar({
 
           {/* NAVIGATION */}
           {activeCompany && (
-            <nav className="flex flex-col gap-1 mt-4">
-              {[
-                { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "dashboard", tourId: "dashboard" },
-                { key: "generate", label: "Create", icon: Wand2, path: "generate", tourId: "create" },
-                { key: "calendar", label: "Calendar", icon: CalendarDays, path: "calendar", tourId: "calendar" },
-                { key: "studio", label: "Studio", icon: FileText, path: "studio", tourId: "studio" },
-                { key: "settings", label: "Settings", icon: Settings, path: "settings/overview", tourId: "company-settings" },
-              ].map((item) => {
-                const Icon = item.icon;
-                const isActive = activeNavKey === item.key;
+            <div className="flex flex-col gap-5 mt-4">
+              {/* Workspace */}
+              <nav className="flex flex-col gap-1">
+                <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/40 font-extrabold px-2 mb-1">Workspace</div>
+                {[
+                  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "dashboard", tourId: "dashboard" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeNavKey === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      data-tour={item.tourId}
+                      className={`flex items-center gap-2.5 py-2 px-2 rounded-xl font-medium transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
+                      onClick={() => {
+                        if (!activeCompanyId) return;
+                        navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
+                        if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
+                      }}
+                    >
+                      <Icon size={18} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
 
-                return (
-                  <button
-                    key={item.key}
-                    data-tour={item.tourId}
-                    className={`flex items-center gap-2.5 py-2.5 px-2 rounded-r-xl font-medium transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500 rounded-xl" : "hover:bg-blue-50 hover:text-blue-400"}`}
-                    onClick={() => {
-                      if (!activeCompanyId) return;
-                      navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
-                      if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
-                    }}
-                  >
-                    <Icon size={18} />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </nav>
+              {/* Content Workflow */}
+              <nav className="flex flex-col gap-1">
+                <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/40 font-extrabold px-2 mb-1">Content</div>
+                {[
+                  { key: "generate", label: "Create", icon: Wand2, path: "generate", tourId: "create" },
+                  { key: "calendar", label: "Calendar", icon: CalendarDays, path: "calendar", tourId: "calendar" },
+                  { key: "studio", label: "Studio", icon: FileText, path: "studio", tourId: "studio" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeNavKey === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      data-tour={item.tourId}
+                      className={`flex items-center gap-2.5 py-2 px-2 rounded-xl font-medium transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
+                      onClick={() => {
+                        if (!activeCompanyId) return;
+                        navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
+                        if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
+                      }}
+                    >
+                      <Icon size={18} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Performance */}
+              <nav className="flex flex-col gap-1">
+                <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/40 font-extrabold px-2 mb-1">Performance</div>
+                {[
+                  { key: "published", label: "Published", icon: CalendarCheck, path: "calendar/published", tourId: "published" },
+                  { key: "insights", label: "Post Insights", icon: BarChart3, path: "insights", tourId: "insights" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeNavKey === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      data-tour={item.tourId}
+                      className={`flex items-center gap-2.5 py-2 px-2 rounded-xl font-medium transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
+                      onClick={() => {
+                        if (!activeCompanyId) return;
+                        navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
+                        if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
+                      }}
+                    >
+                      <Icon size={18} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Resources */}
+              <nav className="flex flex-col gap-1">
+                <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/40 font-extrabold px-2 mb-1">Resources</div>
+                {[
+                  { key: "library", label: "Media Library", icon: Image, path: "library", tourId: "library" },
+                  { key: "settings", label: "Settings", icon: Settings, path: "settings/overview", tourId: "company-settings" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeNavKey === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      data-tour={item.tourId}
+                      className={`flex items-center gap-2.5 py-2 px-2 rounded-xl font-medium transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
+                      onClick={() => {
+                        if (!activeCompanyId) return;
+                        navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
+                        if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
+                      }}
+                    >
+                      <Icon size={18} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
           )}
 
           {/* RECENT SHORTCUTS */}

@@ -153,26 +153,14 @@ export function CalendarPage(props: CalendarPageProps) {
           <div className="absolute bottom-[-8%] right-[8%] w-[35%] h-[35%] bg-gradient-to-tl from-[#a78bfa]/14 to-[#3fa9f5]/12 rounded-full blur-[90px] animate-pulse" style={{ animationDelay: '900ms' }} />
         </div>
         <section
-          className="w-full max-w-[1100px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm flex flex-col h-[calc(100vh-130px)] overflow-hidden relative z-10"
+          className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm flex flex-col h-[calc(100vh-130px)] overflow-hidden relative z-10"
         >
-          <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl shadow-sm flex flex-col gap-4">
+          <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl shadow-sm flex flex-col gap-3">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex-1">
-                <h2 className="text-md md:text-xl font-bold">Content Calendar</h2>
-                <div className="mt-4 inline-flex p-1.5 bg-black/5 rounded-2xl gap-1">
-                  <TabLink
-                    to={`/company/${encodeURIComponent(activeCompanyId!)}/calendar`}
-                    active={viewMode === 'drafts'}
-                  >
-                    Drafts
-                  </TabLink>
-                  <TabLink
-                    to={`/company/${encodeURIComponent(activeCompanyId!)}/calendar/published`}
-                    active={viewMode === 'published'}
-                  >
-                    Published
-                  </TabLink>
-                </div>
+                <h2 className="text-sm md:text-lg font-bold">
+                  {viewMode === 'published' ? 'Published Content' : 'Content Calendar'}
+                </h2>
               </div>
             </div>
 

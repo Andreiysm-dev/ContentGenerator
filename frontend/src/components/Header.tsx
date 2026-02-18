@@ -22,7 +22,7 @@ interface HeaderProps {
 
 export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, notify, navigate, session, supabase, onLogout }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-50 w-full bg-white border-b border-[rgba(56,89,128,0.18)] shadow-[0_4px_20px_rgba(11,38,65,0.06)] px-4 sm:px-6 h-[80px] flex items-center justify-between">
+    <header className="sticky top-0 z-50 w-full bg-white border-b border-[rgba(56,89,128,0.18)] shadow-[0_4px_20px_rgba(11,38,65,0.06)] px-4 sm:px-6 h-[64px] flex items-center justify-between">
       <div className="flex items-center justify-between w-full gap-2 sm:gap-4">
         <button
           type="button"

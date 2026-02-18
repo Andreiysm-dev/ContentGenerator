@@ -73,12 +73,12 @@ export default function Faq() {
         <div className="absolute top-[-8%] left-[-4%] w-[34%] h-[34%] bg-gradient-to-br from-[#6fb6e8]/15 to-[#3fa9f5]/12 rounded-full blur-[80px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[36%] h-[36%] bg-gradient-to-tl from-[#81bad1]/13 to-[#a78bfa]/10 rounded-full blur-[85px] animate-pulse" style={{ animationDelay: '800ms' }} />
       </div>
-      <section className="w-full max-w-[1200px] mx-auto bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+      <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
 
         {/* Header */}
-        <div className="px-4 py-5 md:px-6 md:py-6 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl shadow-sm flex flex-col gap-4">
+        <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl shadow-sm flex flex-col gap-3">
           <div className="flex-1">
-            <h2 className="text-md md:text-xl font-bold text-slate-900">
+            <h2 className="text-sm md:text-lg font-bold text-slate-900">
               Frequently Asked Questions
             </h2>
             <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">
