@@ -200,7 +200,6 @@ export const StatusPill = ({ tone, children }: { tone: "positive" | "warning" | 
 };
 
 import { BrandCoreTab } from "./settings/BrandCoreTab";
-import { BrandAIChat } from "./settings/BrandAIChat";
 
 export function SettingsPage(props: CompanySettingsShellProps) {
   const {

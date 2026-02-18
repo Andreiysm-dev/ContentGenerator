@@ -68,6 +68,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { ProductTour } from '@/components/ProductTour';
 import './App.css';
 import { NotificationProvider } from '@/contexts/NotificationContext';
+import { AIAssistant } from '@/components/AIAssistant';
 
 
 type FormState = {
@@ -557,12 +558,12 @@ function App() {
   };
 
   useEffect(() => {
-    if (!activeCompanyId) {
+    if (!activeCompanyId || !session) {
       setConnectedAccounts([]);
       return;
     }
     fetchConnectedAccounts(activeCompanyId);
-  }, [activeCompanyId]);
+  }, [activeCompanyId, session]);
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [newCompanyDescription, setNewCompanyDescription] = useState('');
@@ -640,6 +641,8 @@ function App() {
   const [isEditingDmp, setIsEditingDmp] = useState<boolean>(false);
   const [dmpDraft, setDmpDraft] = useState<string>('');
 
+  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
+  const [preDefinedPlan, setPreDefinedPlan] = useState<any[] | null>(null);
   const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -1164,6 +1167,13 @@ function App() {
   }, [isImageModalOpen, selectedRow?.contentCalendarId]);
 
   useEffect(() => {
+    if (!selectedRow || !isImageModalOpen || isEditingDmp) return;
+    if (selectedRow.dmp !== dmpDraft) {
+      setDmpDraft(selectedRow.dmp || '');
+    }
+  }, [selectedRow?.dmp, isImageModalOpen, isEditingDmp, dmpDraft]);
+
+  useEffect(() => {
     if (!isImageModalOpen) return;
     if (!selectedRow) return;
     setImagePreviewNonce(Date.now());
@@ -1220,31 +1230,42 @@ function App() {
     loadCompanies();
   }, [activeCompanyId, defaultCompanyId, session]);
 
+  const loadCalendar = async () => {
+    if (!session) return;
+    if (!activeCompanyId) return;
+    setIsLoadingCalendar(true);
+    setCalendarError(null);
+    try {
+      setIsBackendWaking(true);
+      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load content calendar');
+      }
+      setCalendarRows(data.contentCalendars || data);
+      setIsBackendWaking(false);
+    } catch (err: any) {
+      console.error('Error loading content calendar:', err);
+      setCalendarError(err.message || 'Failed to load content calendar');
+      setIsBackendWaking(true);
+    } finally {
+      setIsLoadingCalendar(false);
+    }
+  };
+
+  const refreshAppData = async () => {
+    const promises: Promise<any>[] = [
+      loadCalendar(),
+      loadBrandKB(false, false)
+    ];
+    if (selectedRow?.contentCalendarId) {
+      promises.push(refreshCalendarRow(selectedRow.contentCalendarId));
+    }
+    await Promise.all(promises);
+  };
+
   // Load existing content calendar entries for this company
   useEffect(() => {
-    const loadCalendar = async () => {
-      if (!session) return;
-      if (!activeCompanyId) return;
-      setIsLoadingCalendar(true);
-      setCalendarError(null);
-      try {
-        setIsBackendWaking(true);
-        const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`);
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to load content calendar');
-        }
-        setCalendarRows(data.contentCalendars || data);
-        setIsBackendWaking(false);
-      } catch (err: any) {
-        console.error('Error loading content calendar:', err);
-        setCalendarError(err.message || 'Failed to load content calendar');
-        setIsBackendWaking(true);
-      } finally {
-        setIsLoadingCalendar(false);
-      }
-    };
-
     loadCalendar();
   }, [activeCompanyId, session]);
 
@@ -1470,7 +1491,8 @@ function App() {
     if (brandEditingRef.current) return;
     // Only auto-refresh when brand intelligence is actively being generated (during cooldown)
     // This prevents form interference when users are just filling out settings
-    if (!isBrandWebhookCoolingDown && (brandIntelligenceReady && !brandSetupMode)) return;
+    // if (!isBrandWebhookCoolingDown && (brandIntelligenceReady && !brandSetupMode)) return; // Original line
+    if (!isBrandWebhookCoolingDown && (brandIntelligenceReady && !brandSetupMode) && !activeBrandRuleEdit) return;
     let canceled = false;
     const poll = async () => {
       if (canceled) return;
@@ -2770,7 +2792,7 @@ function App() {
           onLogout={handleLogout}
         />
 
-        <div className="flex min-h-[calc(100vh-80px)] relative">
+        <div className="flex min-h-[calc(100vh-64px)] relative">
           <Sidebar
             isNavDrawerOpen={isNavDrawerOpen}
             setIsNavDrawerOpen={setIsNavDrawerOpen}
@@ -2787,7 +2809,7 @@ function App() {
             recentCompanies={companies.filter((c) => recentCompanyIds.includes(c.companyId))}
           />
 
-          <div className="flex-1 ml-0 lg:ml-[264px] overflow-y-auto h-[calc(100vh-80px)] bg-gray-50">
+          <div className={`flex-1 ml-0 lg:ml-[264px] transition-all duration-300 ${isAiAssistantOpen ? 'lg:mr-[400px]' : 'mr-0'} overflow-y-auto h-[calc(100vh-64px)] bg-gray-50`}>
             <div>
               <Routes>
                 <Route
@@ -2848,7 +2870,9 @@ function App() {
                     <ContentPlannerPage
                       activeCompanyId={activeCompanyId}
                       authedFetch={authedFetch}
+                      initialItems={preDefinedPlan || undefined}
                       onAddToCalendar={async (items: any[]) => {
+                        setPreDefinedPlan(null); // Clear once used
                         // Batch create logic
                         // We will add each item to the calendar one by one or in a batch if supported.
                         // For simplicity, we loop here.
@@ -3031,6 +3055,7 @@ function App() {
                       getImageGeneratedUrl={getImageGeneratedUrl}
                       getImageGeneratedSignature={getImageGeneratedSignature}
                       requestConfirm={requestConfirm}
+                      setSelectedRow={setSelectedRow}
                     />
                   }
                 />
@@ -3710,7 +3735,7 @@ function App() {
         {
           toast && (
             <div
-              className={`fixed bottom-6 right-6 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-white border shadow-premium-lg z-[9999] animate-[toast-slide-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md max-w-[400px] ${toast.tone === 'success' ? 'border-emerald-500/30 bg-emerald-50/95 text-emerald-800' :
+              className={`fixed bottom-24 right-6 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-white border shadow-premium-lg z-[9999] animate-[toast-slide-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md max-w-[400px] ${toast.tone === 'success' ? 'border-emerald-500/30 bg-emerald-50/95 text-emerald-800' :
                 toast.tone === 'error' ? 'border-rose-500/30 bg-rose-50/95 text-rose-800' :
                   'border-brand-primary/30 bg-sky-50/95 text-brand-dark'
                 }`}
@@ -3750,6 +3775,24 @@ function App() {
             }}
           />
         )}
+
+        <AIAssistant
+          activeCompanyId={activeCompanyId}
+          authedFetch={authedFetch}
+          navigate={navigate}
+          notify={notify}
+          extraContext={{ selectedRow }}
+          onRefresh={refreshAppData}
+          isOpen={isAiAssistantOpen}
+          setIsOpen={setIsAiAssistantOpen}
+          onApplyPlan={(plan) => {
+            setPreDefinedPlan(plan);
+            if (activeCompanyId) {
+              navigate(`/company/${activeCompanyId}/plan`);
+              notify("Strategy applied to planner. Review and push to calendar!", "success");
+            }
+          }}
+        />
       </div >
     </NotificationProvider>
   );

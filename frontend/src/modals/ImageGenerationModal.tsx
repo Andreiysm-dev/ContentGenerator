@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Copy, ChevronDown, ChevronUp, Settings2, Pencil, Sparkles, Wand2 } from 'lucide-react';
-import { DMPAIChat } from './DMPAIChat';
 
 interface ImageGenerationModalProps {
     isOpen: boolean;
@@ -68,7 +67,6 @@ export function ImageGenerationModal({
     const [showModelSelection, setShowModelSelection] = useState(false);
     const [provider, setProvider] = useState<'google' | 'replicate' | 'fal'>('fal');
     const [selectedModel, setSelectedModel] = useState('fal-ai/nano-banana-pro');
-    const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
 
     const ALL_MODELS = [
         { id: 'fal-ai/nano-banana-pro', name: 'Google Nano Banana Pro', provider: 'fal', group: 'Fal.ai' },
@@ -145,15 +143,6 @@ export function ImageGenerationModal({
                                             </button>
                                         ) : null}
 
-                                        <button
-                                            type="button"
-                                            title="AI Content Assistant"
-                                            className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all border ${isAiAssistantOpen ? 'bg-slate-800 text-white border-slate-800' : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 shadow-sm'}`}
-                                            onClick={() => setIsAiAssistantOpen(!isAiAssistantOpen)}
-                                        >
-                                            <Sparkles size={12} />
-                                            Assistant
-                                        </button>
 
                                         {isEditingDmp && (
                                             <>
@@ -260,30 +249,6 @@ export function ImageGenerationModal({
                                     placeholder="Enter Design Mega Prompt here..."
                                 />
 
-                                {isAiAssistantOpen && (
-                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <DMPAIChat
-                                            contentCalendarId={selectedRow.contentCalendarId}
-                                            currentDmp={isEditingDmp ? dmpDraft : (selectedRow.dmp ?? '')}
-                                            onUpdateDmp={(updated) => {
-                                                setDmpDraft(updated);
-                                                if (!isEditingDmp) {
-                                                    setIsEditingDmp(true);
-                                                }
-                                                // Sync back to local state
-                                                setSelectedRow((prev: any) => (prev ? { ...prev, dmp: updated } : prev));
-                                                setCalendarRows((prev) =>
-                                                    prev.map((r) =>
-                                                        r.contentCalendarId === selectedRow.contentCalendarId ? { ...r, dmp: updated } : r,
-                                                    ),
-                                                );
-                                            }}
-                                            notify={notify}
-                                            authedFetch={authedFetch}
-                                            onClose={() => setIsAiAssistantOpen(false)}
-                                        />
-                                    </div>
-                                )}
                             </div>
 
                             {/* Preview Panel */}

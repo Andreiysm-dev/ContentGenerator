@@ -16,10 +16,11 @@ interface PlannedItem {
     promoType: string;
 }
 
-export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFetch }: {
+export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFetch, initialItems }: {
     activeCompanyId?: string,
     onAddToCalendar?: (items: any[]) => Promise<void>,
-    authedFetch?: (url: string, options?: RequestInit) => Promise<Response>
+    authedFetch?: (url: string, options?: RequestInit) => Promise<Response>,
+    initialItems?: any[]
 }) {
     const navigate = useNavigate();
     const [goal, setGoal] = useState("");
@@ -28,6 +29,15 @@ export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFet
     const [items, setItems] = useState<PlannedItem[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+
+    React.useEffect(() => {
+        if (initialItems && initialItems.length > 0) {
+            setItems(initialItems.map((item, idx) => ({
+                ...item,
+                id: item.id || (Date.now().toString() + idx)
+            })));
+        }
+    }, [initialItems]);
 
     const handleGenerate = async () => {
         if (!goal.trim()) return;

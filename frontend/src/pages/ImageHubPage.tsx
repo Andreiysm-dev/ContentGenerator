@@ -23,7 +23,6 @@ import {
     Download
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { DMPAIChat } from '../modals/DMPAIChat';
 
 interface ImageHubPageProps {
     calendarRows: any[];
@@ -43,6 +42,7 @@ interface ImageHubPageProps {
         confirmLabel: string;
         cancelLabel: string;
     }) => Promise<boolean>;
+    setSelectedRow: React.Dispatch<React.SetStateAction<any | null>>;
 }
 
 export function ImageHubPage({
@@ -57,13 +57,13 @@ export function ImageHubPage({
     getStatusValue,
     getImageGeneratedUrl,
     getImageGeneratedSignature,
-    requestConfirm
+    requestConfirm,
+    setSelectedRow
 }: ImageHubPageProps) {
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
     const [dmpDraft, setDmpDraft] = useState('');
     const [isEditingDmp, setIsEditingDmp] = useState(false);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-    const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [provider, setProvider] = useState<'google' | 'replicate' | 'fal'>('fal');
     const [selectedModel, setSelectedModel] = useState('fal-ai/nano-banana-pro');
@@ -114,8 +114,15 @@ export function ImageHubPage({
     }, [activeQueueRows, searchQuery]);
 
     const selectedRow = useMemo(() => {
-        return calendarRows.find(r => r.contentCalendarId === selectedRowId) || null;
-    }, [calendarRows, selectedRowId]);
+        const row = approvedRows.find(r => r.contentCalendarId === selectedRowId) || null;
+        // Sync with global state so AI Assistant knows which row is active
+        return row;
+    }, [approvedRows, selectedRowId]);
+
+    // Lift state to App.tsx whenever selectedRow changes
+    useEffect(() => {
+        setSelectedRow(selectedRow);
+    }, [selectedRow, setSelectedRow]);
 
     const handleDownload = async () => {
         const imageUrl = getImageGeneratedUrl(selectedRow);
@@ -168,12 +175,17 @@ export function ImageHubPage({
 
     // Handle row selection change - Only reset when switching DIFFERENT items
     useEffect(() => {
-        if (selectedRow && selectedRow.contentCalendarId !== lastId) {
+        if (!selectedRow) return;
+        if (selectedRow.contentCalendarId !== lastId) {
             setDmpDraft(selectedRow.dmp || '');
             setIsEditingDmp(false);
             setLastId(selectedRow.contentCalendarId);
+        } else if (!isEditingDmp) {
+            if (selectedRow.dmp !== dmpDraft) {
+                setDmpDraft(selectedRow.dmp || '');
+            }
         }
-    }, [selectedRow, lastId]);
+    }, [selectedRow, lastId, isEditingDmp, dmpDraft]);
 
     const handleSaveDmp = async () => {
         if (!selectedRow) return;
@@ -469,19 +481,6 @@ export function ImageHubPage({
                                                 >
                                                     <Pencil size={16} />
                                                 </button>
-                                                <button
-                                                    onClick={() => setIsAiAssistantOpen(!isAiAssistantOpen)}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all relative ${isAiAssistantOpen
-                                                        ? 'bg-slate-900 text-white shadow-lg'
-                                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md group'
-                                                        }`}
-                                                >
-                                                    <Sparkles size={12} className={!isAiAssistantOpen ? 'group-hover:animate-spin-slow' : ''} />
-                                                    AI Assistant
-                                                    {!isAiAssistantOpen && !dmpDraft && (
-                                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 border border-white rounded-full animate-ping" />
-                                                    )}
-                                                </button>
                                             </div>
                                         </div>
 
@@ -498,15 +497,15 @@ export function ImageHubPage({
                                                     placeholder="The Design Style Guide will appear here..."
                                                 />
                                                 {!isEditingDmp && dmpDraft && (
-                                                    <button
-                                                        onClick={() => setIsEditingDmp(true)}
-                                                        className="absolute inset-0 w-full h-full bg-slate-900/0 hover:bg-slate-900/[0.02] flex items-center justify-center opacity-0 hover:opacity-100 transition-all rounded-2xl group-hover:scale-[0.99]"
-                                                    >
-                                                        <div className="bg-white px-4 py-2 rounded-full shadow-lg border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-600">
+                                                    <div className="absolute inset-0 w-full h-full bg-slate-900/0 hover:bg-slate-900/[0.02] flex items-center justify-center opacity-0 hover:opacity-100 transition-all rounded-2xl group-hover:scale-[0.99] pointer-events-none">
+                                                        <button
+                                                            onClick={() => setIsEditingDmp(true)}
+                                                            className="bg-white px-4 py-2 rounded-full shadow-lg border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-600 pointer-events-auto"
+                                                        >
                                                             <Pencil size={14} />
                                                             Click to Edit
-                                                        </div>
-                                                    </button>
+                                                        </button>
+                                                    </div>
                                                 )}
 
                                                 {!dmpDraft && !isGeneratingImage && (
@@ -551,21 +550,6 @@ export function ImageHubPage({
                                             )}
                                         </div>
 
-                                        {isAiAssistantOpen && (
-                                            <div className="px-6 pb-6 animate-in fade-in zoom-in-95 duration-300">
-                                                <DMPAIChat
-                                                    contentCalendarId={selectedRow.contentCalendarId}
-                                                    currentDmp={dmpDraft}
-                                                    onUpdateDmp={(updated) => {
-                                                        setDmpDraft(updated);
-                                                        if (!isEditingDmp) setIsEditingDmp(true);
-                                                    }}
-                                                    notify={notify}
-                                                    authedFetch={authedFetch}
-                                                    onClose={() => setIsAiAssistantOpen(false)}
-                                                />
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Context Panel */}
