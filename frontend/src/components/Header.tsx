@@ -49,7 +49,7 @@ export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, not
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="hidden sm:inline-flex items-center justify-center rounded-full ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 w-9 p-0 overflow-hidden border border-input bg-background hover:bg-accent hover:text-accent-foreground">
-                <img src="https://i.pinimg.com/1200x/d4/a5/82/d4a5829f2d13dac1c9c0d00e4c19e1ad.jpg" alt="Profile" className="h-full w-full object-cover rounded-full" />
+                <img src={session?.user?.user_metadata?.avatar_url || "https://i.pinimg.com/1200x/d4/a5/82/d4a5829f2d13dac1c9c0d00e4c19e1ad.jpg"} alt="Profile" className="h-full w-full object-cover rounded-full" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -72,8 +72,8 @@ export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, not
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="sm:hidden w-8 h-8 flex items-center justify-center rounded-full text-brand-dark/60 hover:text-brand-primary hover:bg-brand-primary/10 transition-colors">
-                <User className="h-4 w-4" />
+              <button className="sm:hidden w-8 h-8 flex items-center justify-center rounded-full overflow-hidden border border-input text-brand-dark/60 hover:text-brand-primary hover:bg-brand-primary/10 transition-colors">
+                <img src={session?.user?.user_metadata?.avatar_url || "https://i.pinimg.com/1200x/d4/a5/82/d4a5829f2d13dac1c9c0d00e4c19e1ad.jpg"} alt="Profile" className="h-full w-full object-cover" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

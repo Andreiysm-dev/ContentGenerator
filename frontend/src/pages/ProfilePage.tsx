@@ -24,6 +24,51 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
   const [password, setPassword] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !supabase || !session?.user) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      notify("Please upload an image file", "error");
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      notify("Image size must be less than 2MB", "error");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          upsert: true,
+          contentType: file.type
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setAvatarUrl(data.publicUrl);
+      notify("Avatar uploaded! Remember to save changes.", "info");
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      notify(err.message || "Failed to upload avatar", "error");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -285,14 +330,22 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
                 <div className="relative w-full border border-gray-300 rounded-xl p-1 transition">
                   <input
                     type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    disabled={isUploading}
                     className="w-full rounded-xl text-sm text-slate-500
                         file:mr-4 file:py-2 file:px-4
                         file:rounded-xl file:border-0
                         file:text-sm file:font-bold
                         file:bg-[#3fa9f5]/10 file:text-[#3fa9f5]
                         hover:file:bg-[#3fa9f5]/20
-                        cursor-pointer transition-all"
+                        cursor-pointer transition-all disabled:opacity-50"
                   />
+                  {isUploading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
                 </div>
               </div>
 
