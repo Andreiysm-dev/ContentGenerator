@@ -1,4 +1,4 @@
-import { BarChart3, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, Image, LayoutDashboard, Plus, Settings, Wand2 } from "lucide-react";
+import { BarChart3, Boxes, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, Image, LayoutDashboard, Magnet, Plus, Settings, Wand2, Target } from "lucide-react";
 import type { NavigateFunction } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -160,9 +160,38 @@ export function Sidebar({
               <nav className="flex flex-col gap-1">
                 <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/40 font-extrabold px-2 mb-1">Content</div>
                 {[
+                  { key: "planner", label: "Planner", icon: Target, path: "plan", tourId: "planner" },
                   { key: "generate", label: "Create", icon: Wand2, path: "generate", tourId: "create" },
                   { key: "calendar", label: "Calendar", icon: CalendarDays, path: "calendar", tourId: "calendar" },
+                  { key: "image-hub", label: "Image Hub", icon: Image, path: "image-hub", tourId: "image-hub" },
                   { key: "studio", label: "Studio", icon: FileText, path: "studio", tourId: "studio" },
+                  { key: "toolbox", label: "AI Toolbox", icon: Boxes, path: "toolbox", tourId: "toolbox" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeNavKey === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      data-tour={item.tourId}
+                      className={`flex items-center gap-2.5 py-2 px-2 rounded-xl font-medium transition ${isActive ? "bg-blue-100 text-blue-400 border-l-4 border-l-blue-500" : "hover:bg-blue-50 hover:text-blue-400"}`}
+                      onClick={() => {
+                        if (!activeCompanyId) return;
+                        navigate(`/company/${encodeURIComponent(activeCompanyId)}/${item.path}`);
+                        if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
+                      }}
+                    >
+                      <Icon size={18} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Growth Strategy */}
+              <nav className="flex flex-col gap-1">
+                <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/40 font-extrabold px-2 mb-1">Growth</div>
+                {[
+                  { key: "leads", label: "Lead Magnets", icon: Magnet, path: "leads", tourId: "leads" },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isActive = activeNavKey === item.key;
@@ -240,31 +269,7 @@ export function Sidebar({
             </div>
           )}
 
-          {/* RECENT SHORTCUTS */}
-          {recentCompanies.length > 0 && (
-            <div className="flex flex-col gap-1 mt-4 px-1.5">
-              <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/50 font-extrabold px-2 mb-1">Your shortcuts</div>
-              {recentCompanies.map((company) => {
-                const isActive = company.companyId === activeCompanyId;
-                return (
-                  <button
-                    key={company.companyId}
-                    className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-blue-100 text-blue-400" : "text-brand-dark/70 hover:bg-brand-primary/[0.06] hover:text-brand-primary"}`}
-                    onClick={() => {
-                      setActiveCompanyIdWithPersistence(company.companyId);
-                      navigate(`/company/${encodeURIComponent(company.companyId)}/dashboard`);
-                      if (window.innerWidth < 1024) setIsNavDrawerOpen(false);
-                    }}
-                  >
-                    <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${isActive ? "bg-blue-200" : "bg-brand-primary/10"}`}>
-                      <span className={`text-[10px] font-bold ${isActive ? "text-blue-500" : "text-brand-primary"}`}>{company.companyName.charAt(0).toUpperCase()}</span>
-                    </div>
-                    <span className="truncate text-left">{company.companyName}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+
         </div>
 
         <div className="flex flex-col gap-2 px-1.5 mt-auto">

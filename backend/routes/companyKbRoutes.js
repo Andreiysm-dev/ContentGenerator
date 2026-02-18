@@ -1,16 +1,20 @@
 import express from 'express';
-import { 
-    createBrandKB, 
-    getAllBrandKBs, 
-    getBrandKBById, 
+import {
+    createBrandKB,
+    getAllBrandKBs,
+    getBrandKBById,
     getBrandKBsByCompanyId,
     generateBrandRulesForBrandKB,
-    updateBrandKB, 
+    updateBrandKB,
     deleteBrandKB,
     deleteBrandKBsByCompanyId
 } from '../controller/companyKbController.js';
+import { handleBrandChat as brandChatHandler } from '../controller/brandChatController.js';
 
 const router = express.Router();
+
+// CHAT - POST /api/brandkb/chat
+router.post('/brandkb/chat', brandChatHandler);
 
 // CREATE - POST /api/brandkb
 router.post('/brandkb', createBrandKB);

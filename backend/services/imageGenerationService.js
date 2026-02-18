@@ -243,16 +243,24 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
   const userId = opts.userId;
   if (!userId) return { ok: false, status: 401, error: 'Unauthorized' };
 
-  // 1. Generate DMP First
-  const dmpResult = await generateDmpForCalendarRow(contentCalendarId, opts);
-  if (!dmpResult.ok) return dmpResult;
+  // 1. Load row to check for existing DMP
+  const loaded = await loadContentCalendarRow({ contentCalendarId, userId });
+  if (!loaded.ok) return loaded;
 
-  const dmpRaw = dmpResult.dmp;
-  const row = dmpResult.row;
-  const companyName = dmpResult.companyName;
-  const triggeredByName = dmpResult.triggeredByName;
+  let row = loaded.row;
+  let companyName = loaded.companyName;
+  let triggeredByName = loaded.triggeredByName;
+  let dmpRaw = row.dmp;
 
-  // 2. Proceed to Image Generation
+  // 2. Generate DMP only if missing or forced
+  if (!dmpRaw || opts.forceDmpRefresh) {
+    const dmpResult = await generateDmpForCalendarRow(contentCalendarId, opts);
+    if (!dmpResult.ok) return dmpResult;
+    dmpRaw = dmpResult.dmp;
+    row = dmpResult.row;
+  }
+
+  // 3. Proceed to Image Generation
   const parsed = parseMegaPromptBlock(dmpRaw);
   if (!parsed.ok) {
     return { ok: false, status: 500, error: parsed.error };

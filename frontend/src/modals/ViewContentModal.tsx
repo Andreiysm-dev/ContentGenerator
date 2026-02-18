@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Wand2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
 
 interface ViewContentModalProps {
     isOpen: boolean;
@@ -21,8 +23,6 @@ interface ViewContentModalProps {
     }) => Promise<boolean>;
     isGeneratingCaption: boolean;
     setIsGeneratingCaption: (generating: boolean) => void;
-    isRevisingCaption: boolean;
-    setIsRevisingCaption: (revising: boolean) => void;
     authedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
     backendBaseUrl: string;
     refreshCalendarRow: (rowId: string) => Promise<void>;
@@ -48,8 +48,6 @@ export function ViewContentModal({
     requestConfirm,
     isGeneratingCaption,
     setIsGeneratingCaption,
-    isRevisingCaption,
-    setIsRevisingCaption,
     authedFetch,
     backendBaseUrl,
     refreshCalendarRow,
@@ -59,6 +57,7 @@ export function ViewContentModal({
     setBrandKbId,
     setSystemInstruction,
 }: ViewContentModalProps) {
+    const navigate = useNavigate();
     const [isManualApproving, setIsManualApproving] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [scheduledDate, setScheduledDate] = useState('');
@@ -505,9 +504,9 @@ export function ViewContentModal({
                                 if (!selectedRow) return;
 
                                 const proceed = await requestConfirm({
-                                    title: 'Generate caption for this item?',
-                                    description: "You're about to trigger caption generation for this content item.",
-                                    confirmLabel: 'Generate caption',
+                                    title: 'Generate & Review Caption?',
+                                    description: "This will trigger AI generation followed by an automatic review. The final caption will be ready for your approval once finished.",
+                                    confirmLabel: 'Generate & Review',
                                     cancelLabel: 'Go back',
                                 });
                                 if (!proceed) return;
@@ -527,14 +526,14 @@ export function ViewContentModal({
                                     if (!genRes.ok) {
                                         if (genRes.status === 409) {
                                             notify(
-                                                genData.error || 'Caption generation is already running or completed.',
+                                                genData.error || 'Generation is already running or completed.',
                                                 'info',
                                             );
                                         } else {
                                             notify(genData.error || 'Failed to generate caption.', 'error');
                                         }
                                     } else {
-                                        notify('Caption generation started.', 'success');
+                                        notify('Generation & Review started.', 'success');
                                     }
                                 } catch (err) {
                                     console.error('Failed to call generation endpoint', err);
@@ -545,72 +544,9 @@ export function ViewContentModal({
                                 }
                             }}
                         >
-                            {isGeneratingCaption ? 'Generating…' : 'Generate Caption'}
+                            {isGeneratingCaption ? 'Generating…' : 'Generate & Review'}
                             {isGeneratingCaption && (
                                 <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            )}
-                        </button>
-
-                        <button
-                            type="button"
-                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['review', 'approved', 'needs revision'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
-                                ? 'bg-white text-brand-dark border border-slate-200/70 hover:bg-slate-50'
-                                : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
-                                }`}
-                            title="Send for review again"
-                            disabled={
-                                !['review', 'approved', 'needs revision'].includes(getStatusValue(selectedRow.status).trim().toLowerCase()) ||
-                                !selectedRow.captionOutput
-                            }
-                            onClick={async () => {
-                                if (!selectedRow) return;
-                                if (!['review', 'approved', 'needs revision'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())) return;
-                                if (!selectedRow.captionOutput) return;
-
-                                const proceed = await requestConfirm({
-                                    title: 'Send this item for review?',
-                                    description: "You're about to send this content item for AI review.",
-                                    confirmLabel: 'Send for review',
-                                    cancelLabel: 'Keep item',
-                                });
-                                if (!proceed) return;
-
-                                setIsRevisingCaption(true);
-                                try {
-                                    const res = await authedFetch(
-                                        `${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/review-content`,
-                                        {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({}),
-                                        },
-                                    );
-
-                                    const data = await res.json().catch(() => ({}));
-
-                                    if (!res.ok) {
-                                        if (res.status === 409) {
-                                            notify(data.error || 'Review is not allowed for this status.', 'info');
-                                        } else {
-                                            notify(data.error || 'Failed to trigger review.', 'error');
-                                        }
-                                        return;
-                                    }
-
-                                    notify('Sent for review.', 'success');
-                                } catch (err) {
-                                    console.error('Failed to call review endpoint', err);
-                                    notify('Failed to trigger review. Check console for details.', 'error');
-                                    return;
-                                } finally {
-                                    await refreshCalendarRow(selectedRow.contentCalendarId);
-                                    setIsRevisingCaption(false);
-                                }
-                            }}
-                        >
-                            {isRevisingCaption ? 'Reviewing…' : 'Review caption'}
-                            {isRevisingCaption && (
-                                <span className="inline-block w-3 h-3 border-2 border-brand-dark/20 border-t-brand-dark rounded-full animate-spin" />
                             )}
                         </button>
 
@@ -683,45 +619,26 @@ export function ViewContentModal({
 
                         <button
                             type="button"
-                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['approved', 'design completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
-                                ? 'bg-white text-brand-dark border border-slate-200/70 hover:bg-slate-50'
+                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['approved', 'design completed', 'design-complete', 'design-completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                                ? 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-700'
                                 : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
                                 }`}
                             disabled={
-                                !['approved', 'design completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                                !['approved', 'design completed', 'design-complete', 'design-completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
                             }
                             onClick={() => {
-                                if (
-                                    !['approved', 'design completed'].includes(
-                                        getStatusValue(selectedRow.status).trim().toLowerCase(),
-                                    )
-                                )
-                                    return;
+                                const status = getStatusValue(selectedRow.status).trim().toLowerCase();
+                                if (!['approved', 'design completed', 'design-complete', 'design-completed'].includes(status)) return;
 
-                                setIsImageModalOpen(true);
-                                setIsViewModalOpen(false);
-
-                                // Prefill from BrandKB for this company
                                 const companyId = selectedRow?.companyId ?? activeCompanyId;
                                 if (companyId) {
-                                    (async () => {
-                                        try {
-                                            const res = await authedFetch(`${backendBaseUrl}/api/brandkb/company/${companyId}`);
-                                            const data = await res.json();
-                                            const list = Array.isArray(data.brandKBs) ? data.brandKBs : data;
-                                            const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
-                                            if (first) {
-                                                if (typeof first.brandKbId === 'string') setBrandKbId(first.brandKbId);
-                                                if (typeof first.systemInstruction === 'string') setSystemInstruction(first.systemInstruction);
-                                            }
-                                        } catch (err) {
-                                            console.error('Failed to load BrandKB for image generation', err);
-                                        }
-                                    })();
+                                    onClose();
+                                    navigate(`/company/${encodeURIComponent(companyId)}/image-hub?id=${selectedRow.contentCalendarId}`);
                                 }
                             }}
                         >
-                            Generate Image
+                            <Wand2 size={16} />
+                            Open in Image Hub
                         </button>
 
                         <button

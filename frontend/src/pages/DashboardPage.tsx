@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Wand2, TrendingUp, TrendingDown } from "lucide-react";
+import { LayoutDashboard, Wand2, TrendingUp, TrendingDown } from "lucide-react";
 
 interface DashboardProps {
   activeCompany: { companyId: string; companyName: string } | null;
@@ -14,9 +14,10 @@ interface DashboardProps {
     upcoming7: number;
     approvalRate: number;
   };
+  brandIntelligenceReady: boolean;
 }
 
-export function DashboardPage({ activeCompany, activeCompanyId, dashboardStats }: DashboardProps) {
+export function DashboardPage({ activeCompany, activeCompanyId, dashboardStats, brandIntelligenceReady }: DashboardProps) {
   const navigate = useNavigate();
 
   return (
@@ -28,27 +29,54 @@ export function DashboardPage({ activeCompany, activeCompanyId, dashboardStats }
         <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-gradient-to-bl from-[#81bad1]/12 to-transparent rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '1400ms' }} />
       </div>
       <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
-        <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
-          <div>
-            <h2 className="text-sm md:text-lg font-bold">{activeCompany?.companyName ?? "Company"} Dashboard</h2>
-            <p className="mt-1 text-sm font-medium">Monitor content performance and workflow status.</p>
+        <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden">
+          <LayoutDashboard className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+              Workspace Overview
+            </div>
+            <h2 className="text-2xl font-black text-white">{activeCompany?.companyName ?? "Company"} Dashboard</h2>
+            <p className="mt-1 text-sm font-medium text-slate-400">Monitor content performance and workflow status.</p>
           </div>
 
           <button
             type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-white text-[#3fa9f5] border border-white/80 shadow-sm ring-1 ring-inset ring-slate-900/5 transition hover:bg-slate-50 hover:border-slate-200 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="relative z-10 inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-600 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/35"
             onClick={() => {
               if (!activeCompanyId) return;
               navigate(`/company/${encodeURIComponent(activeCompanyId)}/generate`);
             }}
             disabled={!activeCompanyId}
           >
-            <Wand2 className="h-4 w-4 mr-2" />
+            <Wand2 className="h-4 w-4" />
             Create Content
           </button>
         </div>
 
-        <div className="p-4 md:p-6">
+        <div className="p-4 md:p-6 space-y-6">
+          {/* Action Required Section */}
+          {!brandIntelligenceReady && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-amber-900 flex items-center gap-2">
+                  <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                  Action Required
+                </h3>
+                <p className="mt-1 text-sm text-amber-700 max-w-2xl">
+                  Your Brand Intelligence is not fully set up yet. Complete the setup to unlock AI-powered content generation tailored to your brand voice.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => activeCompanyId && navigate(`/company/${activeCompanyId}/settings/brand-intelligence`)}
+                className="whitespace-nowrap rounded-lg bg-amber-100 px-4 py-2 text-sm font-bold text-amber-900 hover:bg-amber-200 transition-colors"
+              >
+                Setup Brand Intelligence →
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm hover:border-brand-primary/20 hover:shadow-md hover:-translate-y-px transition-all duration-200 flex flex-col gap-1.5 group">
               <div className="text-[0.7rem] uppercase tracking-wider font-bold text-brand-dark/50">Total Posts</div>

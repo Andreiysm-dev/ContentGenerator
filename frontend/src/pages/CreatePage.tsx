@@ -1,4 +1,4 @@
-import { FileText, Target, Rocket, Plus, Clipboard } from "lucide-react";
+import { FileText, Target, Rocket, Plus, Clipboard, Wand2 } from "lucide-react";
 import type { ChangeEventHandler } from "react";
 
 interface FormState {
@@ -34,27 +34,30 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
         <div className="absolute bottom-[-12%] left-[-6%] w-[42%] h-[42%] bg-gradient-to-tr from-[#e5a4e6]/16 to-[#6fb6e8]/14 rounded-full blur-[105px] animate-pulse" style={{ animationDelay: '500ms' }} />
       </div>
       <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
-        <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
-          <div>
-            <h2 className="text-sm md:text-lg font-bold">Content Generator</h2>
-            <p className="mt-0.5 text-xs font-medium">Create captions and content drafts for your calendar.</p>
+        <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden">
+          <Wand2 className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+              Content Studio
+            </div>
+            <h2 className="text-2xl font-black text-white">Content Generator</h2>
+            <p className="mt-1 text-sm font-medium text-slate-400">Generate high-converting captions and visual ideas in seconds.</p>
           </div>
-          <div>
-            <button
-              type="button"
-              className="w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-white text-[#3fa9f5] border border-white/80 shadow-sm ring-1 ring-inset ring-slate-900/5 transition hover:bg-slate-50 hover:border-slate-200 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2"
-              onClick={() => {
-                setBulkText("");
-                setBulkPreview([]);
-                setShowPreview(false);
-                setIsBulkModalOpen(true);
-              }}
-            >
-              {" "}
-              <Clipboard className="w-4 h-4 mr-2" />
-              Bulk paste
-            </button>
-          </div>
+
+          <button
+            type="button"
+            className="relative z-10 inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-white/10 text-white border border-white/20 backdrop-blur-sm shadow-sm transition hover:bg-white/20 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+            onClick={() => {
+              setBulkText("");
+              setBulkPreview([]);
+              setShowPreview(false);
+              setIsBulkModalOpen(true);
+            }}
+          >
+            <Clipboard className="w-4 h-4 mr-1" />
+            Bulk Paste mode
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6">

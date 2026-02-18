@@ -164,7 +164,16 @@ const buildReviewerUserPrompt = ({ contentCalendar, brandKB }) => {
     .replaceAll('{{channels}}', channelsValue)
     .replaceAll('{{primaryGoal}}', contentCalendar.primaryGoal ?? '')
     .replaceAll('{{brandPack}}', brandKB?.brandPack ?? '')
-    .replaceAll('{{brandCapability}}', brandKB?.brandCapability ?? '');
+    .replaceAll('{{brandCapability}}', brandKB?.brandCapability ?? '')
+    .replaceAll('{{emojiRule}}', (() => {
+      const rule = (brandKB?.emojiRule || '').trim();
+      if (!rule) return '';
+      if (rule.match(/^None$/i)) return 'Do NOT use emojis.';
+      if (rule.match(/^Light$/i)) return 'Use at most 1-2 relevant emojis, placed at the end of the caption. Keep it professional.';
+      if (rule.match(/^Medium$/i)) return 'Use 3-5 emojis to add personality. You may use them to emphasize key points or at the end of paragraphs.';
+      if (rule.match(/^Heavy$/i)) return 'Use emojis frequently (5+) to make the caption fun and engaging. Use them inline and at the end.';
+      return rule;
+    })());
 };
 
 const callOpenAIForReview = async ({ systemPrompt, userPrompt }) => {
@@ -289,7 +298,7 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
   const userPrompt = buildReviewerUserPrompt({ contentCalendar, brandKB });
 
   const openAiRes = await callOpenAIForReview({
-    systemPrompt: brandKB?.writerAgent ?? '',
+    systemPrompt: brandKB?.reviewPrompt1 || brandKB?.writerAgent || '',
     userPrompt,
   });
 
@@ -435,7 +444,7 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
   const userPrompt = buildReviewerUserPrompt({ contentCalendar, brandKB });
 
   const openAiRes = await callOpenAIForReview({
-    systemPrompt: brandKB?.writerAgent ?? '',
+    systemPrompt: brandKB?.reviewPrompt1 || brandKB?.writerAgent || '',
     userPrompt,
   });
 

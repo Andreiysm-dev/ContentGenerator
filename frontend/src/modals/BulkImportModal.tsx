@@ -91,8 +91,8 @@ export function BulkImportModal({
                                                 <thead className="bg-slate-50 border-b border-slate-200/60">
                                                     <tr>
                                                         {[
-                                                            'Date', 'Brand highlight', 'Cross promo', 'Theme',
-                                                            'Content type', 'Channels', 'Target audience',
+                                                            'Date', 'Brand highlight (80%)', 'Cross promo (20%)', 'Theme',
+                                                            'Content type', 'Target audience',
                                                             'Primary goal', 'CTA', 'Promo type'
                                                         ].map((col) => (
                                                             <th key={col} className="px-4 py-3 text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 whitespace-nowrap">
@@ -104,7 +104,7 @@ export function BulkImportModal({
                                                 <tbody className="divide-y divide-slate-100 bg-white">
                                                     {bulkPreview.map((row, rowIndex) => (
                                                         <tr key={rowIndex} className="hover:bg-slate-50/50 transition-colors">
-                                                            {row.map((cell, cellIndex) => (
+                                                            {row.slice(0, 9).map((cell, cellIndex) => (
                                                                 <td key={cellIndex} className="px-4 py-2.5 text-xs text-brand-dark/80 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
                                                                     {cell || '—'}
                                                                 </td>

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
+import { Settings as SettingsIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export type CompanySettingsTab = "overview" | "brand-intelligence" | "team" | "integrations";
 
 export type CompanySettingsShellProps = {
   tab: CompanySettingsTab;
+  notify: (message: string, tone?: "success" | "error" | "info") => void;
+  authedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   setActiveCompanyIdWithPersistence: (companyId: string) => void;
   brandIntelligenceReady: boolean;
   brandSetupMode: "quick" | "advanced" | "custom" | null;
@@ -24,6 +27,7 @@ export type CompanySettingsShellProps = {
   loadBrandKB: (resetDefaults?: boolean, preserveEdits?: boolean) => Promise<void>;
   brandKbId: string | null;
   onDeleteCompany: () => Promise<void>;
+  onSaveCompanyDetails: () => Promise<void>;
   brandPack: string;
   setBrandPack: (value: string) => void;
   brandCapability: string;
@@ -196,6 +200,7 @@ export const StatusPill = ({ tone, children }: { tone: "positive" | "warning" | 
 };
 
 import { BrandCoreTab } from "./settings/BrandCoreTab";
+import { BrandAIChat } from "./settings/BrandAIChat";
 
 export function SettingsPage(props: CompanySettingsShellProps) {
   const {
@@ -217,6 +222,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     loadBrandKB,
     brandKbId,
     onDeleteCompany,
+    onSaveCompanyDetails,
     brandPack,
     setBrandPack,
     brandCapability,
@@ -306,6 +312,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     onConnectLinkedIn,
     onConnectFacebook,
     onDisconnectAccount,
+    notify,
+    authedFetch,
   } = props;
 
   const { companyId } = useParams<{ companyId: string }>();
@@ -395,9 +403,22 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
       <main className="flex-1 flex flex-col overflow-hidden p-2.5 md:p-6">
-        <div className="w-full bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
+        <div className="w-full bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col h-full border border-slate-200/60">
+          {/* Dark Premium Header */}
+          <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 relative overflow-hidden flex flex-col gap-2">
+            <SettingsIcon className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
+
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+                System Configuration
+              </div>
+              <h2 className="text-2xl font-black text-white">Company Settings</h2>
+              <p className="mt-1 text-sm font-medium text-slate-400">Manage your brand identity, team collaboration, and platform integrations.</p>
+            </div>
+          </div>
+
           {/* Tabs Navigation */}
-          <div className="z-30 bg-white px-4 md:px-6 pt-1 md:pt-2 pb-1.5">
+          <div className="z-30 bg-white px-4 md:px-6 pt-3 pb-2 shadow-sm border-b border-slate-100">
             <div className="relative flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-white p-1 shadow-sm">
               <TabLink to={`${companyUrlBase}/overview`} id="overview" pressedTab={pressedTab} onClick={() => setPressedTab("overview")}>
                 Overview
@@ -458,10 +479,19 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                             <Textarea rows={3} value={companyDescription} onChange={(e) => setCompanyDescription(e.target.value)} />
                           </div>
                         </div>
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={onSaveCompanyDetails}
+                            className="btn bg-[#3fa9f5] text-white border border-[#3fa9f5] hover:bg-[#2f97e6] hover:border-[#2f97e6] transition-colors text-sm font-semibold px-4 py-2 rounded-lg shadow-sm"
+                          >
+                            Save Changes
+                          </button>
+                        </div>
                       </Card>
 
                       {/* Danger Zone */}
-                      <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6 shadow-sm">
+                      <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm mt-8 opacity-80 hover:opacity-100 transition-opacity">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <div className="text-sm font-bold text-red-900">Danger Zone</div>

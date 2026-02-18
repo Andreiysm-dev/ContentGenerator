@@ -48,18 +48,38 @@ export const sendTeamNotification = async ({ companyId, title, message, type = '
             return;
         }
 
-        const teamIds = new Set([company.user_id, ...(company.collaborator_ids || [])]);
+        const potentialTeamIds = new Set([company.user_id, ...(company.collaborator_ids || [])]);
 
-        const notifications = Array.from(teamIds).map(userId => ({
-            user_id: userId,
-            title,
-            message,
-            type,
-            link,
-            triggered_by_name: triggeredByName,
-            company_name: companyName,
-            read: false,
-        }));
+        // Filter valid user IDs by checking profiles table
+        const { data: validProfiles, error: profilesError } = await db
+            .from('profiles')
+            .select('id')
+            .in('id', Array.from(potentialTeamIds));
+
+        if (profilesError) {
+            console.error('[Notification] Error verifying valid users:', profilesError);
+            return;
+        }
+
+        const validUserIds = new Set((validProfiles || []).map(p => p.id));
+
+        const notifications = Array.from(potentialTeamIds)
+            .filter(userId => validUserIds.has(userId))
+            .map(userId => ({
+                user_id: userId,
+                title,
+                message,
+                type,
+                link,
+                triggered_by_name: triggeredByName,
+                company_name: companyName,
+                read: false,
+            }));
+
+        if (notifications.length === 0) {
+            console.warn('[Notification] Skipped: No valid users found in team');
+            return;
+        }
 
         const { error } = await db
             .from('notifications')

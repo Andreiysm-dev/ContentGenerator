@@ -87,19 +87,24 @@ export function MediaLibraryPage({
             </div>
 
             <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
-                <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
-                    <div>
-                        <h2 className="text-sm md:text-lg font-bold">Media Library</h2>
-                        <p className="mt-0.5 text-xs font-medium">All your generated and attached visual assets.</p>
+                <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden">
+                    <ImageIcon className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
+
+                    <div className="relative z-10">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+                            Asset Management
+                        </div>
+                        <h2 className="text-2xl font-black text-white">Media Library</h2>
+                        <p className="mt-1 text-sm font-medium text-slate-400">Manage and download your generated visual assets.</p>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative z-10">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                                 type="search"
-                                className="w-full md:w-64 rounded-xl border border-white/20 bg-white/10 pl-10 pr-3 py-1.5 text-xs font-medium text-white placeholder:text-white/60 outline-none focus:bg-white/20 transition-all"
-                                placeholder="Search assets..."
+                                className="w-full md:w-72 rounded-xl border border-white/20 bg-white/10 pl-11 pr-4 py-3 text-sm font-medium text-white placeholder:text-white/40 outline-none focus:bg-white/20 focus:border-blue-500/50 transition-all backdrop-blur-sm"
+                                placeholder="Search your assets..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />

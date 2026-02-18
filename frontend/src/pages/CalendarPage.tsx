@@ -1,5 +1,36 @@
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, FileText, Filter, FilterX, Plus, Rocket, Search, SearchX, Target, Wand2, Activity } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Filter,
+  FilterX,
+  Plus,
+  Rocket,
+  Search,
+  SearchX,
+  Target,
+  Wand2,
+  Activity,
+  Calendar as BigCalendar,
+  Layout,
+  Share2,
+  Trash2,
+  MoreVertical,
+  CheckCircle2,
+  Clock,
+  Instagram,
+  Linkedin,
+  Twitter,
+  Facebook,
+  ExternalLink,
+  Zap,
+  Download,
+  Copy as CopyIcon
+} from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { CalendarTableSkeleton } from "@/components/LoadingState";
 
 export type CalendarPageProps = {
@@ -11,10 +42,8 @@ export type CalendarPageProps = {
   calendarStatusOptions: string[];
   selectedIds: string[];
   isBatchGenerating: boolean;
-  isBatchReviewing: boolean;
   isBatchGeneratingImages: boolean;
   handleBatchGenerate: () => void;
-  handleBatchReview: () => void;
   handleBatchGenerateImages: () => void;
   openCsvModal: () => void;
   openCopyModal: () => void;
@@ -23,6 +52,7 @@ export type CalendarPageProps = {
   calendarError: string | null;
   isLoadingCalendar: boolean;
   calendarRows: any[];
+  setCalendarRows: React.Dispatch<React.SetStateAction<any[]>>;
   filteredCalendarRows: any[];
   activeCompanyId: string | undefined;
   isPageFullySelected: boolean;
@@ -37,6 +67,9 @@ export type CalendarPageProps = {
   setPage: (page: number | ((prev: number) => number)) => void;
   currentPageRows: any[];
   getImageGeneratedUrl: (row: any) => string | null;
+  authedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  backendBaseUrl: string;
+  notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
 };
 
 function statusKey(status: string) {
@@ -103,16 +136,15 @@ export function CalendarPage(props: CalendarPageProps) {
     calendarStatusOptions,
     selectedIds,
     isBatchGenerating,
-    isBatchReviewing,
     isBatchGeneratingImages,
     handleBatchGenerate,
-    handleBatchReview,
     handleBatchGenerateImages,
     handleDeleteSelected,
     isBackendWaking,
     calendarError,
     isLoadingCalendar,
     calendarRows,
+    setCalendarRows,
     filteredCalendarRows,
     activeCompanyId,
     isPageFullySelected,
@@ -127,478 +159,419 @@ export function CalendarPage(props: CalendarPageProps) {
     setPage,
     currentPageRows,
     getImageGeneratedUrl,
+    authedFetch,
+    backendBaseUrl,
+    notify,
   } = props;
 
   const navigate = useNavigate();
+  const { companyId } = useParams();
+
   const showClear = Boolean(calendarSearch) || calendarStatusFilter !== "all";
 
-  const TabLink = ({ to, active, children }: { to: string; active: boolean; children: React.ReactNode }) => (
+  const renderChannelIcons = (channelsString: string) => {
+    if (!channelsString) return <span className="text-slate-300">—</span>;
+    // Handle both comma-separated strings and potential arrays
+    const rawChannels: string[] = typeof channelsString === 'string'
+      ? channelsString.toLowerCase().split(/[,\/&|]/).map((s: string) => s.trim())
+      : (Array.isArray(channelsString) ? (channelsString as any[]).map((s: any) => String(s).toLowerCase()) : []);
+
+    return (
+      <div className="flex gap-2 items-center">
+        {rawChannels.map((ch: string, i: number) => {
+          if (ch.includes('linkedin') || ch.includes('li')) return <Linkedin key={i} className="w-4 h-4 text-[#0A66C2]" />;
+          if (ch.includes('instagram') || ch.includes('ig') || ch.includes('insta')) return <Instagram key={i} className="w-4 h-4 text-[#E4405F]" />;
+          if (ch.includes('twitter') || ch.includes('tw') || ch.includes('x')) return <Twitter key={i} className="w-4 h-4 text-[#1DA1F2]" />;
+          if (ch.includes('facebook') || ch.includes('fb')) return <Facebook key={i} className="w-4 h-4 text-[#1877F2]" />;
+          return <Share2 key={i} className="w-4 h-4 text-slate-400" />;
+        })}
+      </div>
+    );
+  };
+
+  const TabButton = ({ active, onClick, icon: Icon, label, count }: any) => (
     <button
-      onClick={() => navigate(to)}
-      className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2 ${active
-        ? "bg-white text-[#3fa9f5] shadow-sm"
-        : "bg-transparent text-slate-600 hover:text-[#3fa9f5]"
+      onClick={onClick}
+      className={`relative flex items-center gap-2.5 px-6 py-5 text-sm font-bold transition-all border-b-2 z-10 ${active
+        ? "text-blue-600 border-blue-600 bg-white"
+        : "text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50/50"
         }`}
     >
-      {children}
+      <Icon className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400"}`} />
+      {label}
+      {count !== undefined && (
+        <span className={`px-2 py-0.5 rounded-full text-[10px] ${active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+          {count}
+        </span>
+      )}
     </button>
   );
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden min-h-0">
-      <main className="flex-1 bg-gray-50/50 p-2.5 md:p-6 min-h-0 relative">
-        {/* Background Ambience */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-[-12%] left-[5%] w-[38%] h-[38%] bg-gradient-to-br from-[#6fb6e8]/18 to-[#81bad1]/14 rounded-full blur-[95px] animate-pulse" />
-          <div className="absolute bottom-[-8%] right-[8%] w-[35%] h-[35%] bg-gradient-to-tl from-[#a78bfa]/14 to-[#3fa9f5]/12 rounded-full blur-[90px] animate-pulse" style={{ animationDelay: '900ms' }} />
-        </div>
-        <section
-          className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm flex flex-col h-[calc(100vh-130px)] overflow-hidden relative z-10"
-        >
-          <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl shadow-sm flex flex-col gap-3">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex-1">
-                <h2 className="text-sm md:text-lg font-bold">
-                  {viewMode === 'published' ? 'Published Content' : 'Content Calendar'}
-                </h2>
+    <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6 min-w-0 relative">
+      {/* Background Ambience */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-gradient-to-br from-[#3fa9f5]/20 to-[#6fb6e8]/15 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-gradient-to-tr from-[#a78bfa]/15 to-[#e5a4e6]/12 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '700ms' }} />
+      </div>
+
+      <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+        {/* Header Section */}
+        <header className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden flex-shrink-0">
+          <CalendarDays className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+              Workflow Planner
+            </div>
+            <h2 className="text-2xl font-black text-white tracking-tight">Content Calendar</h2>
+            <p className="mt-1 text-sm font-medium text-slate-400">Streamline your content pipeline from concept to publication.</p>
+          </div>
+
+          <div className="flex items-center gap-3 relative z-10">
+            <button
+              onClick={() => navigate(`/company/${companyId}/generate`)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-600 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/35"
+            >
+              <Plus className="w-4 h-4" />
+              Create Posts
+            </button>
+            <div className="relative group">
+              <button className="p-3 bg-white/5 border border-white/10 rounded-xl text-white/70 hover:bg-white/10 transition-all shadow-sm">
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all z-50 overflow-hidden">
+                <button onClick={props.openCsvModal} className="w-full px-4 py-3 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50">
+                  <Download className="w-4 h-4 text-slate-400" /> Export CSV
+                </button>
+                <button onClick={props.openCopyModal} className="w-full px-4 py-3 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+                  <CopyIcon className="w-4 h-4 text-slate-400" /> Copy to Sheets
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Tabs Bar */}
+          <div className="flex flex-col border-b border-slate-100 bg-white">
+            <div className="flex items-center justify-between">
+              <div className="flex">
+                <TabButton
+                  active={viewMode === 'drafts'}
+                  onClick={() => navigate(`/company/${companyId}/calendar`)}
+                  icon={Layout}
+                  label="Pipeline"
+                  count={calendarRows.filter(r => (getStatusValue(r.status) || 'Draft').toLowerCase() !== 'published').length}
+                />
+                <TabButton
+                  active={viewMode === 'published'}
+                  onClick={() => navigate(`/company/${companyId}/calendar/published`)}
+                  icon={CheckCircle2}
+                  label="Archives"
+                  count={calendarRows.filter(r => (getStatusValue(r.status) || 'Draft').toLowerCase() === 'published').length}
+                />
+              </div>
+
+              <div className="hidden md:flex items-center gap-6 px-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
+                  <div className="flex gap-1.5">
+                    {['all', 'Approved', 'Generate', 'Draft'].map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setCalendarStatusFilter(f)}
+                        className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all border ${calendarStatusFilter === f
+                            ? "bg-slate-900 border-slate-900 text-white shadow-sm"
+                            : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                          }`}
+                      >
+                        {f === 'all' ? 'All' : f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-3 w-full">
+            <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-50 flex items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={calendarSearch}
+                  onChange={(e) => setCalendarSearch(e.target.value)}
+                  placeholder="Search and filter content..."
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/50 outline-none transition-all shadow-inner"
+                />
+              </div>
+
               {showClear && (
                 <button
-                  type="button"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold bg-white text-rose-600 border border-slate-200/70 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 focus-visible:ring-offset-2 w-full md:w-auto"
-                  onClick={() => {
-                    setCalendarSearch("");
-                    setCalendarStatusFilter("all");
-                  }}
+                  onClick={() => { setCalendarSearch(""); setCalendarStatusFilter("all"); }}
+                  className="text-xs font-bold text-rose-500 hover:text-rose-600 flex items-center gap-1.5 transition-all bg-rose-50 px-3 py-2 rounded-xl"
                 >
-                  <FilterX className="h-4 w-4" />
-                  Clear filters
+                  <FilterX className="w-3.5 h-3.5" /> Reset
                 </button>
               )}
-
-              <div className="flex flex-col sm:flex-row md:flex-row md:items-center gap-3 flex-1">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <input
-                    type="search"
-                    className="w-full md:w-auto rounded-xl border border-slate-200/70 bg-white pl-10 pr-3 py-2.5 text-sm font-medium text-brand-dark placeholder:text-slate-400 outline-none focus:border-[#3fa9f5]/50 focus:ring-4 focus:ring-[#3fa9f5]/10 transition-all"
-                    placeholder="Search calendar..."
-                    value={calendarSearch}
-                    onChange={(e) => setCalendarSearch(e.target.value)}
-                  />
-                </div>
-
-                <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-2 shadow-sm w-full sm:w-auto">
-                  <span className="inline-flex items-center gap-2 text-[0.78rem] font-bold text-brand-dark/60 whitespace-nowrap">
-                    <Filter className="h-4 w-4" />
-                    Status
-                  </span>
-
-                  <div className="relative flex-1 sm:flex-none">
-                    <select
-                      className="appearance-none w-full sm:w-auto bg-transparent pr-7 pl-2 py-1 text-sm font-semibold text-brand-dark outline-none cursor-pointer"
-                      value={calendarStatusFilter}
-                      onChange={(e) => setCalendarStatusFilter(e.target.value)}
-                    >
-                      {calendarStatusOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt === "all" ? "All" : opt}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Bulk Actions */}
-          {selectedIds.length > 0 && (
-            <div className="mt-5 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 shadow-sm flex flex-col gap-3 md:gap-0 md:flex-row md:items-center md:justify-between flex-wrap">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="text-sm font-bold text-brand-dark">Selected actions</div>
-                <span className="inline-flex items-center rounded-full bg-[#3fa9f5]/10 px-2.5 py-1 text-xs font-bold text-[#3fa9f5]">{selectedIds.length} selected</span>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleBatchGenerate}
-                  disabled={isBatchGenerating}
-                >
-                  {isBatchGenerating ? "Generating…" : "Generate"}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleBatchReview}
-                  disabled={isBatchReviewing}
-                >
-                  {isBatchReviewing ? "Reviewing…" : "Review"}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleBatchGenerateImages}
-                  disabled={isBatchGeneratingImages}
-                >
-                  {isBatchGeneratingImages ? "Generating…" : "Generate Image"}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-rose-700 border border-slate-200/70 shadow-sm transition hover:bg-rose-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 focus-visible:ring-offset-2"
-                  onClick={handleDeleteSelected}
-                >
-                  Delete ({selectedIds.length})
-                </button>
-              </div>
-            </div>
-          )}
-          {/* Table */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 min-h-0">
-            {isBackendWaking && (
-              <div className="mt-5 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm flex items-center gap-3">
-                <span className="h-4 w-4 rounded-full border-2 border-slate-300 border-t-transparent animate-spin" aria-hidden="true" />
-                <div className="text-sm font-medium flex items-center">Getting things ready…</div>
-              </div>
-            )}
-            {!isLoadingCalendar && !calendarError && calendarRows.length === 0 && (
-              <div className="rounded-xl border border-slate-200/60 bg-white p-10 text-center shadow-sm">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
-                  <FileText className="h-6 w-6 text-brand-dark/60" aria-hidden />
+          {/* Table Container */}
+          <div className="flex-1 overflow-auto relative bg-white">
+            {isLoadingCalendar ? (
+              <div className="p-10"><CalendarTableSkeleton /></div>
+            ) : filteredCalendarRows.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-12">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+                  <SearchX className="w-8 h-8 text-slate-300" />
                 </div>
-                <div className="text-base font-bold text-brand-dark">No content yet</div>
-                <p className="mt-1 text-sm text-brand-dark/60">Import rows or generate content to get started. Your calendar will appear here.</p>
-                <div className="mt-6 flex justify-center">
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                    onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/generate`)}
-                    disabled={!activeCompanyId}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Go to Content Generator
-                  </button>
-                </div>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight">No content matches</h3>
+                <p className="text-slate-400 text-xs mt-1 max-w-[200px]">
+                  Try adjusting your search or filter to see more results.
+                </p>
               </div>
-            )}
+            ) : viewMode === 'drafts' ? (
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead className="sticky top-0 z-20 bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="w-12 px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={isPageFullySelected}
+                        onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
+                    <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Content Overview</th>
+                    <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Channels</th>
+                    <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Strategy</th>
+                    <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Date</th>
+                    <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
+                    <th className="w-32 px-6 py-4"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {currentPageRows.map((row) => {
+                    const status = getStatusValue(row.status) || "Draft";
+                    const key = statusKey(status);
+                    const isSelected = selectedIds.includes(row.contentCalendarId);
 
-            {!isLoadingCalendar && !calendarError && filteredCalendarRows.length === 0 && calendarRows.length > 0 && (
-              <div className="mt-5 rounded-2xl border border-slate-200/60 bg-white p-10 text-center shadow-sm">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
-                  <SearchX className="h-6 w-6 text-brand-dark/60" aria-hidden />
-                </div>
-                <div className="text-base font-bold text-brand-dark">No matching rows</div>
-                <p className="mt-1 text-sm text-brand-dark/60">Try adjusting your search or filter to see more content.</p>
-              </div>
-            )}
-            {!isLoadingCalendar && !calendarError && filteredCalendarRows.length > 0 && viewMode === 'drafts' && (
-              <div className="flex flex-col h-full min-h-0">
-                <div className="flex-1 overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/70 bg-white shadow-sm relative">
-                  <table className="min-w-full table-fixed text-sm border-separate border-spacing-0">
-                    <thead className="sticky top-0 z-20 bg-slate-50 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
-                      <tr>
-                        <th className="w-11 px-4 py-3 text-left bg-slate-50">
-                          <input type="checkbox" checked={isPageFullySelected} onChange={(e) => toggleSelectAllOnPage(e.target.checked)} className="h-4 w-4 accent-[#3fa9f5]" />
-                        </th>
-
-                        <th className="w-[120px] px-4 py-3 text-left text-[0.72rem] font-bold uppercase tracking-widest text-brand-dark/60 bg-slate-50">
-                          <span className="inline-flex items-center gap-2">
-                            <CalendarDays className="h-4 w-4 opacity-70" />
-                            Date
-                          </span>
-                        </th>
-
-                        <th className="px-4 py-3 text-left text-[0.72rem] font-bold uppercase tracking-widest text-brand-dark/60 bg-slate-50">
-                          <span className="inline-flex items-center gap-2">
-                            <Wand2 className="h-4 w-4 opacity-70" />
-                            Theme / Content
-                          </span>
-                        </th>
-
-                        <th className="px-4 py-3 text-left text-[0.72rem] font-bold uppercase tracking-widest text-brand-dark/60 bg-slate-50">Brand / Promo</th>
-
-                        <th className="px-4 py-3 text-left text-[0.72rem] font-bold uppercase tracking-widest text-brand-dark/60 bg-slate-50">
-                          <span className="inline-flex items-center gap-2">
-                            <Target className="h-4 w-4 opacity-70" />
-                            Channel / Target
-                          </span>
-                        </th>
-
-                        <th className="px-4 py-3 text-left text-[0.72rem] font-bold uppercase tracking-widest text-brand-dark/60 bg-slate-50">
-                          <span className="inline-flex items-center gap-2">
-                            <Rocket className="h-4 w-4 opacity-70" />
-                            Primary / CTA
-                          </span>
-                        </th>
-
-                        <th className="w-[140px] px-4 py-3 text-left text-[0.72rem] font-bold uppercase tracking-widest text-brand-dark/60 bg-slate-50">
-                          <span className="inline-flex items-center gap-2">
-                            <Activity className="h-4 w-4 opacity-70" />
-                            Status
-                          </span>
-                        </th>
-
-                        <th className="w-[120px] px-4 py-3 text-center text-[0.72rem] font-bold uppercase tracking-widest text-brand-dark/60 bg-slate-50">Actions</th>
-                      </tr>
-                    </thead>
-
-                    <tbody className="bg-white">
-                      {currentPageRows.map((row) => {
-                        const currentStatus = getStatusValue(row.status) || "Draft";
-                        const key = statusKey(currentStatus);
-
-                        return (
-                          <tr key={row.contentCalendarId} className={["border-b border-slate-200/50 align-top", "hover:bg-[#3fa9f5]/[0.06] transition-colors", "border-l-4", rowAccentClasses(key)].join(" ")}>
-                            <td className="w-11 px-4 py-3">
-                              <input type="checkbox" checked={selectedIds.includes(row.contentCalendarId)} onChange={(e) => toggleSelectOne(row.contentCalendarId, e.target.checked)} className="h-4 w-4 accent-[#3fa9f5]" />
-                            </td>
-
-                            <td className="w-[120px] px-4 py-3">
-                              <div className="text-sm font-medium text-brand-dark/80">{row.date ?? "—"}</div>
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col gap-1">
-                                <span className="text-sm font-semibold text-brand-dark">{row.theme || "—"}</span>
-                                {row.contentType ? <span className="text-xs text-brand-dark/60">{row.contentType}</span> : null}
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col gap-1 text-brand-dark/80">
-                                {row.brandHighlight ? <span className="text-xs text-brand-dark/60">{row.brandHighlight}</span> : null}
-
-                                {row.crossPromo || row.promoType ? <span className="text-xs text-brand-dark/60">{[row.crossPromo, row.promoType].filter(Boolean).join(" • ")}</span> : null}
-
-                                {!row.brandHighlight && !row.crossPromo && !row.promoType && <span className="text-sm text-brand-dark/30">—</span>}
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col gap-1">
-                                {row.channels ? <span className="text-sm font-semibold text-brand-dark">{row.channels}</span> : null}
-                                {row.targetAudience ? <span className="text-xs text-brand-dark/60">{row.targetAudience}</span> : null}
-                                {!row.channels && !row.targetAudience && <span className="text-sm text-brand-dark/30">—</span>}
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col gap-1">
-                                {row.primaryGoal ? <span className="text-sm font-semibold text-brand-dark">{row.primaryGoal}</span> : null}
-                                {row.cta ? <span className="text-xs text-brand-dark/60">{row.cta}</span> : null}
-                                {!row.primaryGoal && !row.cta && <span className="text-sm text-brand-dark/30">—</span>}
-                              </div>
-                            </td>
-
-                            <td className="w-[140px] px-4 py-3">
-                              <span className={["inline-flex items-center rounded-lg border px-2 py-1 text-xs font-semibold capitalize whitespace-nowrap", statusBadgeClasses(key)].join(" ")}>{currentStatus}</span>
-                            </td>
-
-                            <td className="w-[120px] px-4 py-3 text-center">
-                              <button
-                                type="button"
-                                className="inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2"
-                                onClick={() => {
-                                  setSelectedRow(row);
-                                  setIsViewModalOpen(true);
-                                }}
-                              >
-                                View
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination (Sticky Footer) */}
-                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50 px-4 py-3 sm:px-5 sm:py-4 sticky bottom-0 z-10 shadow-[0_-1px_0_0_rgba(226,232,240,1)] rounded-b-2xl">
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="hidden text-xs font-semibold text-brand-dark/60 md:block whitespace-nowrap">Rows per page</span>
-                      <div className="relative">
-                        <select
-                          className="appearance-none rounded-lg border border-slate-200/70 bg-white pl-3 pr-7 py-1.5 text-xs sm:text-sm font-semibold text-brand-dark shadow-sm transition hover:border-[#3fa9f5]/30 focus:outline-none focus:ring-2 focus:ring-[#3fa9f5]/20"
-                          value={pageSize}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setPage(1);
-                            setPageSize(val === "all" ? "all" : Number(val));
-                          }}
-                        >
-                          {[10, 25, 50, "all"].map((size) => (
-                            <option key={size} value={size}>
-                              {size === "all" ? "All" : size}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] sm:text-sm text-brand-dark/60 border-l border-slate-200 pl-2 sm:pl-4">
-                      <span className="xs:inline">Showing </span>
-                      <strong className="text-brand-dark">{currentPageRows.length}</strong> of {filteredCalendarRows.length}
-                    </div>
-                  </div>
-
-                  {pageSize !== "all" && (
-                    <div className="flex items-center gap-1 sm:gap-2 rounded-lg sm:rounded-xl border border-slate-200/70 bg-white p-0.5 sm:p-1 shadow-sm">
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-md sm:rounded-lg text-brand-dark/70 transition hover:bg-[#3fa9f5]/10 hover:text-[#3fa9f5] disabled:opacity-30"
-                        disabled={page <= 1}
-                        onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-
-                      <div className="px-1 sm:px-2 text-[11px] sm:text-sm font-semibold whitespace-nowrap">
-                        <span className="text-[#3fa9f5]">{page}</span>
-                        <span className="text-slate-400 font-medium px-0.5">/</span>
-                        <span className="text-brand-dark">{Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1)))}</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-md sm:rounded-lg text-brand-dark/70 transition hover:bg-[#3fa9f5]/10 hover:text-[#3fa9f5] disabled:opacity-30"
-                        disabled={page >= Math.ceil(filteredCalendarRows.length / (pageSize || 1))}
-                        onClick={() => setPage((prev) => Math.min(Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1))), prev + 1))}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Published Grid View */}
-            {!isLoadingCalendar && !calendarError && filteredCalendarRows.length > 0 && viewMode === 'published' && (
-              <div className="flex flex-col h-full min-h-0">
-                <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-                    {currentPageRows.map((row) => {
-                      const imageUrl = getImageGeneratedUrl(row);
-                      const caption = row.finalCaption || row.captionOutput || "";
-                      const captionPreview = caption.length > 150 ? `${caption.substring(0, 150)}...` : caption;
-
-                      return (
-                        <div
-                          key={row.contentCalendarId}
-                          className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm transition hover:shadow-lg cursor-pointer"
-                          onClick={() => {
-                            setSelectedRow(row);
-                            setIsViewModalOpen(true);
-                          }}
-                        >
-                          {/* Image */}
-                          {imageUrl ? (
-                            <img src={imageUrl} alt="Content preview" className="h-48 sm:h-56 w-full object-cover bg-slate-100" loading="lazy" />
-                          ) : (
-                            <div className="h-48 sm:h-56 w-full bg-slate-100 flex items-center justify-center">
-                              <FileText className="h-10 w-10 text-brand-dark/30" />
+                    return (
+                      <tr key={row.contentCalendarId} className={`group hover:bg-slate-50/80 transition-all ${isSelected ? "bg-blue-50/30" : ""}`}>
+                        <td className="w-12 px-6 py-5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => toggleSelectOne(row.contentCalendarId, e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-5" onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}>
+                          <div className="flex gap-4">
+                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border shadow-inner ${status.toLowerCase() === 'approved' ? 'bg-emerald-50/50 border-emerald-100 text-emerald-600' : 'bg-slate-50 border-slate-100 text-slate-400'
+                              }`}>
+                              {row.attachedDesign ? <Share2 className="w-5 h-5 opacity-80" /> : <FileText className="w-5 h-5 opacity-80" />}
                             </div>
-                          )}
-
-                          {/* Content */}
-                          <div className="p-4 flex flex-col gap-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="text-xs font-semibold text-[#3fa9f5]">{row.date || "No date"}</div>
-                              <span className="text-[0.72rem] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Published</span>
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <span className="text-sm font-bold text-slate-900 truncate">
+                                {row.theme || "Untitled Post"}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{row.contentType || "General"}</span>
                             </div>
-
-                            <div className="text-sm leading-relaxed text-brand-dark/80 line-clamp-3">
-                              {captionPreview || <span className="text-brand-dark/50 italic">No caption available.</span>}
-                            </div>
-
-                            {row.channels && (
-                              <div className="flex flex-wrap gap-2">
-                                <span className="text-[0.72rem] font-medium px-2.5 py-1 rounded-lg bg-[#3fa9f5]/10 text-[#3fa9f5]">
-                                  {row.channels}
-                                </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-5">
+                          {renderChannelIcons(row.channels)}
+                        </td>
+                        <td className="px-4 py-5 font-medium">
+                          <div className="flex flex-col gap-1.5">
+                            {row.primaryGoal && (
+                              <div className="flex items-center gap-1.5">
+                                <Target className="w-3 h-3 text-blue-500" />
+                                <span className="text-[11px] font-bold text-slate-600">{row.primaryGoal}</span>
                               </div>
                             )}
+                            {row.cta && <span className="text-[10px] bg-slate-100 w-fit px-1.5 py-0.5 rounded text-slate-500 font-bold uppercase">{row.cta}</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-5 text-center">
+                          <div className="inline-flex flex-col items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{row.date ? row.date.split(' ')[0] : '—'}</span>
+                            <span className="text-xs font-bold text-slate-700">{row.date ? row.date.split(' ')[1] : ''}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-5">
+                          <div
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${statusBadgeClasses(key)
+                              }`}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                            {status}
+                          </div>
+                        </td>
+                        <td className="px-6 py-5 text-right">
+                          <div className="flex items-center justify-end gap-2 transition-all">
+                            {status.toLowerCase() === 'approved' && (
+                              <button
+                                title="Go to Image Hub"
+                                onClick={(e) => { e.stopPropagation(); navigate(`/company/${companyId}/image-hub?id=${row.contentCalendarId}`); }}
+                                className="p-2.5 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 shadow-sm border border-blue-100"
+                              >
+                                <Share2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}
+                              className="p-2.5 text-slate-500 bg-slate-50 rounded-xl hover:bg-slate-100 border border-slate-100 shadow-sm"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              /* Published Grid View */
+              <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50/30 overflow-y-auto max-h-full">
+                {currentPageRows.map((row) => {
+                  const imageUrl = getImageGeneratedUrl(row);
+                  const caption = row.finalCaption || row.captionOutput || "";
+                  const captionPreview = caption.length > 100 ? `${caption.substring(0, 100)}...` : caption;
+
+                  return (
+                    <div
+                      key={row.contentCalendarId}
+                      className="group relative bg-white border border-slate-200 rounded-3xl overflow-hidden hover:shadow-xl transition-all cursor-pointer flex flex-col"
+                      onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}
+                    >
+                      <div className="aspect-square relative bg-slate-100 overflow-hidden shrin-0">
+                        {imageUrl ? (
+                          <img src={imageUrl} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-3 border-b border-slate-100">
+                            <FileText className="w-10 h-10" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">No Visual</span>
+                          </div>
+                        )}
+                        <div className="absolute top-3 right-3 z-10">
+                          <div className="px-2.5 py-1 bg-white/90 backdrop-blur shadow-sm rounded-full flex items-center gap-1.5 border border-white/50">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                            <span className="text-[9px] font-black text-slate-900 uppercase">Published</span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Pagination (Sticky Footer for Grid) */}
-                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50 px-4 py-3 sm:px-5 sm:py-4 sticky bottom-0 z-10 shadow-[0_-1px_0_0_rgba(226,232,240,1)] rounded-b-2xl">
-                  {/* Reuse the same pagination UI as table above */}
-                  <div className="flex items-center gap-2 sm:gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="hidden text-xs font-semibold text-brand-dark/60 md:block whitespace-nowrap">Cards per page</span>
-                      <div className="relative">
-                        <select
-                          className="appearance-none rounded-lg border border-slate-200/70 bg-white pl-3 pr-7 py-1.5 text-xs sm:text-sm font-semibold text-brand-dark shadow-sm transition hover:border-[#3fa9f5]/30 focus:outline-none focus:ring-2 focus:ring-[#3fa9f5]/20"
-                          value={pageSize}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setPage(1);
-                            setPageSize(val === "all" ? "all" : Number(val));
-                          }}
-                        >
-                          {[9, 18, 36, "all"].map((size) => (
-                            <option key={size} value={size}>
-                              {size === "all" ? "All" : size}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                      </div>
+                      <div className="p-5 flex-1 flex flex-col">
+                        <div className="flex items-center gap-2.5 mb-3">
+                          {renderChannelIcons(row.channels)}
+                          <div className="h-3 w-[1.5px] bg-slate-200" />
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{row.date || "Past Post"}</span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700 line-clamp-2 leading-relaxed mb-4 flex-1">
+                          {captionPreview || <span className="text-slate-300 italic font-medium">No caption preserved.</span>}
+                        </p>
+                        <div className="pt-3 border-t border-slate-50 mt-auto flex items-center justify-between">
+                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Performance Ready</span>
+                          <ExternalLink className="w-3 h-3 text-slate-300" />
+                        </div>
                       </div>
                     </div>
-
-                    <div className="text-[11px] sm:text-sm text-brand-dark/60 border-l border-slate-200 pl-2 sm:pl-4">
-                      <span className="xs:inline">Showing </span>
-                      <strong className="text-brand-dark">{currentPageRows.length}</strong> of {filteredCalendarRows.length}
-                    </div>
-                  </div>
-
-                  {pageSize !== "all" && (
-                    <div className="flex items-center gap-1 sm:gap-2 rounded-lg sm:rounded-xl border border-slate-200/70 bg-white p-0.5 sm:p-1 shadow-sm">
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-md sm:rounded-lg text-brand-dark/70 transition hover:bg-[#3fa9f5]/10 hover:text-[#3fa9f5] disabled:opacity-30"
-                        disabled={page <= 1}
-                        onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-
-                      <div className="px-1 sm:px-2 text-[11px] sm:text-sm font-semibold whitespace-nowrap">
-                        <span className="text-[#3fa9f5]">{page}</span>
-                        <span className="text-slate-400 font-medium px-0.5">/</span>
-                        <span className="text-brand-dark">{Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1)))}</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-md sm:rounded-lg text-brand-dark/70 transition hover:bg-[#3fa9f5]/10 hover:text-[#3fa9f5] disabled:opacity-30"
-                        disabled={page >= Math.ceil(filteredCalendarRows.length / (pageSize || 1))}
-                        onClick={() => setPage((prev) => Math.min(Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1))), prev + 1))}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
             )}
           </div>
-        </section>
-      </main>
-    </div>
+
+          {/* Pagination Footer */}
+          <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black text-slate-400 uppercase">Size</span>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPage(1); setPageSize(e.target.value === "all" ? "all" : Number(e.target.value)); }}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none hover:bg-white transition-all shadow-inner"
+              >
+                {[10, 25, 50, "all"].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <div className="h-4 w-[1px] bg-slate-100 mx-1" />
+              <span className="text-[11px] font-bold text-slate-500">
+                {currentPageRows.length} of {filteredCalendarRows.length} results
+              </span>
+            </div>
+
+            {pageSize !== "all" && (
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 disabled:opacity-30 transition-all shadow-sm"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg shadow-inner text-[11px] font-black">
+                  <span className="text-blue-600">{page}</span>
+                  <span className="text-slate-300 mx-2">/</span>
+                  <span className="text-slate-900">{Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1)))}</span>
+                </div>
+                <button
+                  disabled={page >= Math.ceil(filteredCalendarRows.length / (pageSize || 1))}
+                  onClick={() => setPage(p => p + 1)}
+                  className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 disabled:opacity-30 transition-all shadow-sm"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Floating Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-[scale-up_0.2s_ease-out]">
+          <div className="bg-slate-900 border border-white/10 shadow-2xl rounded-3xl p-3 flex items-center gap-6 text-white min-w-[480px]">
+            <div className="flex items-center gap-3 px-3">
+              <div className="w-9 h-9 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-black uppercase tracking-wider">{selectedIds.length} Selected</span>
+              </div>
+            </div>
+
+            <div className="h-10 w-[1px] bg-white/10" />
+
+            <div className="flex gap-2 pr-2">
+              <button
+                onClick={handleBatchGenerate}
+                disabled={isBatchGenerating}
+                className="px-5 py-2 bg-white text-slate-900 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-100 transition-all flex items-center gap-2"
+              >
+                {isBatchGenerating ? <Activity className="w-3 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                Generate
+              </button>
+              <button
+                onClick={handleBatchGenerateImages}
+                disabled={isBatchGeneratingImages}
+                className="px-5 py-2 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all flex items-center gap-2"
+              >
+                {isBatchGeneratingImages ? <Activity className="w-3 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                Visuals
+              </button>
+              <button
+                onClick={handleDeleteSelected}
+                className="p-2 hover:bg-rose-500 text-rose-500 hover:text-white rounded-2xl transition-all"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }

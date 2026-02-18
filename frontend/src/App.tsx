@@ -42,9 +42,14 @@ import { SettingsPage, type CompanySettingsTab } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
 import { PostInsightsPage } from '@/pages/PostInsightsPage';
+import { AIToolboxPage } from '@/pages/AIToolboxPage';
+import { LeadMagnetsPage } from '@/pages/LeadMagnetsPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { MediaLibraryPage } from '@/pages/MediaLibraryPage';
+import { ContentPlannerPage } from '@/pages/ContentPlannerPage';
 import Faq from "@/pages/Faq";
+import { ImageHubPage } from '@/pages/ImageHubPage';
+
 
 import {
   AddCompanyModal,
@@ -141,12 +146,10 @@ function App() {
   const [imagePreviewNonce, setImagePreviewNonce] = useState(0);
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [isRevisingCaption, setIsRevisingCaption] = useState(false);
   const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
   const [draftPublishIntent, setDraftPublishIntent] = useState<'draft' | 'ready'>('draft');
   const [isUploadingDesigns, setIsUploadingDesigns] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
-  const [isBatchReviewing, setIsBatchReviewing] = useState(false);
   const [isBatchGeneratingImages, setIsBatchGeneratingImages] = useState(false);
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [copyFieldSelection, setCopyFieldSelection] = useState<Record<string, boolean>>({});
@@ -359,47 +362,65 @@ function App() {
     }
   };
 
+  // Fetch user profile and handle onboarding trigger
+  const fetchProfile = async (currentSession: Session | null) => {
+    if (!currentSession) {
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      const token = currentSession.access_token;
+      const res = await fetch(`${backendBaseUrl}/api/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        setAuthLoading(false);
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      setUserProfile(data.profile || null);
+
+      // Show onboarding if not completed
+      if (data.profile && !data.profile.onboarding_completed) {
+        setIsOnboardingOpen(true);
+      }
+    } catch (err) {
+      console.error('Error loading profile:', err);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!supabase) {
       setAuthLoading(false);
       return;
     }
 
+    // Initial session check
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-      setAuthLoading(false);
+      const s = data.session ?? null;
+      setSession(s);
+      fetchProfile(s); // This will eventually setAuthLoading(false)
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      setSession(currentSession ?? null);
+      const s = currentSession ?? null;
+      setSession(s);
+      if (_event === 'SIGNED_IN') {
+        fetchProfile(s);
+      }
     });
 
     return () => {
       listener?.subscription?.unsubscribe();
     };
   }, []);
-
-  // Fetch user profile
-  useEffect(() => {
-    const loadProfile = async () => {
-      if (!session) return;
-      try {
-        const res = await authedFetch(`${backendBaseUrl}/api/profile`);
-        if (!res.ok) return;
-        const data = await res.json().catch(() => ({}));
-        setUserProfile(data.profile || null);
-
-        // Show onboarding if not completed
-        if (data.profile && !data.profile.onboarding_completed) {
-          setIsOnboardingOpen(true);
-        }
-      } catch (err) {
-        console.error('Error loading profile:', err);
-      }
-    };
-
-    loadProfile();
-  }, [session]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState<string | undefined>(() => {
     // Try to get from localStorage first, fallback to defaultCompanyId
@@ -1889,8 +1910,12 @@ function App() {
     if (/^\/company\/[^/]+\/studio(?:\/|$)/.test(path)) return 'studio';
     if (/^\/company\/[^/]+\/integrations(?:\/|$)/.test(path)) return 'integrations';
     if (/^\/company\/[^/]+\/insights(?:\/|$)/.test(path)) return 'insights';
+    if (/^\/company\/[^/]+\/toolbox(?:\/|$)/.test(path)) return 'toolbox';
+    if (/^\/company\/[^/]+\/leads(?:\/|$)/.test(path)) return 'leads';
     if (/^\/company\/[^/]+\/library(?:\/|$)/.test(path)) return 'library';
+    if (/^\/company\/[^/]+\/image-hub(?:\/|$)/.test(path)) return 'image-hub';
     if (/^\/company\/[^/]+\/settings(?:\/|$)/.test(path)) return 'settings';
+
     return null;
   }, [location.pathname]);
 
@@ -2020,9 +2045,9 @@ function App() {
   const handleBatchGenerate = async () => {
     if (selectedIds.length === 0) return;
     const proceed = await requestConfirm({
-      title: 'Generate captions for selected content?',
-      description: `You're about to trigger caption generation for ${selectedIds.length} content items.`,
-      confirmLabel: `Generate ${selectedIds.length} captions`,
+      title: 'Generate & Review selected content?',
+      description: `You're about to trigger caption generation followed by an automatic review for ${selectedIds.length} content items.`,
+      confirmLabel: `Generate & Review ${selectedIds.length} items`,
       cancelLabel: 'Go back',
       confirmVariant: 'primary',
     });
@@ -2056,7 +2081,7 @@ function App() {
         const successCount = Array.isArray(summary?.success) ? summary.success.length : 0;
         const failedCount = Array.isArray(summary?.failed) ? summary.failed.length : 0;
         const skippedCount = Array.isArray(summary?.skipped) ? summary.skipped.length : 0;
-        notify(`Generation triggered: ${successCount} success, ${skippedCount} skipped, ${failedCount} failed.`, 'success');
+        notify(`Generation & Review triggered: ${successCount} success, ${skippedCount} skipped, ${failedCount} failed.`, 'success');
       }
     } catch (err) {
       console.error('Bulk generate captions failed', err);
@@ -2066,54 +2091,6 @@ function App() {
     setIsBatchGenerating(false);
   };
 
-  const handleBatchReview = async () => {
-    if (selectedIds.length === 0) return;
-    const proceed = await requestConfirm({
-      title: 'Send selected content for review?',
-      description: `You're about to send ${selectedIds.length} content items for review.`,
-      confirmLabel: `Send ${selectedIds.length} items`,
-      cancelLabel: 'Go back',
-      confirmVariant: 'primary',
-    });
-    if (!proceed) return;
-    setIsBatchReviewing(true);
-
-    const rowsToProcess = calendarRows.filter((row) => selectedIds.includes(row.contentCalendarId));
-    const reviewEligibleRows = rowsToProcess.filter(
-      (row) => getStatusValue(row.status).trim().toLowerCase() === 'review',
-    );
-    const validRows = reviewEligibleRows.filter((row) => !!row.captionOutput);
-
-    if (validRows.length === 0) {
-      notify('Only items already in Review status can be sent for review.', 'error');
-      setIsBatchReviewing(false);
-      return;
-    }
-
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/review-content-bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentCalendarIds: validRows.map((r) => r.contentCalendarId) }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        notify(data.error || 'Failed to trigger review.', 'error');
-      } else {
-        const summary = data.summary as any;
-        const successCount = Array.isArray(summary?.success) ? summary.success.length : 0;
-        const failedCount = Array.isArray(summary?.failed) ? summary.failed.length : 0;
-        const skippedCount = Array.isArray(summary?.skipped) ? summary.skipped.length : 0;
-        notify(`Review triggered: ${successCount} success, ${skippedCount} skipped, ${failedCount} failed.`, 'success');
-      }
-    } catch (err) {
-      console.error('Bulk review failed', err);
-      notify('Failed to trigger review due to a network error.', 'error');
-    } finally {
-      validRows.forEach((row) => refreshCalendarRow(row.contentCalendarId));
-      setIsBatchReviewing(false);
-    }
-  };
 
   // ...
   const handleBatchGenerateImages = async () => {
@@ -2234,11 +2211,6 @@ function App() {
           setIsGeneratingCaption(false);
         }
 
-        // Stop loading if status changed from "review" to something else (revision completed)
-        if (isRevisingCaption && prevStatus === 'review' && newStatus !== 'review') {
-          console.log('Stopping revise caption loading');
-          setIsRevisingCaption(false);
-        }
       } catch (_) {
         // ignore polling errors
       }
@@ -2420,7 +2392,6 @@ function App() {
           crossPromo,
           theme,
           contentType,
-          channels,
           targetAudience,
           primaryGoal,
           cta,
@@ -2433,7 +2404,7 @@ function App() {
           crossPromo: crossPromo || null,
           theme: theme || null,
           contentType: contentType || null,
-          channels: channels || null,
+          channels: null, // Removed from bulk paste but kept in payload
           targetAudience: targetAudience || null,
           primaryGoal: primaryGoal || null,
           cta: cta || null,
@@ -2626,6 +2597,40 @@ function App() {
     navigate('/');
   };
 
+  const handleUpdateCompany = async () => {
+    if (!activeCompanyId) return;
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: companyName.trim(),
+          companyDescription: companyDescription.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update company');
+      }
+
+      notify('Company updated successfully', 'success');
+
+      // Update local companies list
+      setCompanies((prev) =>
+        prev.map((c) =>
+          c.companyId === activeCompanyId
+            ? { ...c, companyName: companyName.trim(), companyDescription: companyDescription.trim() }
+            : c
+        )
+      );
+
+    } catch (err: any) {
+      console.error('Error updating company:', err);
+      notify(err.message || 'Failed to update company', 'error');
+    }
+  };
+
   const handleDeleteCompany = async (companyId: string) => {
     try {
       const companyToDelete = companies.find((c) => c.companyId === companyId);
@@ -2816,6 +2821,7 @@ function App() {
                       activeCompany={activeCompany}
                       activeCompanyId={activeCompanyId}
                       dashboardStats={dashboardStats}
+                      brandIntelligenceReady={brandIntelligenceReady}
                     />
                   }
                 />
@@ -2837,6 +2843,62 @@ function App() {
                 />
 
                 <Route
+                  path="/company/:companyId/plan"
+                  element={
+                    <ContentPlannerPage
+                      activeCompanyId={activeCompanyId}
+                      authedFetch={authedFetch}
+                      onAddToCalendar={async (items: any[]) => {
+                        // Batch create logic
+                        // We will add each item to the calendar one by one or in a batch if supported.
+                        // For simplicity, we loop here.
+                        for (const item of items) {
+                          // Mimic form state for handleAdd
+                          // But handleAdd uses 'form' state. We should ideally refactor handleAdd or create a new bulkAdd function.
+                          // Since we don't have a bulk add function exposed easily without refactoring, we will create a direct specialized fetch here.
+
+                          try {
+                            await authedFetch(`${backendBaseUrl}/api/content-calendar`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                companyId: activeCompanyId,
+                                date: item.date,
+                                brandHighlight: item.brandHighlight,
+                                crossPromo: item.crossPromo,
+                                theme: item.theme,
+                                contentType: item.contentType,
+                                channels: item.channels || [],
+                                targetAudience: item.targetAudience,
+                                primaryGoal: item.primaryGoal,
+                                cta: item.cta,
+                                promoType: item.promoType,
+                                status: 'Draft'
+                              })
+                            });
+                          } catch (e) {
+                            console.error('Failed to add plan item', e);
+                          }
+                        }
+                        notify('Plan added to calendar!', 'success');
+
+                        // Refresh calendar manually
+                        if (activeCompanyId) {
+                          try {
+                            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`, { cache: 'no-store' });
+                            if (res.ok) {
+                              const data = await res.json();
+                              const list = (data.contentCalendars || data) as any[];
+                              setCalendarRows(Array.isArray(list) ? list : []);
+                            }
+                          } catch (e) { console.error(e); }
+                        }
+                      }}
+                    />
+                  }
+                />
+
+                <Route
                   path="/company/:companyId/calendar"
                   element={
                     <CalendarPage
@@ -2848,10 +2910,8 @@ function App() {
                       calendarStatusOptions={calendarStatusOptions}
                       selectedIds={selectedIds}
                       isBatchGenerating={isBatchGenerating}
-                      isBatchReviewing={isBatchReviewing}
                       isBatchGeneratingImages={isBatchGeneratingImages}
                       handleBatchGenerate={handleBatchGenerate}
-                      handleBatchReview={handleBatchReview}
                       handleBatchGenerateImages={handleBatchGenerateImages}
                       openCsvModal={openCsvModal}
                       openCopyModal={openCopyModal}
@@ -2860,6 +2920,7 @@ function App() {
                       calendarError={calendarError}
                       isLoadingCalendar={isLoadingCalendar}
                       calendarRows={calendarRows}
+                      setCalendarRows={setCalendarRows}
                       filteredCalendarRows={filteredCalendarRows}
                       activeCompanyId={activeCompanyId}
                       isPageFullySelected={isPageFullySelected}
@@ -2874,6 +2935,9 @@ function App() {
                       setPage={setPage}
                       currentPageRows={currentPageRows}
                       getImageGeneratedUrl={getImageGeneratedUrl}
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
                     />
                   }
                 />
@@ -2890,10 +2954,8 @@ function App() {
                       calendarStatusOptions={calendarStatusOptions}
                       selectedIds={selectedIds}
                       isBatchGenerating={isBatchGenerating}
-                      isBatchReviewing={isBatchReviewing}
                       isBatchGeneratingImages={isBatchGeneratingImages}
                       handleBatchGenerate={handleBatchGenerate}
-                      handleBatchReview={handleBatchReview}
                       handleBatchGenerateImages={handleBatchGenerateImages}
                       openCsvModal={openCsvModal}
                       openCopyModal={openCopyModal}
@@ -2902,6 +2964,7 @@ function App() {
                       calendarError={calendarError}
                       isLoadingCalendar={isLoadingCalendar}
                       calendarRows={calendarRows}
+                      setCalendarRows={setCalendarRows}
                       filteredCalendarRows={filteredCalendarRows}
                       activeCompanyId={activeCompanyId}
                       isPageFullySelected={isPageFullySelected}
@@ -2916,6 +2979,9 @@ function App() {
                       setPage={setPage}
                       currentPageRows={currentPageRows}
                       getImageGeneratedUrl={getImageGeneratedUrl}
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
                     />
                   }
                 />
@@ -2949,6 +3015,25 @@ function App() {
                     />
                   }
                 />
+                <Route
+                  path="/company/:companyId/image-hub"
+                  element={
+                    <ImageHubPage
+                      calendarRows={calendarRows}
+                      setCalendarRows={setCalendarRows}
+                      authedFetch={authedFetch}
+                      notify={notify}
+                      activeCompanyId={activeCompanyId}
+                      brandKbId={brandKbId}
+                      systemInstruction={systemInstruction}
+                      backendBaseUrl={backendBaseUrl}
+                      getStatusValue={getStatusValue}
+                      getImageGeneratedUrl={getImageGeneratedUrl}
+                      getImageGeneratedSignature={getImageGeneratedSignature}
+                      requestConfirm={requestConfirm}
+                    />
+                  }
+                />
 
                 <Route
                   path="/company/:companyId/insights"
@@ -2959,6 +3044,16 @@ function App() {
                       activeCompanyId={activeCompanyId}
                     />
                   }
+                />
+
+                <Route
+                  path="/company/:companyId/toolbox"
+                  element={<AIToolboxPage />}
+                />
+
+                <Route
+                  path="/company/:companyId/leads"
+                  element={<LeadMagnetsPage />}
                 />
 
                 <Route
@@ -2973,6 +3068,8 @@ function App() {
                   element={
                     <SettingsPage
                       tab="overview"
+                      notify={notify}
+                      authedFetch={authedFetch}
                       setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
                       brandIntelligenceReady={brandIntelligenceReady}
                       brandSetupMode={brandSetupMode}
@@ -2989,6 +3086,7 @@ function App() {
                       setCompanyDescription={setCompanyDescription}
                       loadBrandKB={loadBrandKB}
                       brandKbId={brandKbId}
+                      onSaveCompanyDetails={handleUpdateCompany}
                       brandPack={brandPack}
                       setBrandPack={setBrandPack}
                       brandCapability={brandCapability}
@@ -3108,6 +3206,8 @@ function App() {
                   element={
                     <SettingsPage
                       tab="brand-intelligence"
+                      notify={notify}
+                      authedFetch={authedFetch}
                       setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
                       brandIntelligenceReady={brandIntelligenceReady}
                       brandSetupMode={brandSetupMode}
@@ -3124,6 +3224,7 @@ function App() {
                       setCompanyDescription={setCompanyDescription}
                       loadBrandKB={loadBrandKB}
                       brandKbId={brandKbId}
+                      onSaveCompanyDetails={handleUpdateCompany}
                       brandPack={brandPack}
                       setBrandPack={setBrandPack}
                       brandCapability={brandCapability}
@@ -3229,6 +3330,8 @@ function App() {
                   element={
                     <SettingsPage
                       tab="team"
+                      notify={notify}
+                      authedFetch={authedFetch}
                       setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
                       brandIntelligenceReady={brandIntelligenceReady}
                       brandSetupMode={brandSetupMode}
@@ -3245,6 +3348,7 @@ function App() {
                       setCompanyDescription={setCompanyDescription}
                       loadBrandKB={loadBrandKB}
                       brandKbId={brandKbId}
+                      onSaveCompanyDetails={handleUpdateCompany}
                       brandPack={brandPack}
                       setBrandPack={setBrandPack}
                       brandCapability={brandCapability}
@@ -3349,6 +3453,8 @@ function App() {
                   element={
                     <SettingsPage
                       tab="integrations"
+                      notify={notify}
+                      authedFetch={authedFetch}
                       setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
                       brandIntelligenceReady={brandIntelligenceReady}
                       brandSetupMode={brandSetupMode}
@@ -3365,6 +3471,7 @@ function App() {
                       setCompanyDescription={setCompanyDescription}
                       loadBrandKB={loadBrandKB}
                       brandKbId={brandKbId}
+                      onSaveCompanyDetails={handleUpdateCompany}
                       brandPack={brandPack}
                       setBrandPack={setBrandPack}
                       brandCapability={brandCapability}
@@ -3464,6 +3571,7 @@ function App() {
                       formAnswerCache={formAnswerCache}
                     />}
                 />
+
                 <Route path="/profile" element={<ProfilePage session={session} supabase={supabase} notify={notify} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
@@ -3560,8 +3668,6 @@ function App() {
           requestConfirm={requestConfirm}
           isGeneratingCaption={isGeneratingCaption}
           setIsGeneratingCaption={setIsGeneratingCaption}
-          isRevisingCaption={isRevisingCaption}
-          setIsRevisingCaption={setIsRevisingCaption}
           authedFetch={authedFetch}
           backendBaseUrl={backendBaseUrl}
           refreshCalendarRow={refreshCalendarRow}

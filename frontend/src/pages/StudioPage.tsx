@@ -1,5 +1,5 @@
+import { FileText, CalendarDays, Eye, Copy, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { FileText, Eye, Copy, Download } from "lucide-react";
 
 interface DraftsPageProps {
   calendarRows: any[];
@@ -38,33 +38,31 @@ export function StudioPage({ calendarRows, getStatusValue, getImageGeneratedUrl,
       </div>
       <div className="w-full flex flex-col gap-6 relative z-10">
         <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
-            <div>
-              <div className="text-sm md:text-lg font-bold">Studio</div>
+          <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden">
+            <FileText className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
 
-              <p className="mt-1 text-sm font-medium flex flex-wrap items-center gap-2">
-                {draftCount > 0 ? (
-                  <>
-                    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-lg bg-[#3fa9f5]/10 text-[#3fa9f5] font-semibold">{draftCount}</span>
-                    {draftCount === 1 ? "design ready for final refinement." : "designs ready for final refinement."}
-                  </>
-                ) : (
-                  "No items ready. Generated content will appear here once designs are completed."
-                )}
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+                Design Refinement
+              </div>
+              <h2 className="text-2xl font-black text-white">Content Studio</h2>
+              <p className="mt-1 text-sm font-medium text-slate-400">
+                {draftCount > 0
+                  ? `${draftCount} ${draftCount === 1 ? 'item' : 'items'} ready for your final artistic touch.`
+                  : "Drafts will appear here once you've generated your initial concepts."}
               </p>
             </div>
 
             <button
               type="button"
-              className="btn btn-primary flex justify-center"
+              className="relative z-10 btn btn-secondary px-6 py-3 rounded-xl flex items-center gap-2 bg-white/10 text-white border-white/20 hover:bg-white/20"
               onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/calendar`)}
-              disabled={!activeCompanyId}
             >
-              Go to Calendar
+              <CalendarDays className="w-4 h-4" />
+              View Calendar
             </button>
           </div>
 
-          {/* Empty State */}
           {draftRows.length === 0 ? (
             <div className="p-3">
               <div className="rounded-2xl border border-slate-200/60 bg-white p-8 sm:p-10 text-center shadow-sm">
@@ -75,12 +73,9 @@ export function StudioPage({ calendarRows, getStatusValue, getImageGeneratedUrl,
                 <div className="text-base font-bold text-brand-dark">Nothing in Studio yet</div>
 
                 <p className="mt-1 text-sm text-brand-dark/60">Complete designs in the Calendar to see them in the Studio.</p>
-
-
               </div>
             </div>
           ) : (
-            /* Responsive Card Grid */
             <div className="p-4 md:p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
                 {draftRows.map((row) => {
@@ -169,7 +164,7 @@ export function StudioPage({ calendarRows, getStatusValue, getImageGeneratedUrl,
             </div>
           )}
         </section>
-      </div>
-    </main>
+      </div >
+    </main >
   );
 }

@@ -13,6 +13,7 @@ import {
 } from '../controller/contentCalendarController.js';
 import { generateCaptionForContent, generateCaptionsBulk } from '../services/captionGenerationService.js';
 import { reviewContentForCalendarRow, reviewContentBulk } from '../services/contentReviewService.js';
+import { handleDmpChat } from '../controller/dmpChatController.js';
 
 const router = express.Router();
 
@@ -74,6 +75,9 @@ router.post('/content-calendar/:contentCalendarId/generate-image-from-dmp', asyn
         return res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+// POST - /api/content-calendar/:contentCalendarId/dmp-chat
+router.post('/content-calendar/:contentCalendarId/dmp-chat', handleDmpChat);
 
 // POST - /api/content-calendar/:contentCalendarId/generate-caption
 router.post('/content-calendar/:contentCalendarId/generate-caption', async (req, res) => {

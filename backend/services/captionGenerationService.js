@@ -59,7 +59,15 @@ const buildUserPrompt = ({ contentCalendar, brandKB }) => {
     .replaceAll('{{primaryGoal}}', contentCalendar.primaryGoal ?? '')
     .replaceAll('{{cta}}', contentCalendar.cta ?? '')
     .replaceAll('{{promoType}}', contentCalendar.promoType ?? '')
-    .replaceAll('{{emojiRule}}', brandKB?.emojiRule ?? '')
+    .replaceAll('{{emojiRule}}', (() => {
+      const rule = (brandKB?.emojiRule || '').trim();
+      if (!rule) return '';
+      if (rule.match(/^None$/i)) return 'Do NOT use emojis.';
+      if (rule.match(/^Light$/i)) return 'Use at most 1-2 relevant emojis, placed at the end of the caption. Keep it professional.';
+      if (rule.match(/^Medium$/i)) return 'Use 3-5 emojis to add personality. You may use them to emphasize key points or at the end of paragraphs.';
+      if (rule.match(/^Heavy$/i)) return 'Use emojis frequently (5+) to make the caption fun and engaging. Use them inline and at the end.';
+      return rule;
+    })())
     .replaceAll('{{brandPack}}', brandKB?.brandPack ?? '')
     .replaceAll('{{brandCapability}}', brandKB?.brandCapability ?? '');
 };
@@ -366,6 +374,14 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
       triggeredByName,
       companyName,
     });
+
+    // Auto-trigger review if caption was generated successfully
+    try {
+      const { reviewContentForCalendarRow } = await import('./contentReviewService.js');
+      await reviewContentForCalendarRow(contentCalendarId, { userId });
+    } catch (reviewErr) {
+      console.error('Failed to auto-trigger review after generation:', reviewErr);
+    }
   }
 
   return {

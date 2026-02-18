@@ -27,6 +27,12 @@ const TOUR_STEPS: TourStep[] = [
         placement: 'right',
     },
     {
+        target: '[data-tour="planner"]',
+        title: '🎯 Content Planner',
+        description: 'Define your goals and let AI structure your long-term campaign strategy and scheduled posts.',
+        placement: 'right',
+    },
+    {
         target: '[data-tour="create"]',
         title: '✨ Create Content',
         description: 'Generate new social media posts with AI assistance. Create engaging content in seconds.',
@@ -39,19 +45,55 @@ const TOUR_STEPS: TourStep[] = [
         placement: 'right',
     },
     {
-        target: '[data-tour="drafts"]',
-        title: '📝 Drafts',
-        description: 'Access your saved drafts and work-in-progress content. Never lose your ideas.',
+        target: '[data-tour="image-hub"]',
+        title: '🖼️ Image Hub',
+        description: 'Generate stunning AI visuals for your social posts. Choose from multiple styles and upscale your brand imagery.',
+        placement: 'right',
+    },
+    {
+        target: '[data-tour="studio"]',
+        title: '🎨 Studio Editor',
+        description: 'Refine and perfect your posts in our powerful editor before they go live.',
+        placement: 'right',
+    },
+    {
+        target: '[data-tour="toolbox"]',
+        title: '🧰 AI Toolbox',
+        description: 'A suite of specialized AI tools for research, copywriting, and strategy.',
+        placement: 'right',
+    },
+    {
+        target: '[data-tour="leads"]',
+        title: '🧲 Lead Magnets',
+        description: 'Convert your social reach into a loyal audience. Create high-value lead magnets and digital assets in seconds with AI.',
+        placement: 'right',
+    },
+    {
+        target: '[data-tour="published"]',
+        title: '✅ Published Posts',
+        description: 'Review your history of successfully published content across all social channels.',
+        placement: 'right',
+    },
+    {
+        target: '[data-tour="insights"]',
+        title: '📈 Performance Insights',
+        description: 'Analyze what works and optimize your strategy with detailed engagement data.',
+        placement: 'right',
+    },
+    {
+        target: '[data-tour="library"]',
+        title: '📁 Media Library',
+        description: 'Organize your images, videos, and Brand DNA assets for quick use in any post.',
         placement: 'right',
     },
     {
         target: '[data-tour="company-settings"]',
         title: '⚙️ Company Settings',
-        description: '🎯 Continue setting up your Brand Intelligence here! Configure your brand voice, audience, and AI preferences to get better, more personalized content.',
+        description: '🎯 Finalize your Brand Intelligence here! Configure your voice, audience, and AI preferences to get personalized content.',
         placement: 'right',
         highlight: true,
         ctaText: 'Go to Settings',
-        navigateTo: 'settings',
+        navigateTo: 'settings/brand-intelligence',
     },
 ];
 

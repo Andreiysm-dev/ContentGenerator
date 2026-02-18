@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { UserCircle } from "lucide-react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 interface ProfilePageProps {
@@ -204,18 +205,23 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
         <div className="absolute top-[-10%] right-[-7%] w-[40%] h-[40%] bg-gradient-to-bl from-[#3fa9f5]/17 to-[#6fb6e8]/13 rounded-full blur-[95px] animate-pulse" />
         <div className="absolute bottom-[-12%] left-[-5%] w-[38%] h-[38%] bg-gradient-to-tr from-[#a78bfa]/13 to-[#e5a4e6]/10 rounded-full blur-[90px] animate-pulse" style={{ animationDelay: '700ms' }} />
       </div>
-      <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
-        <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-blue-50 via-blue-50/50 to-white border-t border-l border-r border-blue-100 rounded-t-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 md:gap-0 shadow-sm">
-          <div>
-            <h2 className="text-sm md:text-lg font-bold">Personal Information</h2>
-            <p className="mt-0.5 text-xs font-medium">Manage your personal details.</p>
+      <section className="w-full bg-white border border-slate-200/60 rounded-[2rem] shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+        <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden">
+          <UserCircle className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+              User Profile
+            </div>
+            <h2 className="text-2xl font-black text-white">Personal Settings</h2>
+            <p className="mt-1 text-sm font-medium text-slate-400">Manage your identity and authentication credentials.</p>
           </div>
 
-          <div className="flex gap-3">
-            <button onClick={() => setShowEdit(true)} className="btn btn-primary btn-sm">
+          <div className="flex gap-3 relative z-10">
+            <button onClick={() => setShowEdit(true)} className="btn btn-secondary px-5 py-2.5 rounded-xl bg-white/10 text-white border-white/20 hover:bg-white/20">
               Edit Profile
             </button>
-            <button onClick={handleDeleteAccount} className="btn btn-danger btn-sm">
+            <button onClick={handleDeleteAccount} className="btn bg-rose-500/20 text-rose-300 border border-rose-500/20 hover:bg-rose-500/30 px-5 py-2.5 rounded-xl">
               Delete Account
             </button>
           </div>

@@ -11,6 +11,7 @@ import websiteAnalyzerRoutes from './routes/websiteAnalyzerRoutes.js';
 import accountRoutes from './routes/accountRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import socialRoutes from './routes/socialRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
 import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
@@ -48,5 +49,6 @@ app.use("/api", profileRoutes);
 app.use("/api", accountRoutes);
 app.use("/api", authRoutes);
 app.use("/api", socialRoutes);
+app.use("/api", aiRoutes);
 
 app.listen(PORT, () => { });

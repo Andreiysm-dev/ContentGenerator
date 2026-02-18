@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, HelpCircle } from "lucide-react";
 
 interface FaqItem {
   question: string;
@@ -73,17 +73,17 @@ export default function Faq() {
         <div className="absolute top-[-8%] left-[-4%] w-[34%] h-[34%] bg-gradient-to-br from-[#6fb6e8]/15 to-[#3fa9f5]/12 rounded-full blur-[80px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[36%] h-[36%] bg-gradient-to-tl from-[#81bad1]/13 to-[#a78bfa]/10 rounded-full blur-[85px] animate-pulse" style={{ animationDelay: '800ms' }} />
       </div>
-      <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
+      <section className="w-full bg-white border border-slate-200/60 rounded-[2rem] shadow-sm overflow-hidden flex flex-col h-full relative z-10">
 
-        {/* Header */}
-        <div className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-[#3fa9f5]/85 via-[#6fb6e8]/75 to-[#a78bfa]/65 border-t border-l border-r border-[#3fa9f5]/60 rounded-t-2xl shadow-sm flex flex-col gap-3">
-          <div className="flex-1">
-            <h2 className="text-sm md:text-lg font-bold text-slate-900">
-              Frequently Asked Questions
-            </h2>
-            <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">
-              Everything you need to know about the platform and how it works.
-            </p>
+        <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col gap-2 relative overflow-hidden">
+          <HelpCircle className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+              Support Center
+            </div>
+            <h2 className="text-2xl font-black text-white">Knowledge Base</h2>
+            <p className="mt-1 text-sm font-medium text-slate-400">Everything you need to know about navigating your content engine.</p>
           </div>
         </div>
 
