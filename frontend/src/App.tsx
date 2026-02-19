@@ -3036,6 +3036,9 @@ function App() {
                       setIsViewModalOpen={setIsViewModalOpen}
                       notify={notify}
                       activeCompanyId={activeCompanyId}
+                      connectedAccounts={connectedAccounts}
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
                     />
                   }
                 />

@@ -15,7 +15,8 @@ import {
     FileText,
     Eye,
     Globe,
-    Layers
+    Layers,
+    SendHorizontal
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { ImageGenerationModal } from '../modals/ImageGenerationModal';
@@ -166,7 +167,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
         }
     };
 
-    const saveContentCalendar = async (newStatus: 'DRAFT' | 'READY' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT', isPublishing = false): Promise<string | null> => {
+    const saveContentCalendar = async (newStatus: 'DRAFT' | 'REVIEWED' | 'READY' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT', isPublishing = false): Promise<string | null> => {
         if (!activeCompanyId) return null;
         setIsSaving(true);
 
@@ -317,7 +318,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
         }
     };
 
-    const handleSave = async (newStatus: 'DRAFT' | 'READY' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT', isPublishing = false): Promise<string | null> => {
+    const handleSave = async (newStatus: 'DRAFT' | 'REVIEWED' | 'READY' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT', isPublishing = false): Promise<string | null> => {
         // 1. Save Content Calendar Draft first
         // If create mode, this gets us the ID.
         const effectiveStatus = newStatus === 'SCHEDULED' ? 'SCHEDULED' : newStatus;
@@ -336,8 +337,9 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
             }
         }
 
-        if (newStatus === 'DRAFT' || newStatus === 'READY') {
+        if (newStatus === 'DRAFT' || newStatus === 'READY' || newStatus === 'REVIEWED') {
             notify(contentId ? 'Saved changes' : 'Created new post', 'success');
+            if (newStatus === 'READY') notify('Post sent for supervisor review', 'info');
         }
 
         return savedId;
@@ -543,6 +545,15 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                         >
                             <Save className="h-3.5 w-3.5 inline mr-1.5" />
                             Save Draft
+                        </button>
+
+                        <button
+                            onClick={() => handleSave('READY')}
+                            disabled={isSaving}
+                            className="px-4 py-2 rounded-lg bg-purple-600/20 text-purple-200 border border-purple-500/30 text-xs font-bold hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
+                            <SendHorizontal className="h-3.5 w-3.5" />
+                            Send for Review
                         </button>
 
                         <div className="relative">
