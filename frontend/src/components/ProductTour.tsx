@@ -52,20 +52,20 @@ const TOUR_STEPS: TourStep[] = [
     },
     {
         target: '[data-tour="studio"]',
-        title: '🎨 Studio Editor',
-        description: 'Refine and perfect your posts in our powerful editor before they go live.',
-        placement: 'right',
-    },
-    {
-        target: '[data-tour="toolbox"]',
-        title: '🧰 AI Toolbox',
-        description: 'A suite of specialized AI tools for research, copywriting, and strategy.',
+        title: '🎨 Content Studio',
+        description: 'Your high-end staging ground. Use the multi-tab workflow to manage Drafts, Approvals, and Scheduled posts with ease.',
         placement: 'right',
     },
     {
         target: '[data-tour="leads"]',
         title: '🧲 Lead Magnets',
         description: 'Convert your social reach into a loyal audience. Create high-value lead magnets and digital assets in seconds with AI.',
+        placement: 'right',
+    },
+    {
+        target: '[data-tour="toolbox"]',
+        title: '🧰 AI Toolbox',
+        description: 'A suite of specialized AI tools for research, copywriting, and growth strategy.',
         placement: 'right',
     },
     {

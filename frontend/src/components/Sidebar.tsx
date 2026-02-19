@@ -165,7 +165,6 @@ export function Sidebar({
                   { key: "calendar", label: "Calendar", icon: CalendarDays, path: "calendar", tourId: "calendar" },
                   { key: "image-hub", label: "Image Hub", icon: Image, path: "image-hub", tourId: "image-hub" },
                   { key: "studio", label: "Studio", icon: FileText, path: "studio", tourId: "studio" },
-                  { key: "toolbox", label: "AI Toolbox", icon: Boxes, path: "toolbox", tourId: "toolbox" },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isActive = activeNavKey === item.key;
@@ -192,6 +191,7 @@ export function Sidebar({
                 <div className="text-[0.65rem] tracking-[0.12em] uppercase text-brand-dark/40 font-extrabold px-2 mb-1">Growth</div>
                 {[
                   { key: "leads", label: "Lead Magnets", icon: Magnet, path: "leads", tourId: "leads" },
+                  { key: "toolbox", label: "AI Toolbox", icon: Boxes, path: "toolbox", tourId: "toolbox" },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isActive = activeNavKey === item.key;

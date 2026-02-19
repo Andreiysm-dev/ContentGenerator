@@ -201,7 +201,8 @@ export const IMAGE_GENERATION_SYSTEM_PROMPT =
     '- Subhead: 1 line, ideally <= ~60 characters.\n' +
     '- Optional microcopy: either 1 short helper line OR 2 micro-bullets (very short).\n' +
     '- Total on-image words should remain low for reliable text rendering.\n' +
-    '- Never include the brand/company name unless brand system explicitly allows/requires.\n\n' +
+    '- Never include the brand/company name unless brand system explicitly allows/requires.\n' +
+    '- Do NOT write font names or hex codes on the image itself. Use them only for internal style reference.\n\n' +
     'DEFAULT SPEC (USE UNLESS BRAND SYSTEM OVERRIDES):\n' +
     '- Format: 1:1 square, 1080x1080.\n' +
     '- Safe margins: at least 6% padding from all edges.\n' +
@@ -234,7 +235,9 @@ export const IMAGE_GENERATION_SYSTEM_PROMPT =
     '- Any CTA changes (no paraphrase, no quotes)\n' +
     '- Clutter, low contrast, tiny text, busy background behind text\n' +
     '- Low-res, artifacts, distorted faces/hands, uncanny anatomy\n' +
-    '- Watermarks, mock UI, random signage text, extra unreadable text blocks\n\n' +
+    '- Watermarks, mock UI, random signage text, extra unreadable text blocks\n' +
+    '- Rendering font names (e.g. "Roboto", "Sans Serif") as visual text\n' +
+    '- Rendering hex codes (e.g. "#FF0000") as visual text\n\n' +
     'OUTPUT FORMAT (STRICT — FOLLOW EXACTLY):\n\n' +
     'MEGAPROMPT:\n' +
     '<Multi-line labeled spec block. Only plain text.>\n\n' +
@@ -272,16 +275,16 @@ export const IMAGE_GENERATION_USER_PROMPT =
 // --- BRAND RULES GENERATION PROMPTS ---
 
 export const BRAND_PACK_SYSTEM_PROMPT =
-    'Return a BRAND PACK based only on the inputs below.\n\nStart your output with:\nBRAND_PACK_START\nThen immediately write section 1 (no blank lines before section 1).\n\nINPUTS\nBrand JSON (may contain empty strings):\n{{FORM_ANSWER}}\n\nRULES\n- Do NOT invent facts not supported by the JSON.\n- If something is missing, write "UNSPECIFIED" or give safe, conservative general guidance.\n- No hype. No guarantees. No fabricated credentials, pricing, timelines, or outcomes.\n- Must resemble the example style: numbered sections, clear rules, must-say/avoid, execution rules, final checklist.\n\nOUTPUT FORMAT (STRICT)\nBRAND_PACK_START\n1) Brand Reality / Absolute Truths (Non-Negotiable)\n...bullets / short statements\n\n2) Offerings Summary\nWhat <BrandName> Sells\n...\nWhat <BrandName> Does NOT Do\n...\n\n3) Target Audience Summary\n...\n\n4) Tone Rules (Strict)\n...\n\n5) Compliance / Legal Constraints (Hard Rules)\n...\n\n6) Required Language Framing\nUse:\n...\nAvoid:\n...\n\n7) Forbidden Words / Phrases\n...\n\n8) Execution Rules\n...\n\n9) Language Simplicity Rule (Non-Negotiable)\n...\n\n10) Final Self-Check Checklist (Must Pass Before Output)\n☐ ...';
+    'Return a BRAND PACK based only on the inputs below. Output strictly as professional human-readable Markdown. Do NOT output JSON.\n\nStart your output with:\nBRAND_PACK_START\nThen immediately write section 1 (no blank lines before section 1).\n\nINPUTS...';
 
 export const BRAND_PACK_USER_PROMPT =
-    'Brand intelligence input (JSONB):{{FORM_ANSWER}}\n\nTASK:\nGenerate a BRAND PACK that closely matches the structure, tone, and rigor of the following characteristics:\n\n- Numbered sections\n- Clear headings\n- Bullet points over prose\n- Reads like a governance document, not website copy\n- Calm authority, no hype\n- Written for founders and operators\n\nThe Brand Pack MUST include these sections (use exact or near-exact headings):\n\n1) Brand Reality / Absolute Truths (Non-Negotiable)\n- Explicit truths from input\n- If missing, state “Not specified”\n\n2) Offerings Summary\n- What the brand sells\n- What the brand does NOT do (hard exclusions)\n\n3) Target Audience Summary\n- Primary and secondary audiences\n- Use conservative descriptions if limited data\n\n4) Tone Rules (Strict)\n- Interpret tone sliders into enforceable writing rules\n- Plain-language requirement\n- Define emoji usage based on the "voice.emojiUsage" field in the input (e.g. "Rarely", "sometimes", "often")\n\n5) Compliance / Legal Constraints (Hard Rules)\n- Explicit prohibitions\n- Regulated industry handling\n\n6) Required Language Framing\n- Phrases to prefer\n- Framing guidance\n\n7) Forbidden Words / Phrases\n- Derived from guardrails.noSay and safety defaults\n\n8) Execution Rules\n- Promotion balance (e.g. 80/20)\n- Structural guidance\n\n9) Language Simplicity Rule (Non-Negotiable)\n- Non-technical, founder-readable requirement\n\n10) Final Self-Check Checklist (Must Pass Before Output)\n- Bullet checklist enforcing accuracy, tone, compliance\n\nFormatting rules:\n- Use professional formatting (no emojis in the guide itself, unless defining emoji rules)\n- No marketing fluff\n- No mention of JSON, AI, or internal systems\n- Clear, enforceable language\n\nThis Brand Pack will be treated as a permanent source of truth.';
+    'Brand intelligence input (JSONB):{{FORM_ANSWER}}\n\nTASK:\nGenerate a BRAND PACK that closely matches the structure, tone, and rigor of the following characteristics:\n\n- Numbered sections\n- Clear headings\n- Bullet points over prose\n- Reads like a governance document, not website copy\n- Calm authority, no hype\n- Written for founders and operators\n\nThe Brand Pack MUST include these sections (use exact or near-exact headings):\n\n1) Brand Reality / Absolute Truths (Non-Negotiable)\n- Explicit truths from input\n- If missing, state “Not specified”\n\n2) Offerings Summary\n- What the brand sells\n- What the brand does NOT do (hard exclusions)\n\n3) Target Audience Summary\n- Primary and secondary audiences\n- Use conservative descriptions if limited data\n\n4) Tone Rules (Strict)\n- Interpret tone sliders into enforceable writing rules\n- Plain-language requirement\n- Define emoji usage based on the "voice.emojiUsage" field in the input (e.g. "Rarely", "sometimes", "often")\n\n5) Compliance / Legal Constraints (Hard Rules)\n- Explicit prohibitions\n- Regulated industry handling\n\n6) Required Language Framing\n- Phrases to prefer\n- Framing guidance\n\n7) Forbidden Words / Phrases\n- Derived from guardrails.noSay and safety defaults\n\n8) Execution Rules\n- Promotion balance (e.g. 80/20)\n- Structural guidance\n\n9) Language Simplicity Rule (Non-Negotiable)\n- Non-technical, founder-readable requirement\n\n10) Final Self-Check Checklist (Must Pass Before Output)\n- Bullet checklist enforcing accuracy, tone, compliance\n\nFormatting rules:\n- Use professional formatting (no emojis in the guide itself, unless defining emoji rules)\n- No marketing fluff\n- No mention of JSON, AI, or internal systems in the documentation content.\n- STRICTLY FORBIDDEN: Do NOT output the result as a JSON object or string. Use Plain Markdown only.\n- Clear, enforceable language\n\nThis Brand Pack will be treated as a permanent source of truth.';
 
 export const BRAND_CAPABILITY_SYSTEM_PROMPT =
     'You are generating BRAND CAPABILITIES.\n\nBrand Capabilities are a structured internal reference that translates an existing Brand Pack into operational guidance for AI content systems.';
 
 export const BRAND_CAPABILITY_USER_PROMPT =
-    'INPUTS:\n\nBrand Intelligence JSON (supporting context):\n{{FORM_ANSWER}}\n\nBrand Pack (authoritative source):\n{{BRAND_PACK}}\n\nTASK:\nGenerate a BRAND CAPABILITIES document...';
+    'INPUTS:\n\nBrand Intelligence JSON (supporting context):\n{{FORM_ANSWER}}\n\nBrand Pack (authoritative source):\n{{BRAND_PACK}}\n\nTASK:\nGenerate a BRAND CAPABILITIES document for this company. This document translates brand facts into actionable rules for an AI.\n\nSTRUCTURE:\n1. Core Offers: What are we actually selling? What is the value prop?\n2. Feature-to-Benefit Map: List 3-5 primary features and their corresponding benefits.\n3. Brand Differentiators: What makes us unique?\n4. Audience Nuances: How do we talk to specific personas mentioned in the Brand Pack?\n5. Industry Safety: How to handle technical or regulated topics.\n\nFORMATTING RULES:\n- Use Markdown only.\n- Use bolding for emphasis.\n- Use bullet points for readability.\n- STRICTLY FORBIDDEN: Do NOT output JSON. Do NOT output a single JSON object. Output professional, human-readable documentation only.';
 
 export const WRITER_AGENT_SYSTEM_PROMPT =
     'You are a PROMPT ENGINEER.\n\nYou are generating a reusable CAPTION WRITER SYSTEM PROMPT.';
@@ -291,15 +294,22 @@ Brand Pack: {{BRAND_PACK}}
 Brand Capabilities: {{BRAND_CAP}}
 
 TASK:
-Generate a CAPTION WRITER SYSTEM PROMPT for this brand.
+Generate a CAPTION WRITER SYSTEM PROMPT for this brand. This will be the master "System Instruction" for another AI that writes social media captions.
 
 THE SYSTEM PROMPT YOU GENERATE MUST INSTRUCT THE WRITER TO:
 1. Embody the brand voice and tone defined in the Brand Pack.
 2. Use the Brand Capability Map as the source of truth for facts and offers.
 3. Structure captions with a clear hook, value-led body, and a strong CTA.
-4. Output in valid JSON format with "framework", "caption", "cta", and "hashtags".
+4. Output the FINISHED caption in valid JSON format with "framework", "caption", "cta", and "hashtags".
 5. Always provide a relevant CTA and 3-8 hashtags even if not explicitly provided in the request.
 6. Follow all "Absolute Truths" and strictly avoid "Forbidden Words".
+
+FORMATTING RULES FOR THIS TASK:
+- Output the System Prompt as a clean, Markdown-formatted professional instruction sheet.
+- Start with "You are the Social Media Caption Writer for [Brand Name]..."
+- USE HEADINGS AND BULLETS.
+- STRICTLY FORBIDDEN: Do NOT wrap these instructions in a JSON object. Do NOT return a JSON string. Output PLAIN TEXT / MARKDOWN only.
+- Do NOT include any meta-commentary about JSON or AI in the instructions themselves unless instructing the writer on its output format.
 
 OUTPUT THE FINAL SYSTEM PROMPT BELOW:`;
 
@@ -311,7 +321,7 @@ Brand Pack: {{BRAND_PACK}}
 Brand Capabilities: {{BRAND_CAP}}
 
 TASK:
-Generate a CAPTION REVIEWER SYSTEM PROMPT for this specific brand.
+Generate a CAPTION REVIEWER SYSTEM PROMPT for this specific brand. This will be the master "System Instruction" for another AI that audits social media captions.
 
 This prompt will be used to instruct a "Reviewer AI" that audits social media captions.
 
@@ -323,6 +333,12 @@ THE SYSTEM PROMPT YOU GENERATE MUST INSTRUCT THE REVIEWER TO:
 5. ALWAYS output the results in the following sections: DECISION, NOTES, FINAL CAPTION, FINAL CTA, and FINAL HASHTAGS.
 6. MANDATORY RULE: The Reviewer MUST NEVER leave FINAL CTA or FINAL HASHTAGS empty. If the drafts are empty, the Reviewer must generate them using the Brand Capabilities and the primary goal of the content.
 7. If a user provided a specific CTA in the draft, the Reviewer MUST preserve it exactly unless it violates a hard compliance rule.
+
+FORMATTING RULES FOR THIS TASK:
+- Output the System Prompt as a clean, Markdown-formatted professional instruction sheet.
+- Start with "You are the Brand Guardian and Content Reviewer for [Brand Name]..."
+- USE HEADINGS AND BULLETS.
+- STRICTLY FORBIDDEN: Do NOT wrap these instructions in a JSON object. Do NOT return a JSON string. Output PLAIN TEXT / MARKDOWN only.
 
 OUTPUT THE FINAL SYSTEM PROMPT BELOW:`;
 

@@ -18,6 +18,7 @@ import {
     EyeOff,
     HelpCircle,
     ArrowLeft,
+    Maximize2,
     MousePointer2,
     RefreshCw,
     Download
@@ -69,6 +70,7 @@ export function ImageHubPage({
     const [selectedModel, setSelectedModel] = useState('fal-ai/nano-banana-pro');
     const [imagePreviewNonce, setImagePreviewNonce] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isZoomModalOpen, setIsZoomModalOpen] = useState(false);
     const [searchParams] = useSearchParams();
 
     // Persist dismissed IDs in localStorage
@@ -616,28 +618,35 @@ export function ImageHubPage({
                                             </div>
                                         </div>
 
-                                        <div className="p-6 flex flex-col items-center justify-center bg-slate-100/30 min-h-[400px] relative overflow-hidden">
+                                        <div className="p-6 flex flex-col items-center justify-center bg-slate-100/30 min-h-[400px] relative overflow-hidden rounded-2xl">
                                             {/* Design Pattern Grid (Subtle) */}
                                             <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 0)', backgroundSize: '16px 16px' }} />
 
                                             {getImageGeneratedUrl(selectedRow) ? (
-                                                <div className="relative group/preview w-full flex items-center justify-center">
+                                                <div className="relative group/preview w-full flex items-center justify-center z-10">
                                                     <img
                                                         src={`${getImageGeneratedUrl(selectedRow)}?v=${imagePreviewNonce}`}
                                                         alt="Preview"
-                                                        className="max-w-full max-h-[600px] rounded-2xl shadow-premium-lg object-contain bg-white transition-transform group-hover/preview:scale-[1.01]"
+                                                        className="max-w-full max-h-[600px] rounded-2xl shadow-premium-lg object-contain bg-white transition-all duration-500 relative z-10"
                                                     />
-                                                    <div className="absolute inset-x-0 bottom-4 flex justify-center gap-2 opacity-0 group-hover/preview:opacity-100 transition-opacity">
+                                                    <div className="absolute inset-x-0 bottom-4 flex justify-center gap-2 opacity-0 group-hover/preview:opacity-100 transition-opacity z-40">
+                                                        <button
+                                                            onClick={() => setIsZoomModalOpen(true)}
+                                                            className="px-4 py-2 bg-white text-slate-900 text-[10px] font-bold rounded-full shadow-xl hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                                        >
+                                                            <Maximize2 size={12} />
+                                                            Expand
+                                                        </button>
                                                         <button
                                                             onClick={handleDownload}
-                                                            className="px-4 py-2 bg-blue-600 text-white text-[10px] font-bold rounded-full backdrop-blur-md flex items-center gap-2 shadow-xl hover:bg-blue-700 transition-colors"
+                                                            className="px-4 py-2 bg-blue-600 text-white text-[10px] font-bold rounded-full backdrop-blur-md flex items-center gap-2 shadow-xl hover:bg-blue-700 transition-colors pointer-events-auto"
                                                         >
                                                             <Download size={12} />
                                                             Download
                                                         </button>
                                                         <button
                                                             onClick={() => setImagePreviewNonce(n => n + 1)}
-                                                            className="px-4 py-2 bg-slate-900/80 text-white text-[10px] font-bold rounded-full backdrop-blur-md flex items-center gap-2 shadow-xl hover:bg-slate-900 transition-colors"
+                                                            className="px-4 py-2 bg-slate-900/80 text-white text-[10px] font-bold rounded-full backdrop-blur-md flex items-center gap-2 shadow-xl hover:bg-slate-900 transition-colors pointer-events-auto"
                                                         >
                                                             <History size={12} />
                                                             Refresh
@@ -783,6 +792,49 @@ export function ImageHubPage({
                     </div>
                 </div>
             </section>
+
+            {/* Lightbox / Zoom Modal */}
+            {isZoomModalOpen && getImageGeneratedUrl(selectedRow) && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300"
+                    onClick={() => setIsZoomModalOpen(false)}
+                >
+                    <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl" />
+
+                    <button
+                        className="absolute top-6 right-6 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all z-20 shadow-2xl"
+                        onClick={() => setIsZoomModalOpen(false)}
+                    >
+                        <X size={24} />
+                    </button>
+
+                    <div
+                        className="relative z-10 max-w-7xl w-full h-full flex items-center justify-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <img
+                            src={getImageGeneratedUrl(selectedRow)!}
+                            alt="Visual Detail"
+                            className="max-w-full max-h-full object-contain rounded-3xl shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-500"
+                        />
+
+                        <div className="absolute bottom-[-40px] left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/5 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Theme</span>
+                                <span className="text-sm font-bold text-white truncate max-w-sm">{selectedRow?.theme}</span>
+                            </div>
+                            <div className="w-px h-8 bg-white/10 mx-2" />
+                            <button
+                                onClick={handleDownload}
+                                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-black shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+                            >
+                                <Download size={14} />
+                                Download High-Res
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }
