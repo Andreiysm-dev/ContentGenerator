@@ -87,6 +87,18 @@ const TOUR_STEPS: TourStep[] = [
         placement: 'right',
     },
     {
+        target: '[data-tour="ai-assistant"]',
+        title: '🤖 AI Assistant',
+        description: 'Your autonomous command center. Use it to navigate, update brand rules, or get creative strategy advice on the fly.',
+        placement: 'left',
+    },
+    {
+        target: '[data-tour="profile-settings"]',
+        title: '👤 Profile & Security',
+        description: 'Manage your personal account, update your avatar, and configure security preferences.',
+        placement: 'left',
+    },
+    {
         target: '[data-tour="company-settings"]',
         title: '⚙️ Company Settings',
         description: '🎯 Finalize your Brand Intelligence here! Configure your voice, audience, and AI preferences to get personalized content.',
@@ -101,6 +113,7 @@ export function ProductTour({ onComplete, onSkip, companyId }: ProductTourProps)
     const [currentStep, setCurrentStep] = useState(0);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
     const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+    const [placement, setPlacement] = useState<'top' | 'bottom' | 'left' | 'right'>('bottom');
     const navigate = useNavigate();
 
     const currentTourStep = TOUR_STEPS[currentStep];
@@ -112,10 +125,65 @@ export function ProductTour({ onComplete, onSkip, companyId }: ProductTourProps)
                 const rect = element.getBoundingClientRect();
                 setTargetRect(rect);
 
-                // Calculate tooltip position (below the target)
-                const tooltipTop = rect.bottom + 16;
-                const tooltipLeft = rect.left;
-                setTooltipPosition({ top: tooltipTop, left: tooltipLeft });
+                const tooltipWidth = 380;
+                const tooltipHeight = 220; // Estimated height
+                const gap = 16;
+                const margin = 20;
+
+                let finalPlacement = currentTourStep.placement || 'bottom';
+
+                const calculatePos = (p: string) => {
+                    switch (p) {
+                        case 'top':
+                            return {
+                                top: rect.top - tooltipHeight - gap,
+                                left: rect.left + (rect.width / 2) - (tooltipWidth / 2)
+                            };
+                        case 'bottom':
+                            return {
+                                top: rect.bottom + gap,
+                                left: rect.left + (rect.width / 2) - (tooltipWidth / 2)
+                            };
+                        case 'left':
+                            return {
+                                top: rect.top + (rect.height / 2) - (tooltipHeight / 2),
+                                left: rect.left - tooltipWidth - gap
+                            };
+                        case 'right':
+                            return {
+                                top: rect.top + (rect.height / 2) - (tooltipHeight / 2),
+                                left: rect.right + gap
+                            };
+                        default:
+                            return { top: rect.bottom + gap, left: rect.left };
+                    }
+                };
+
+                let pos = calculatePos(finalPlacement);
+
+                // Simple collision detection and flip
+                if (finalPlacement === 'bottom' && pos.top + tooltipHeight > window.innerHeight - margin) {
+                    finalPlacement = 'top';
+                    pos = calculatePos('top');
+                } else if (finalPlacement === 'top' && pos.top < margin) {
+                    finalPlacement = 'bottom';
+                    pos = calculatePos('bottom');
+                }
+
+                // Horizontal boundary check
+                if (pos.left < margin) pos.left = margin;
+                if (pos.left + tooltipWidth > window.innerWidth - margin) {
+                    pos.left = window.innerWidth - tooltipWidth - margin;
+                }
+
+                // Vertical boundary check (final fallback)
+                if (pos.top < margin) pos.top = margin;
+                if (pos.top + tooltipHeight > window.innerHeight - margin) {
+                    pos.top = window.innerHeight - tooltipHeight - margin;
+                }
+
+                setTooltipPosition({ top: pos.top, left: pos.left });
+                setPlacement(finalPlacement as any);
             }
         };
 
@@ -127,7 +195,7 @@ export function ProductTour({ onComplete, onSkip, companyId }: ProductTourProps)
             window.removeEventListener('resize', updatePosition);
             window.removeEventListener('scroll', updatePosition);
         };
-    }, [currentStep, currentTourStep.target]);
+    }, [currentStep, currentTourStep.target, currentTourStep.placement]);
 
     // Keyboard navigation
     useEffect(() => {
@@ -171,6 +239,7 @@ export function ProductTour({ onComplete, onSkip, companyId }: ProductTourProps)
                 onNext={handleNext}
                 onSkip={onSkip}
                 position={tooltipPosition}
+                placement={placement}
                 isLastStep={currentStep === TOUR_STEPS.length - 1}
                 ctaText={currentTourStep.ctaText}
                 highlight={currentTourStep.highlight}

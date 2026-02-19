@@ -193,6 +193,7 @@ export function AIAssistant({
         return (
             <button
                 onClick={() => setIsOpen(true)}
+                data-tour="ai-assistant"
                 className="fixed bottom-6 right-6 w-14 h-14 bg-slate-900 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[100] group border border-white/10"
                 title="Command Center (⌘+K)"
             >
@@ -206,7 +207,12 @@ export function AIAssistant({
         <div className="fixed top-[64px] right-0 bottom-0 w-[400px] bg-white border-l border-slate-200 flex flex-col z-[100] shadow-2xl animate-in slide-in-from-right duration-300">
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between bg-slate-50 border-b border-slate-200">
-                <div className="flex items-center gap-3">
+                <button
+                    type="button"
+                    data-tour="profile-settings"
+                    className="flex items-center gap-3 p-1 -ml-1 rounded-lg hover:bg-slate-100 transition-colors"
+                    onClick={() => navigate("/profile")}
+                >
                     <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center shadow-lg">
                         <Terminal size={16} className="text-blue-400" />
                     </div>
@@ -214,7 +220,8 @@ export function AIAssistant({
                         <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Command Center</h3>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight -mt-0.5">Autonomous Agent</p>
                     </div>
-                </div>
+                </button>
+
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setIsOpen(false)}
@@ -231,124 +238,140 @@ export function AIAssistant({
                 ref={scrollRef}
                 className="flex-1 overflow-y-auto p-5 space-y-5 bg-white custom-scrollbar"
             >
-                {messages.length === 0 && (
-                    <div className="space-y-6 pt-2">
-                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-500/10">
-                                <Sparkles size={20} className="text-blue-600" />
+                {
+                    messages.length === 0 && (
+                        <div className="space-y-6 pt-2">
+                            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-500/10">
+                                    <Sparkles size={20} className="text-blue-600" />
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-900">How can I help?</h4>
+                                    <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                                        I am your central hub for automation. I can navigate the app, update brand identities, or refine your image prompts.
+                                    </p>
+                                </div>
                             </div>
-                            <div className="space-y-1">
-                                <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-900">How can I help?</h4>
-                                <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                                    I am your central hub for automation. I can navigate the app, update brand identities, or refine your image prompts.
-                                </p>
-                            </div>
-                        </div>
 
-                        <div className="space-y-3">
-                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Suggested Commands</h5>
-                            <div className="grid gap-2">
-                                {[
-                                    { icon: Layout, label: "View Content Calendar", text: "What's my schedule looking like?" },
-                                    { icon: Zap, label: "Review Writing Style", text: "How is our writing style defined right now?" },
-                                    { icon: Target, label: "Optimize Brand Pack", text: "Propose a more professional writing style for our brand." }
-                                ].map((s, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => {
-                                            setInputValue(s.text);
-                                            setTimeout(() => handleSendMessage(s.text), 0);
-                                        }}
-                                        className="flex items-center justify-between w-full p-3 text-left bg-white hover:bg-slate-50 border border-slate-100 rounded-xl transition-all group"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-slate-400 group-hover:text-blue-500 transition-colors">
-                                                <s.icon size={14} />
+                            <div className="space-y-3">
+                                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Suggested Commands</h5>
+                                <div className="grid gap-2">
+                                    {[
+                                        { icon: Layout, label: "View Content Calendar", text: "What's my schedule looking like?" },
+                                        { icon: Zap, label: "Review Writing Style", text: "How is our writing style defined right now?" },
+                                        { icon: Target, label: "Optimize Brand Pack", text: "Propose a more professional writing style for our brand." }
+                                    ].map((s, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => {
+                                                setInputValue(s.text);
+                                                setTimeout(() => handleSendMessage(s.text), 0);
+                                            }}
+                                            className="flex items-center justify-between w-full p-3 text-left bg-white hover:bg-slate-50 border border-slate-100 rounded-xl transition-all group"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-slate-400 group-hover:text-blue-500 transition-colors">
+                                                    <s.icon size={14} />
+                                                </div>
+                                                <span className="text-[11px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{s.label}</span>
                                             </div>
-                                            <span className="text-[11px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{s.label}</span>
-                                        </div>
-                                        <Terminal size={12} className="text-slate-200 group-hover:text-slate-400" />
-                                    </button>
-                                ))}
+                                            <Terminal size={12} className="text-slate-200 group-hover:text-slate-400" />
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
-                {messages.map((m) => (
-                    <div
-                        key={m.id}
-                        className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}
-                    >
-                        <div className={`flex items-center gap-2 mb-1.5 px-1`}>
-                            {m.role === 'assistant' && (
+                {
+                    messages.map((m) => (
+                        <div
+                            key={m.id}
+                            className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}
+                        >
+                            <div className={`flex items-center gap-2 mb-1.5 px-1`}>
+                                {m.role === 'assistant' && (
+                                    <div className="p-1 bg-slate-900 rounded shadow-sm">
+                                        <Terminal size={10} className="text-blue-400" />
+                                    </div>
+                                )}
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    {m.role === 'user' ? 'You' : 'Assistant'}
+                                </span>
+                            </div>
+                            <div className={`max-w-[92%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm ${m.role === 'user'
+                                ? 'bg-blue-600 text-white rounded-tr-none font-medium'
+                                : 'bg-slate-50 text-slate-800 border border-slate-200 rounded-tl-none font-semibold'
+                                }`}>
+                                {m.attachment && (
+                                    <div className={`flex items-center gap-2 mb-2 p-2 rounded-lg border ${m.role === 'user' ? 'bg-blue-700/50 border-blue-400/30' : 'bg-slate-100 border-slate-200'}`}>
+                                        <FileText size={14} className={m.role === 'user' ? 'text-blue-200' : 'text-slate-400'} />
+                                        <span className="text-[10px] font-bold truncate max-w-[150px]">{m.attachment.name}</span>
+                                    </div>
+                                )}
+                                <div className="whitespace-pre-wrap">
+                                    {m.content.split(/(\*\*.*?\*\*|\*.*?\*)/g).map((part, i) => {
+                                        if (part.startsWith('**') && part.endsWith('**')) {
+                                            return <strong key={i} className="font-black text-slate-900">{part.slice(2, -2)}</strong>;
+                                        }
+                                        if (part.startsWith('*') && part.endsWith('*')) {
+                                            return <em key={i} className="font-bold italic">{part.slice(1, -1)}</em>;
+                                        }
+                                        return part;
+                                    })}
+                                </div>
+
+                                {m.plan && m.plan.length > 0 && (
+                                    <div className="mt-4 space-y-2 border-t border-slate-200 pt-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">Proposed Strategy</span>
+                                            <button
+                                                onClick={() => onApplyPlan && onApplyPlan(m.plan!)}
+                                                className="px-2 py-1 bg-blue-600 text-white text-[10px] font-bold rounded uppercase tracking-tighter hover:bg-blue-700 transition"
+                                            >
+                                                Apply All
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                                            {m.plan.map((item, idx) => (
+                                                <div key={idx} className="p-2 bg-white border border-slate-100 rounded-lg text-[11px]">
+                                                    <div className="flex justify-between font-black text-slate-400 uppercase tracking-tighter mb-1">
+                                                        <span>{item.date}</span>
+                                                        <span className="text-blue-500">{item.contentType}</span>
+                                                    </div>
+                                                    <div className="text-slate-900 leading-tight">{item.theme}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                }
+
+                {
+                    isTyping && (
+                        <div className="flex flex-col items-start">
+                            <div className="flex items-center gap-2 mb-1.5 px-1">
                                 <div className="p-1 bg-slate-900 rounded shadow-sm">
                                     <Terminal size={10} className="text-blue-400" />
                                 </div>
-                            )}
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                {m.role === 'user' ? 'You' : 'Assistant'}
-                            </span>
-                        </div>
-                        <div className={`max-w-[92%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm ${m.role === 'user'
-                            ? 'bg-blue-600 text-white rounded-tr-none font-medium'
-                            : 'bg-slate-50 text-slate-800 border border-slate-200 rounded-tl-none font-semibold'
-                            }`}>
-                            {m.attachment && (
-                                <div className={`flex items-center gap-2 mb-2 p-2 rounded-lg border ${m.role === 'user' ? 'bg-blue-700/50 border-blue-400/30' : 'bg-slate-100 border-slate-200'}`}>
-                                    <FileText size={14} className={m.role === 'user' ? 'text-blue-200' : 'text-slate-400'} />
-                                    <span className="text-[10px] font-bold truncate max-w-[150px]">{m.attachment.name}</span>
-                                </div>
-                            )}
-                            {m.content}
-
-                            {m.plan && m.plan.length > 0 && (
-                                <div className="mt-4 space-y-2 border-t border-slate-200 pt-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">Proposed Strategy</span>
-                                        <button
-                                            onClick={() => onApplyPlan && onApplyPlan(m.plan!)}
-                                            className="px-2 py-1 bg-blue-600 text-white text-[10px] font-bold rounded uppercase tracking-tighter hover:bg-blue-700 transition"
-                                        >
-                                            Apply All
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                                        {m.plan.map((item, idx) => (
-                                            <div key={idx} className="p-2 bg-white border border-slate-100 rounded-lg text-[11px]">
-                                                <div className="flex justify-between font-black text-slate-400 uppercase tracking-tighter mb-1">
-                                                    <span>{item.date}</span>
-                                                    <span className="text-blue-500">{item.contentType}</span>
-                                                </div>
-                                                <div className="text-slate-900 leading-tight">{item.theme}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ))}
-
-                {isTyping && (
-                    <div className="flex flex-col items-start">
-                        <div className="flex items-center gap-2 mb-1.5 px-1">
-                            <div className="p-1 bg-slate-900 rounded shadow-sm">
-                                <Terminal size={10} className="text-blue-400" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Thinking...</span>
                             </div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Thinking...</span>
+                            <div className="bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl rounded-tl-none flex gap-1.5">
+                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" />
+                            </div>
                         </div>
-                        <div className="bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl rounded-tl-none flex gap-1.5">
-                            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" />
-                        </div>
-                    </div>
-                )}
-            </div>
+                    )
+                }
+            </div >
 
             {/* Input Area */}
-            <div className="p-5 bg-white border-t border-slate-100">
+            < div className="p-5 bg-white border-t border-slate-100" >
                 {selectedFile && (
                     <div className="mb-3 flex items-center justify-between p-2 bg-blue-50 border border-blue-100 rounded-xl animate-in slide-in-from-bottom-1">
                         <div className="flex items-center gap-2">
@@ -364,7 +387,8 @@ export function AIAssistant({
                             <X size={14} />
                         </button>
                     </div>
-                )}
+                )
+                }
                 <div className="relative group">
                     <input
                         type="file"
@@ -433,8 +457,8 @@ export function AIAssistant({
                         </span>
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
 

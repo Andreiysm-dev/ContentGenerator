@@ -16,6 +16,9 @@ import {
   Activity,
   Calendar as BigCalendar,
   Layout,
+  Download,
+  Copy as CopyIcon,
+  Image as ImageIcon,
   Share2,
   Trash2,
   MoreVertical,
@@ -26,9 +29,7 @@ import {
   Twitter,
   Facebook,
   ExternalLink,
-  Zap,
-  Download,
-  Copy as CopyIcon
+  Zap
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CalendarTableSkeleton } from "@/components/LoadingState";
@@ -43,6 +44,7 @@ export type CalendarPageProps = {
   selectedIds: string[];
   isBatchGenerating: boolean;
   isBatchGeneratingImages: boolean;
+  isBatchDeleting: boolean;
   handleBatchGenerate: () => void;
   handleBatchGenerateImages: () => void;
   openCsvModal: () => void;
@@ -137,6 +139,7 @@ export function CalendarPage(props: CalendarPageProps) {
     selectedIds,
     isBatchGenerating,
     isBatchGeneratingImages,
+    isBatchDeleting,
     handleBatchGenerate,
     handleBatchGenerateImages,
     handleDeleteSelected,
@@ -283,8 +286,8 @@ export function CalendarPage(props: CalendarPageProps) {
                         key={f}
                         onClick={() => setCalendarStatusFilter(f)}
                         className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all border ${calendarStatusFilter === f
-                            ? "bg-slate-900 border-slate-900 text-white shadow-sm"
-                            : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                          ? "bg-slate-900 border-slate-900 text-white shadow-sm"
+                          : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
                           }`}
                       >
                         {f === 'all' ? 'All' : f}
@@ -419,7 +422,7 @@ export function CalendarPage(props: CalendarPageProps) {
                                 onClick={(e) => { e.stopPropagation(); navigate(`/company/${companyId}/image-hub?id=${row.contentCalendarId}`); }}
                                 className="p-2.5 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 shadow-sm border border-blue-100"
                               >
-                                <Share2 className="w-4 h-4" />
+                                <ImageIcon className="w-4 h-4" />
                               </button>
                             )}
                             <button
@@ -559,14 +562,15 @@ export function CalendarPage(props: CalendarPageProps) {
                 disabled={isBatchGeneratingImages}
                 className="px-5 py-2 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all flex items-center gap-2"
               >
-                {isBatchGeneratingImages ? <Activity className="w-3 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                {isBatchGeneratingImages ? <Activity className="w-3 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                 Visuals
               </button>
               <button
                 onClick={handleDeleteSelected}
-                className="p-2 hover:bg-rose-500 text-rose-500 hover:text-white rounded-2xl transition-all"
+                disabled={isBatchDeleting}
+                className={`p-2 rounded-2xl transition-all ${isBatchDeleting ? 'bg-rose-500 text-white' : 'hover:bg-rose-500 text-rose-500 hover:text-white'}`}
               >
-                <Trash2 className="w-5 h-5" />
+                {isBatchDeleting ? <Activity className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
               </button>
             </div>
           </div>

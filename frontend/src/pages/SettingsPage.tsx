@@ -125,6 +125,7 @@ export type CompanySettingsShellProps = {
   onConnectFacebook: () => void;
   onDisconnectAccount: (accountId: string) => Promise<void>;
   onRefreshAccounts?: () => Promise<void>;
+  backendBaseUrl: string;
 };
 
 const TabLink = ({ to, id, children, pressedTab, onClick }: { to: string; id: CompanySettingsTab; children: React.ReactNode; pressedTab: string | null; onClick: () => void }) => (
@@ -318,6 +319,9 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   const { companyId } = useParams<{ companyId: string }>();
   const [localAccounts, setLocalAccounts] = useState<any[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [userSearchResults, setUserSearchResults] = useState<any[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   const fetchAccounts = async () => {
     if (!companyId || !supabase) return;
@@ -398,6 +402,33 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   }, []);
 
 
+  // Handle user search for collaborators
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (!newCollaboratorEmail || newCollaboratorEmail.length < 2) {
+        setUserSearchResults([]);
+        setShowUserDropdown(false);
+        return;
+      }
+
+      setIsSearchingUsers(true);
+      try {
+        const res = await authedFetch(`${props.backendBaseUrl}/api/users/search?email=${encodeURIComponent(newCollaboratorEmail)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setUserSearchResults(data.users || []);
+          setShowUserDropdown(data.users && data.users.length > 0);
+        }
+      } catch (err) {
+        console.error("User search error:", err);
+      } finally {
+        setIsSearchingUsers(false);
+      }
+    };
+
+    const timer = setTimeout(searchUsers, 300);
+    return () => clearTimeout(timer);
+  }, [newCollaboratorEmail, props.backendBaseUrl, authedFetch]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
@@ -559,14 +590,74 @@ export function SettingsPage(props: CompanySettingsShellProps) {
 
                   <Card className="bg-white" title="Collaborators" subtitle="Add teammates who can access and approve content.">
                     <div className="space-y-4">
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 relative">
                         <label className="text-xs font-bold text-slate-700">Add collaborator (email)</label>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                          <Input type="email" placeholder="user@example.com" value={newCollaboratorEmail} onChange={(e) => setNewCollaboratorEmail(e.target.value)} />
-                          <button className="btn btn-primary btn-sm" type="button" onClick={onAddCollaborator} disabled={!newCollaboratorEmail}>
-                            Add
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center relative z-[100]">
+                          <div className="relative flex-1">
+                            <Input
+                              type="email"
+                              placeholder="user@example.com"
+                              value={newCollaboratorEmail}
+                              onChange={(e) => {
+                                setNewCollaboratorEmail(e.target.value);
+                                if (e.target.value.length >= 2) {
+                                  setShowUserDropdown(true);
+                                }
+                              }}
+                              onFocus={() => {
+                                if (newCollaboratorEmail.length >= 2 && userSearchResults.length > 0) {
+                                  setShowUserDropdown(true);
+                                }
+                              }}
+                            />
+                            {isSearchingUsers && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                              </div>
+                            )}
+
+                            {/* Dropdown Results */}
+                            {showUserDropdown && userSearchResults.length > 0 && (
+                              <div className="absolute z-[100] left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="p-2 border-b border-slate-50 bg-slate-50/50">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Suggestions</span>
+                                </div>
+                                <div className="max-h-[240px] overflow-y-auto">
+                                  {userSearchResults.map((user) => (
+                                    <button
+                                      key={user.id}
+                                      type="button"
+                                      className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center justify-between group"
+                                      onClick={() => {
+                                        setNewCollaboratorEmail(user.email);
+                                        setShowUserDropdown(false);
+                                      }}
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-900 group-hover:text-blue-700">{user.email}</span>
+                                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Existing User</span>
+                                      </div>
+                                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded-md uppercase">Select</div>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            className="btn btn-primary btn-sm h-[38px] px-6"
+                            type="button"
+                            onClick={onAddCollaborator}
+                            disabled={!newCollaboratorEmail}
+                          >
+                            Add Teammate
                           </button>
                         </div>
+                        {showUserDropdown && (
+                          <div className="fixed inset-0 z-[90]" onClick={() => setShowUserDropdown(false)} />
+                        )}
                       </div>
 
                       <div className="space-y-2">

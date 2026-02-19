@@ -338,9 +338,9 @@ export function ImageHubPage({
                                 <span className="text-xs font-bold text-white uppercase">2-Step Process</span>
                             </div>
                             <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-1.5 gap-1">
-                                <div className="px-3 py-1.5 bg-blue-500 text-white text-[10px] font-black rounded-xl">1. PROMPT</div>
+                                <div className={`px-3 py-1.5 ${!selectedRow?.dmp ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/40'} text-[10px] font-black rounded-xl transition-all duration-300`}>1. PROMPT</div>
                                 <ArrowRight size={14} className="text-white/20" />
-                                <div className="px-3 py-1.5 bg-white/10 text-white/40 text-[10px] font-black rounded-xl">2. GENERATE</div>
+                                <div className={`px-3 py-1.5 ${selectedRow?.dmp ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/40'} text-[10px] font-black rounded-xl transition-all duration-300`}>2. GENERATE</div>
                             </div>
                         </div>
                     </div>
@@ -708,7 +708,7 @@ export function ImageHubPage({
                                         >
                                             <div className="flex items-center gap-2">
                                                 <Settings2 size={16} className="text-slate-400" />
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Expert Settings</span>
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Advanced Settings</span>
                                             </div>
                                             {showAdvanced ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                                         </button>

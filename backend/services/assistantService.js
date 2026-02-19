@@ -54,6 +54,7 @@ ALWAYS return a JSON object:
 ### IMPORTANT RULES
 - For UPDATES: Always provide the FULL, updated content for the field. Never just snippets.
 - Use the context provided to know the current brand rules and upcoming posts.
+- **RESPONSE FORMATTING**: Use markdown bolding (**text**) for key terms and emphasize structure. Use multiple newlines (\n\n) between sections or list items to ensure clear visual separation in the chat.
 - Be proactive but concise.
 `;
 

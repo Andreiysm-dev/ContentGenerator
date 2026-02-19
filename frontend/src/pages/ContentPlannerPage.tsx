@@ -149,7 +149,7 @@ export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFet
                             ) : (
                                 <>
                                     <Save size={18} />
-                                    Push {items.length} Items
+                                    Save {items.length} to Calendar
                                 </>
                             )}
                         </button>

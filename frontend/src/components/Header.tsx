@@ -42,7 +42,7 @@ export function Header({ isNavDrawerOpen, setIsNavDrawerOpen, activeCompany, not
         <div className="flex items-center gap-1 sm:gap-2">
           <NotificationBell />
 
-          <button type="button" className="w-8 h-8 flex items-center justify-center rounded-full text-brand-dark/60 hover:text-brand-primary hover:bg-brand-primary/10 transition-colors" onClick={() => navigate("/profile")} title="User settings">
+          <button type="button" data-tour="profile-settings" className="w-8 h-8 flex items-center justify-center rounded-full text-brand-dark/60 hover:text-brand-primary hover:bg-brand-primary/10 transition-colors" onClick={() => navigate("/profile")} title="User settings">
             <Settings className="h-4 w-4" />
           </button>
 

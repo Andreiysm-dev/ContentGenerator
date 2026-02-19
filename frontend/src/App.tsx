@@ -152,6 +152,7 @@ function App() {
   const [isUploadingDesigns, setIsUploadingDesigns] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [isBatchGeneratingImages, setIsBatchGeneratingImages] = useState(false);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [copyFieldSelection, setCopyFieldSelection] = useState<Record<string, boolean>>({});
   const [copySuccessMessage, setCopySuccessMessage] = useState('');
@@ -177,39 +178,28 @@ function App() {
     }
   };
 
-  // Check if user just completed onboarding to trigger product tour
-  useEffect(() => {
-    if (!userProfile?.id) return;
-
-    // Key tour completion by user ID so multiple users on same device get it
-    const STORAGE_KEY = `productTourCompleted_${userProfile.id}`;
-    const tourCompleted = localStorage.getItem(STORAGE_KEY);
-    const justOnboarded = sessionStorage.getItem('justCompletedOnboarding');
-
-    // Only start tour if onboarding is NOT open
-    if (justOnboarded && !tourCompleted && !isOnboardingOpen) {
-      // Small delay to ensure navigation/animations complete
-      const timer = setTimeout(() => {
-        setShowProductTour(true);
-        sessionStorage.removeItem('justCompletedOnboarding');
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [location.pathname, userProfile?.id, isOnboardingOpen]);
 
   const handleAddCollaborator = async () => {
-    if (!newCollaboratorEmail || !activeCompanyId) return;
+    if (!newCollaboratorEmail) {
+      notify('Please enter an email address.', 'info');
+      return;
+    }
+    if (!activeCompanyId) {
+      notify('Company context missing. Please refresh the page.', 'error');
+      console.error('[handleAddCollaborator] activeCompanyId is null');
+      return;
+    }
+
     try {
       const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newCollaboratorEmail }),
+        body: JSON.stringify({ email: newCollaboratorEmail.trim() }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 404) {
-          notify('User with this email not found or not registered.', 'error');
+          notify(data.error || 'User with this email not found or not registered.', 'error');
         } else if (res.status === 409) {
           notify('User is already a collaborator.', 'error');
         } else {
@@ -217,11 +207,12 @@ function App() {
         }
         return;
       }
-      notify('Collaborator added.', 'success');
+      notify('Collaborator added successfully!', 'success');
       setNewCollaboratorEmail('');
       await fetchCollaborators(activeCompanyId);
     } catch (err) {
-      notify('Failed to add collaborator.', 'error');
+      console.error('handleAddCollaborator error:', err);
+      notify('Failed to add collaborator. Please check your connection.', 'error');
     }
   };
 
@@ -458,7 +449,6 @@ function App() {
     setActiveCompanyIdWithPersistence(routeCompanyId);
   }, [routeCompanyId, activeCompanyId]);
 
-  // Update recent companies when activeCompanyId changes
   useEffect(() => {
     if (!activeCompanyId) return;
     setRecentCompanyIds((prev) => {
@@ -468,6 +458,28 @@ function App() {
       return next;
     });
   }, [activeCompanyId]);
+
+  // Trigger product tour for new users (including collaborators)
+  useEffect(() => {
+    if (!userProfile?.id || !activeCompanyId) return;
+
+    const STORAGE_KEY = `productTourCompleted_${userProfile.id}`;
+    const tourCompleted = localStorage.getItem(STORAGE_KEY);
+    const justOnboarded = sessionStorage.getItem('justCompletedOnboarding');
+
+    // Trigger if:
+    // 1. They just finished onboarding (traditional path)
+    // 2. OR they are a new user/collaborator who hasn't seen the tour yet and is not currently in onboarding
+    if ((justOnboarded || !tourCompleted) && !tourCompleted && !isOnboardingOpen) {
+      // Delay to ensure layout is ready
+      const timer = setTimeout(() => {
+        setShowProductTour(true);
+        if (justOnboarded) sessionStorage.removeItem('justCompletedOnboarding');
+      }, 1500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [activeCompanyId, userProfile?.id, isOnboardingOpen]);
 
   useEffect(() => {
     const isTeamRoute = /^\/company\/[^/]+\/settings\/team\/?$/.test(location.pathname);
@@ -1986,63 +1998,61 @@ function App() {
     });
     if (!proceed) return;
 
-    const idsToDelete = new Set(selectedIds);
-    setCalendarRows((prev) => prev.filter((r) => !idsToDelete.has(r.contentCalendarId)));
-    setSelectedIds([]);
+    setIsBatchDeleting(true);
+    notify(`Deleting ${selectedIds.length} items...`, 'info');
 
-    for (const id of idsToDelete) {
+    const idsToDelete = [...selectedIds];
+    const successes: string[] = [];
+    const failures: { id: string; error: any }[] = [];
+
+    const deleteSingleItem = async (id: string) => {
       try {
-        // Get the row data to find the image filename before deleting
         const row = calendarRows.find((r) => r.contentCalendarId === id);
         if (row?.imageGeneratedUrl) {
-          // Extract filename from the URL (remove query params and cache busting)
-          const url = new URL(row.imageGeneratedUrl);
-          let filename = url.pathname.split('/').pop() || '';
-          // Remove any cache busting query params from filename
-          filename = filename.split('?')[0];
+          try {
+            const url = new URL(row.imageGeneratedUrl);
+            let filename = url.pathname.split('/').pop() || '';
+            filename = filename.split('?')[0];
 
-          if (filename) {
-            try {
-              // Delete the image from the bucket
-              const deleteRes = await authedFetch(`${backendBaseUrl}/api/storage/delete/${encodeURIComponent(filename)}`, {
+            if (filename) {
+              await authedFetch(`${backendBaseUrl}/api/storage/delete/${encodeURIComponent(filename)}`, {
                 method: 'DELETE',
               });
-              if (!deleteRes.ok) {
-                const errText = await deleteRes.text().catch(() => '');
-                console.warn('Storage delete endpoint returned error:', deleteRes.status, errText);
-              } else {
-                console.log('Deleted image from storage:', filename);
-              }
-            } catch (storageErr) {
-              console.error('Failed to delete image from storage', filename, storageErr);
-              // Continue with row deletion even if image deletion fails
             }
-          } else {
-            console.warn('Could not extract filename from image URL:', row.imageGeneratedUrl);
+          } catch (storageErr) {
+            console.error('Failed to delete image from storage for row', id, storageErr);
+            // Continue with row deletion anyway
           }
         }
 
-        // Delete the row from Supabase
         const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${id}`, {
           method: 'DELETE',
         });
-        if (!res.ok) {
-          const msg = await res.text().catch(() => '');
-          console.error('Delete failed', id, res.status, msg);
-          // Re-add the row to UI if delete failed
-          setCalendarRows((prev) => {
-            const deletedRow = calendarRows.find((r) => r.contentCalendarId === id);
-            return deletedRow ? [...prev, deletedRow] : prev;
-          });
+
+        if (res.ok) {
+          successes.push(id);
+        } else {
+          const msg = await res.text().catch(() => 'Unknown error');
+          failures.push({ id, error: msg });
         }
       } catch (e) {
-        console.error('Delete error', id, e);
-        // Re-add the row to UI if error
-        const deletedRow = calendarRows.find((r) => r.contentCalendarId === id);
-        if (deletedRow) {
-          setCalendarRows((prev) => [...prev, deletedRow]);
-        }
+        failures.push({ id, error: e });
       }
+    };
+
+    // Run all deletions concurrently
+    await Promise.all(idsToDelete.map((id) => deleteSingleItem(id)));
+
+    // Final UI update - only once
+    const successSet = new Set(successes);
+    setCalendarRows((prev) => prev.filter((r) => !successSet.has(r.contentCalendarId)));
+    setSelectedIds([]);
+    setIsBatchDeleting(false);
+
+    if (failures.length > 0) {
+      notify(`Deleted ${successes.length} items, but ${failures.length} failed.`, 'error');
+    } else {
+      notify(`Successfully deleted all ${successes.length} selected items.`, 'success');
     }
   };
 
@@ -2935,6 +2945,7 @@ function App() {
                       selectedIds={selectedIds}
                       isBatchGenerating={isBatchGenerating}
                       isBatchGeneratingImages={isBatchGeneratingImages}
+                      isBatchDeleting={isBatchDeleting}
                       handleBatchGenerate={handleBatchGenerate}
                       handleBatchGenerateImages={handleBatchGenerateImages}
                       openCsvModal={openCsvModal}
@@ -2979,6 +2990,7 @@ function App() {
                       selectedIds={selectedIds}
                       isBatchGenerating={isBatchGenerating}
                       isBatchGeneratingImages={isBatchGeneratingImages}
+                      isBatchDeleting={isBatchDeleting}
                       handleBatchGenerate={handleBatchGenerate}
                       handleBatchGenerateImages={handleBatchGenerateImages}
                       openCsvModal={openCsvModal}
@@ -3347,6 +3359,7 @@ function App() {
                       onTransferOwnership={handleTransferOwnership}
                       isOwner={activeCompany?.user_id === session?.user?.id}
                       onDisconnectAccount={handleDisconnectAccount}
+                      backendBaseUrl={backendBaseUrl}
                     />
                   }
                 />
@@ -3471,6 +3484,7 @@ function App() {
                       brandEditingRef={brandEditingRef}
                       onDisconnectAccount={handleDisconnectAccount}
                       formAnswerCache={formAnswerCache}
+                      backendBaseUrl={backendBaseUrl}
                     />}
                 />
                 <Route
@@ -3594,6 +3608,7 @@ function App() {
                       brandEditingRef={brandEditingRef}
                       onDisconnectAccount={handleDisconnectAccount}
                       formAnswerCache={formAnswerCache}
+                      backendBaseUrl={backendBaseUrl}
                     />}
                 />
 
@@ -3735,7 +3750,7 @@ function App() {
         {
           toast && (
             <div
-              className={`fixed bottom-24 right-6 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-white border shadow-premium-lg z-[9999] animate-[toast-slide-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md max-w-[400px] ${toast.tone === 'success' ? 'border-emerald-500/30 bg-emerald-50/95 text-emerald-800' :
+              className={`fixed bottom-24 ${isAiAssistantOpen ? 'right-[424px]' : 'right-6'} transition-all duration-300 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-white border shadow-premium-lg z-[9999] animate-[toast-slide-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md max-w-[400px] ${toast.tone === 'success' ? 'border-emerald-500/30 bg-emerald-50/95 text-emerald-800' :
                 toast.tone === 'error' ? 'border-rose-500/30 bg-rose-50/95 text-rose-800' :
                   'border-brand-primary/30 bg-sky-50/95 text-brand-dark'
                 }`}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Wand2 } from 'lucide-react';
+import { ExternalLink, Wand2, Check, Copy, BarChart3, Clock, Target, Layout, MessageSquare, Calendar, ChevronDown, Zap, ClipboardList, PenLine, X, Info, ShieldCheck, Eye, FileText, MousePointer2, Tag, Share2, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 
@@ -59,10 +59,13 @@ export function ViewContentModal({
 }: ViewContentModalProps) {
     const navigate = useNavigate();
     const [isManualApproving, setIsManualApproving] = useState(false);
-    const [showDatePicker, setShowDatePicker] = useState(false);
     const [scheduledDate, setScheduledDate] = useState('');
     const [analytics, setAnalytics] = useState<{ reach: number; likes: number; comments: number } | null>(null);
     const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+    const [isEditingInputs, setIsEditingInputs] = useState(false);
+    const [editedValues, setEditedValues] = useState<any>({});
+    const [isSavingInputs, setIsSavingInputs] = useState(false);
+    const [showAllStrategy, setShowAllStrategy] = useState(false);
 
     React.useEffect(() => {
         if (isOpen && selectedRow && selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook') {
@@ -87,11 +90,53 @@ export function ViewContentModal({
         }
     };
 
+    const handleStartEditing = () => {
+        setEditedValues({
+            date: selectedRow.date,
+            brandHighlight: selectedRow.brandHighlight,
+            crossPromo: selectedRow.crossPromo,
+            theme: selectedRow.theme,
+            contentType: selectedRow.contentType,
+            channels: selectedRow.channels,
+            targetAudience: selectedRow.targetAudience,
+            primaryGoal: selectedRow.primaryGoal,
+            cta: selectedRow.cta,
+            promoType: selectedRow.promoType,
+            frameworkUsed: selectedRow.frameworkUsed,
+        });
+        setIsEditingInputs(true);
+    };
+
+    const handleSaveInputs = async () => {
+        setIsSavingInputs(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editedValues)
+            });
+
+            if (res.ok) {
+                notify('Inputs updated successfully', 'success');
+                setIsEditingInputs(false);
+                await refreshCalendarRow(selectedRow.contentCalendarId);
+            } else {
+                const data = await res.json().catch(() => ({}));
+                notify(data.error || 'Failed to update inputs', 'error');
+            }
+        } catch (err) {
+            console.error('Save inputs error:', err);
+            notify('Error saving inputs', 'error');
+        } finally {
+            setIsSavingInputs(false);
+        }
+    };
+
     if (!isOpen || !selectedRow) return null;
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
             role="dialog"
             aria-modal="true"
             aria-label="Content Details"
@@ -99,400 +144,331 @@ export function ViewContentModal({
                 if (e.target === e.currentTarget) onClose();
             }}
         >
-            <div className="w-full max-w-5xl">
+            <div className="w-full max-w-[95vw] xl:max-w-6xl 2xl:max-w-[1400px]">
                 <div className="rounded-2xl border border-slate-200/60 bg-white shadow-xl overflow-hidden flex flex-col">
-                    {/* Header */}
-                    <div className="flex items-center justify-between gap-4 border-b border-slate-200/60 p-6 bg-gradient-to-b from-white to-slate-50/50">
-                        <div>
-                            <h2 className="text-xl font-bold text-brand-dark tracking-tight font-display">
-                                Content Details
-                            </h2>
-                            <p className="mt-1 text-sm text-brand-dark/60 font-medium">
-                                Review inputs, generated outputs, and final approvals.
-                            </p>
+                    {/* Header: Premium Workspace Style */}
+                    <div className="flex items-center justify-between gap-4 border-b border-slate-200/80 p-6 bg-white sticky top-0 z-30">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white shrink-0">
+                                <ClipboardList size={24} />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                                    {selectedRow.theme || "Content Details"}
+                                    <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm ${statusBadgeClasses(statusKey(getStatusValue(selectedRow.status)))
+                                        }`}>
+                                        {getStatusValue(selectedRow.status)}
+                                    </div>
+                                </h2>
+                                <div className="flex items-center gap-3 mt-0.5">
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+                                        <Calendar size={12} />
+                                        {selectedRow.date || "Unscheduled"}
+                                    </div>
+                                    <div className="w-1 h-1 bg-slate-200 rounded-full" />
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+                                        <Layout size={12} />
+                                        {selectedRow.contentType || "General"}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-
-
-
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/70 bg-white text-brand-dark/70 shadow-sm transition hover:bg-slate-50 hover:text-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2"
-                                aria-label="Close"
-                                title="Close"
-                            >
-                                ×
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
+                        >
+                            <X size={20} />
+                        </button>
                     </div>
 
-                    {/* Body */}
-                    <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
-                        {/* Section: Inputs */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">
-                                    Inputs
-                                </h3>
-                                <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
-                                <span className="text-xs text-brand-dark/50 italic">
-                                    What was provided for generation
-                                </span>
-                            </div>
+                    {/* Body: Two-Column Workspace */}
+                    <div className="flex flex-col lg:flex-row h-full max-h-[70vh] min-h-[500px]">
+                        {/* Main Feed Column */}
+                        <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-12 bg-slate-50/30">
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {[
-                                    { label: 'Date', value: selectedRow.date },
-                                    { label: 'Brand Highlight', value: selectedRow.brandHighlight },
-                                    { label: 'Cross Promo', value: selectedRow.crossPromo },
-                                    { label: 'Theme', value: selectedRow.theme },
-                                    { label: 'Content Type', value: selectedRow.contentType },
-                                    { label: 'Channels', value: selectedRow.channels },
-                                    { label: 'Target Audience', value: selectedRow.targetAudience },
-                                    { label: 'Primary Goal', value: selectedRow.primaryGoal },
-                                    { label: 'CTA', value: selectedRow.cta },
-                                    { label: 'Promo Type', value: selectedRow.promoType },
-                                    { label: 'Framework Used', value: selectedRow.frameworkUsed },
-                                    { label: 'Status', value: getStatusValue(selectedRow.status) },
-                                ].map((item, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="p-3 rounded-xl border border-slate-200/60 bg-slate-50/50"
-                                    >
-                                        <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">
-                                            {item.label}
+                            {/* Section: AI-Generated Core */}
+                            <section className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-blue-600 flex items-center gap-2">
+                                        <Zap size={14} className="fill-blue-600" />
+                                        AI-Generated Outputs
+                                    </h3>
+                                    <span className="text-[11px] font-bold text-slate-400">Draft suggestions for your review</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    {/* Caption Output Card */}
+                                    <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => handleCopy('captionOutput', selectedRow.captionOutput)}
+                                                className="p-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-lg"
+                                            >
+                                                {copiedField === 'captionOutput' ? <Check size={14} /> : <Copy size={14} />}
+                                            </button>
                                         </div>
-                                        <div className="text-sm font-medium text-brand-dark break-words">
-                                            {item.value || '—'}
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
+                                            <MessageSquare size={12} />
+                                            Caption draft
+                                        </div>
+                                        <div className="text-sm font-medium text-slate-700 leading-relaxed min-h-[100px] whitespace-pre-wrap max-h-[250px] overflow-y-auto pr-2">
+                                            {selectedRow.captionOutput ?? <span className="text-slate-300 italic">Not generated yet</span>}
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+
+                                    {/* CTA & Hashtags Stack */}
+                                    <div className="space-y-5">
+                                        <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm relative group">
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
+                                                <Target size={12} />
+                                                Suggested CTA
+                                            </div>
+                                            <div className="text-sm font-bold text-slate-900">
+                                                {selectedRow.ctaOuput ?? <span className="text-slate-300 italic font-normal">—</span>}
+                                            </div>
+                                            <button
+                                                onClick={() => handleCopy('ctaOuput', selectedRow.ctaOuput)}
+                                                className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 transition-colors"
+                                            >
+                                                {copiedField === 'ctaOuput' ? <Check size={12} /> : <Copy size={12} />}
+                                            </button>
+                                        </div>
+                                        <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm relative group">
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
+                                                <PenLine size={12} />
+                                                Suggested Hashtags
+                                            </div>
+                                            <div className="text-sm font-medium text-slate-600 line-clamp-3">
+                                                {selectedRow.hastagsOutput ?? <span className="text-slate-300 italic font-normal">—</span>}
+                                            </div>
+                                            <button
+                                                onClick={() => handleCopy('hastagsOutput', selectedRow.hastagsOutput)}
+                                                className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 transition-colors"
+                                            >
+                                                {copiedField === 'hastagsOutput' ? <Check size={12} /> : <Copy size={12} />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Section: Final Deliverable */}
+                            <section className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-2">
+                                        <ShieldCheck size={14} className="fill-emerald-600" />
+                                        Review & Final Deliverable
+                                    </h3>
+                                    <span className="text-[11px] font-bold text-slate-400">Approved version ready for deployment</span>
+                                </div>
+
+                                <div className="bg-emerald-500/[0.03] border-2 border-emerald-500/10 rounded-[2rem] p-6 lg:p-8 relative">
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                                        <div className="flex flex-col gap-6">
+                                            <div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
+                                                    <Info size={12} />
+                                                    Approval status & Notes
+                                                </div>
+                                                <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm min-h-[100px]">
+                                                    <div className="text-sm font-black text-slate-900 mb-2">Decision: {selectedRow.reviewDecision || "PENDING"}</div>
+                                                    <p className="text-xs font-semibold text-slate-500 italic leading-relaxed">
+                                                        "{selectedRow.reviewNotes || "No review notes provided yet."}"
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm group">
+                                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 flex justify-between">
+                                                        Final CTA
+                                                        <button onClick={() => handleCopy('finalCTA', selectedRow.finalCTA)} className="text-slate-300 hover:text-blue-600 transition-colors">
+                                                            {copiedField === 'finalCTA' ? <Check size={12} /> : <Copy size={12} />}
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-sm font-black text-slate-900 leading-snug">
+                                                        {selectedRow.finalCTA || <span className="text-slate-300 font-normal">—</span>}
+                                                    </div>
+                                                </div>
+                                                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm group">
+                                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 flex justify-between">
+                                                        Final Hashtags
+                                                        <button onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags)} className="text-slate-300 hover:text-blue-600 transition-colors">
+                                                            {copiedField === 'finalHashtags' ? <Check size={12} /> : <Copy size={12} />}
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-sm font-bold text-blue-600/80 leading-relaxed">
+                                                        {selectedRow.finalHashtags || <span className="text-slate-300 font-normal">—</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="relative">
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex justify-between items-center">
+                                                <div className="flex items-center gap-2"><PenLine size={12} /> Final Caption</div>
+                                                <button
+                                                    onClick={() => handleCopy('finalDescription', [selectedRow.finalCaption, selectedRow.finalHashtags].filter(Boolean).join('\n\n'))}
+                                                    className="px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-[9px] font-black shadow-lg shadow-emerald-500/20"
+                                                >
+                                                    {copiedField === 'finalDescription' ? "COPIED" : "COPY READY DESCRIPTION"}
+                                                </button>
+                                            </div>
+                                            <div className="bg-white border border-emerald-500/20 rounded-2xl p-5 shadow-inner min-h-[180px] text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+                                                {[selectedRow.finalCaption, selectedRow.finalHashtags].filter(Boolean).join('\n\n') || "Drafting finalized version..."}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Section: Analytics */}
+                            {selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook' && (
+                                <section className="pt-6 border-t border-slate-200 space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 flex items-center gap-2">
+                                            <BarChart3 size={14} className="text-slate-900" />
+                                            Live Insights
+                                        </h3>
+                                        {selectedRow.social_post_id && (
+                                            <a href={`https://facebook.com/${selectedRow.social_post_id}`} target="_blank" className="text-[10px] font-black text-blue-600 flex items-center gap-1.5 hover:underline decoration-2">
+                                                LIVE AT FACEBOOK <ExternalLink size={10} />
+                                            </a>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-6">
+                                        {[
+                                            { label: 'Reach', val: analytics?.reach, icon: Eye },
+                                            { label: 'Engagement', val: analytics?.likes, icon: Target },
+                                            { label: 'Conversations', val: analytics?.comments, icon: MessageSquare }
+                                        ].map((stat, i) => (
+                                            <div key={i} className="bg-white border border-slate-200 rounded-[1.5rem] p-4 text-center group hover:border-blue-200 transition-all">
+                                                <div className="w-8 h-8 mx-auto mb-2 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-all">
+                                                    <stat.icon size={16} />
+                                                </div>
+                                                <div className="text-xl font-black text-slate-900">{isLoadingAnalytics ? '...' : (stat.val ?? '0')}</div>
+                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
                         </div>
 
-                        {/* Section: AI Outputs */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">
-                                    AI-Generated Outputs
-                                </h3>
-                                <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
-                                <span className="text-xs text-brand-dark/50 italic">
-                                    What the system generated for review
-                                </span>
-                            </div>
+                        {/* Sidebar: Strategy & Metadata */}
+                        <div className="w-full lg:w-[400px] border-l border-slate-200 bg-white overflow-y-auto p-8 space-y-10 flex-shrink-0">
 
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                <div className="p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col gap-3 lg:col-span-1">
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-xs font-bold text-brand-dark/70">Caption Output</div>
-                                        <button
-                                            type="button"
-                                            className="text-[0.7rem] font-bold text-[#3fa9f5] hover:underline"
-                                            onClick={() => handleCopy('captionOutput', selectedRow.captionOutput)}
-                                        >
-                                            {copiedField === 'captionOutput' ? 'Copied' : 'Copy'}
-                                        </button>
-                                    </div>
-                                    <div className="text-sm text-brand-dark/80 bg-slate-50 p-3 rounded-lg border border-slate-100 min-h-[120px] whitespace-pre-wrap max-h-60 overflow-y-auto">
-                                        {selectedRow.captionOutput ?? '—'}
-                                    </div>
-                                </div>
-
-                                <div className="p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col gap-3 lg:col-span-1">
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-xs font-bold text-brand-dark/70">CTA Output</div>
-                                        <button
-                                            type="button"
-                                            className="text-[0.7rem] font-bold text-[#3fa9f5] hover:underline"
-                                            onClick={() => handleCopy('ctaOuput', selectedRow.ctaOuput)}
-                                        >
-                                            {copiedField === 'ctaOuput' ? 'Copied' : 'Copy'}
-                                        </button>
-                                    </div>
-                                    <div className="text-sm text-brand-dark/80 bg-slate-50 p-3 rounded-lg border border-slate-100 min-h-[120px] whitespace-pre-wrap max-h-60 overflow-y-auto">
-                                        {selectedRow.ctaOuput ?? '—'}
-                                    </div>
-                                </div>
-
-                                <div className="p-4 rounded-xl border border-slate-200/60 bg-white shadow-sm flex flex-col gap-3 lg:col-span-1">
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-xs font-bold text-brand-dark/70">Hashtags Output</div>
-                                        <button
-                                            type="button"
-                                            className="text-[0.7rem] font-bold text-[#3fa9f5] hover:underline"
-                                            onClick={() => handleCopy('hastagsOutput', selectedRow.hastagsOutput)}
-                                        >
-                                            {copiedField === 'hastagsOutput' ? 'Copied' : 'Copy'}
-                                        </button>
-                                    </div>
-                                    <div className="text-sm text-brand-dark/80 bg-slate-50 p-3 rounded-lg border border-slate-100 min-h-[120px] whitespace-pre-wrap max-h-60 overflow-y-auto">
-                                        {selectedRow.hastagsOutput ?? '—'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Section: Review & Final Approval */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">
-                                    Review &amp; Final Approval
-                                </h3>
-                                <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
-                                <span className="text-xs text-brand-dark/50 italic">
-                                    What will ship after human approval
-                                </span>
-                            </div>
-
-                            {/* ✅ Restored CSS-like 3-column layout */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                {/* Review Decision */}
-                                <div className="rounded-2xl border border-slate-200/60 bg-slate-50/50 p-4">
-                                    <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-2">
-                                        Review Decision
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm font-semibold text-brand-dark">
-                                        {selectedRow.reviewDecision ?? '—'}
-                                    </div>
-                                </div>
-
-                                {/* Review Notes */}
-                                <div className="rounded-2xl border border-slate-200/60 bg-slate-50/50 p-4">
-                                    <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-2">
-                                        Review Notes
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/80 whitespace-pre-wrap">
-                                        {selectedRow.reviewNotes ?? '—'}
-                                    </div>
-                                </div>
-
-                                {/* Final Caption */}
-                                <div className="rounded-2xl border border-[#3fa9f5]/25 bg-slate-50/40 p-4 shadow-sm">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="text-sm font-bold text-[#3fa9f5]">Final Caption</div>
-                                        <button
-                                            type="button"
-                                            className="text-xs font-bold text-[#3fa9f5] hover:underline"
-                                            onClick={() => handleCopy('finalCaption', selectedRow.finalCaption)}
-                                        >
-                                            {copiedField === 'finalCaption' ? 'Copied' : 'Copy'}
-                                        </button>
-                                    </div>
-
-                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/90 whitespace-pre-wrap max-h-[240px] overflow-y-auto">
-                                        {selectedRow.finalCaption ?? '—'}
-                                    </div>
-                                </div>
-
-                                {/* Final CTA */}
-                                <div className="rounded-2xl border border-slate-200/60 bg-slate-50/50 p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="text-xs font-bold uppercase tracking-widest text-brand-dark/60">
-                                            Final CTA
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className="text-xs font-bold text-[#3fa9f5] hover:underline"
-                                            onClick={() => handleCopy('finalCTA', selectedRow.finalCTA)}
-                                        >
-                                            {copiedField === 'finalCTA' ? 'Copied' : 'Copy'}
-                                        </button>
-                                    </div>
-
-                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/80 whitespace-pre-wrap">
-                                        {selectedRow.finalCTA || '—'}
-                                    </div>
-                                </div>
-
-                                {/* Final Hashtags */}
-                                <div className="rounded-2xl border border-slate-200/60 bg-slate-50/50 p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="text-xs font-bold uppercase tracking-widest text-brand-dark/60">
-                                            Final Hashtags
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className="text-xs font-bold text-[#3fa9f5] hover:underline"
-                                            onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags)}
-                                        >
-                                            {copiedField === 'finalHashtags' ? 'Copied' : 'Copy'}
-                                        </button>
-                                    </div>
-
-                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/80 whitespace-pre-wrap">
-                                        {selectedRow.finalHashtags || '—'}
-                                    </div>
-                                </div>
-
-                                {/* Final Description */}
-                                <div className="rounded-2xl border border-brand-dark/10 bg-slate-50/50 p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="text-sm font-bold text-brand-dark/80">
-                                            Final Description (Ready to Post)
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className="text-xs font-bold text-[#3fa9f5] hover:underline"
-                                            onClick={() => {
-                                                const finalDescription = [
-                                                    selectedRow.finalCaption,
-                                                    selectedRow.finalHashtags,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join('\n\n');
-                                                handleCopy('finalDescription', finalDescription);
-                                            }}
-                                        >
-                                            {copiedField === 'finalDescription' ? 'Copied' : 'Copy'}
-                                        </button>
-                                    </div>
-
-                                    <div className="rounded-xl border border-slate-200/60 bg-white p-4 text-sm text-brand-dark/90 whitespace-pre-wrap max-h-[240px] overflow-y-auto">
-                                        {[selectedRow.finalCaption, selectedRow.finalHashtags].filter(Boolean).join('\n\n') ||
-                                            '—'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Section: Analytics */}
-                        {selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook' && (
+                            {/* Strategy Section */}
                             <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">
-                                        Post Performance
-                                    </h3>
-                                    <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
-                                    {selectedRow.social_post_id && (
-                                        <a
-                                            href={`https://facebook.com/${selectedRow.social_post_id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3fa9f5] hover:underline"
-                                            title="View this post on Facebook in a new tab"
-                                        >
-                                            <ExternalLink className="h-3 w-3" />
-                                            View Post
-                                        </a>
+                                <div className="flex items-center justify-between">
+                                    <div className="text-xs font-black uppercase tracking-widest text-slate-900">Campaign Strategy</div>
+                                    {isEditingInputs ? (
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setIsEditingInputs(false)} className="p-1 text-slate-400 hover:text-slate-600 transition-all"><X size={14} /></button>
+                                            <button onClick={handleSaveInputs} disabled={isSavingInputs} className="p-1 text-blue-600 hover:text-blue-700 disabled:opacity-50"><Check size={14} /></button>
+                                        </div>
+                                    ) : (
+                                        <button onClick={handleStartEditing} className="p-1.5 bg-slate-50 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                                            <PenLine size={14} />
+                                        </button>
                                     )}
-                                    <span className="text-xs text-brand-dark/50 italic">
-                                        Live metrics from Facebook
-                                    </span>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div className="p-4 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col items-center justify-center text-center">
-                                        <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">Reach</div>
-                                        <div className="text-2xl font-bold text-brand-dark">
-                                            {isLoadingAnalytics ? '...' : analytics?.reach ?? '0'}
-                                        </div>
-                                    </div>
-                                    <div className="p-4 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col items-center justify-center text-center">
-                                        <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">Likes</div>
-                                        <div className="text-2xl font-bold text-brand-dark">
-                                            {isLoadingAnalytics ? '...' : analytics?.likes ?? '0'}
-                                        </div>
-                                    </div>
-                                    <div className="p-4 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col items-center justify-center text-center">
-                                        <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 mb-1">Comments</div>
-                                        <div className="text-2xl font-bold text-brand-dark">
-                                            {isLoadingAnalytics ? '...' : analytics?.comments ?? '0'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Section: System Metadata (Expandable) */}
-                        <details className="group border border-slate-200/60 rounded-xl bg-slate-50/30 overflow-hidden">
-                            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-sm font-bold tracking-wide text-brand-dark/50 uppercase">
-                                        System / Internal
-                                    </h3>
-                                    <span className="text-xs text-brand-dark/30 italic">
-                                        Internal references and metadata
-                                    </span>
-                                </div>
-                                <div className="text-brand-dark/30 group-open:rotate-180 transition-transform">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </div>
-                            </summary>
-
-                            <div className="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-200/60 mt-0">
-                                <div className="space-y-2">
-                                    <label className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
-                                        DMP (Data Management Plan)
-                                    </label>
-                                    <textarea
-                                        className="w-full text-xs font-mono bg-white border border-slate-200 rounded-lg p-3 text-brand-dark/70 outline-none focus:border-[#3fa9f5]/30 transition-colors"
-                                        rows={6}
-                                        value={selectedRow.dmp ?? ''}
-                                        readOnly
-                                        style={{ resize: 'vertical', maxHeight: '200px' }}
-                                    />
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className="flex flex-col gap-2">
-                                        <label className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
-                                            Generated Image Preview
-                                        </label>
-                                        <div className="p-2 border border-slate-200 rounded-xl bg-white min-h-[120px] flex items-center justify-center">
-                                            {getImageGeneratedUrl(selectedRow) ? (
-                                                (() => {
-                                                    const imageUrl = getImageGeneratedUrl(selectedRow);
-                                                    const separator = imageUrl?.includes('?') ? '&' : '?';
-                                                    return (
-                                                        <img
-                                                            src={`${imageUrl}${separator}v=${imagePreviewNonce}`}
-                                                            alt="Generated"
-                                                            className="max-w-full h-auto rounded-lg shadow-sm border border-slate-100"
-                                                            style={{ maxWidth: '220px' }}
-                                                        />
-                                                    );
-                                                })()
+                                <div className="bg-slate-50/50 border border-slate-200/60 rounded-[1.5rem] p-4 space-y-5">
+                                    {[
+                                        { label: 'Theme', key: 'theme', icon: Layout },
+                                        { label: 'Type', key: 'contentType', icon: FileText },
+                                        { label: 'Date', key: 'date', icon: Calendar },
+                                        { label: 'Brand Focus', key: 'brandHighlight', icon: Target },
+                                        { label: 'Primary Goal', key: 'primaryGoal', icon: Zap },
+                                        { label: 'Audience', key: 'targetAudience', icon: Eye },
+                                        { label: 'Channels', key: 'channels', icon: ExternalLink },
+                                        { label: 'CTA', key: 'cta', icon: MousePointer2 },
+                                        { label: 'Promo Type', key: 'promoType', icon: Tag },
+                                        { label: 'Cross Promo', key: 'crossPromo', icon: Share2 },
+                                        { label: 'Framework', key: 'frameworkUsed', icon: ClipboardList },
+                                    ].slice(0, showAllStrategy ? undefined : 5).map((item, idx) => (
+                                        <div key={idx} className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                <item.icon size={10} />
+                                                {item.label}
+                                            </div>
+                                            {isEditingInputs ? (
+                                                <input
+                                                    type="text"
+                                                    value={editedValues[item.key] || ''}
+                                                    onChange={(e) => setEditedValues({ ...editedValues, [item.key]: e.target.value })}
+                                                    className="w-full bg-white border border-blue-200 rounded-lg p-2 text-xs font-bold text-blue-600 outline-none shadow-sm"
+                                                    autoFocus={idx === 0}
+                                                />
                                             ) : (
-                                                <div className="text-xs text-brand-dark/30 italic">No image generated yet</div>
+                                                <div className="text-xs font-bold text-slate-900 leading-tight">
+                                                    {selectedRow[item.key] || '—'}
+                                                </div>
                                             )}
                                         </div>
+                                    ))}
+
+                                    <button
+                                        onClick={() => setShowAllStrategy(!showAllStrategy)}
+                                        className="w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-blue-100"
+                                    >
+                                        {showAllStrategy ? (
+                                            <>Show Less <ChevronUp size={12} /></>
+                                        ) : (
+                                            <>Show More +6 Items <ChevronDown size={12} /></>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Visual Preview */}
+                            <div className="space-y-4">
+                                <div className="text-xs font-black uppercase tracking-widest text-slate-900">Visual Asset</div>
+                                <div className="aspect-square bg-slate-100 rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-4 relative overflow-hidden transition-all hover:border-blue-200 group">
+                                    {getImageGeneratedUrl(selectedRow) ? (
+                                        <img
+                                            src={`${getImageGeneratedUrl(selectedRow)}${getImageGeneratedUrl(selectedRow)?.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
+                                            alt="Generated"
+                                            className="w-full h-full object-cover rounded-2xl transition-transform duration-500 group-hover:scale-110"
+                                        />
+                                    ) : (
+                                        <>
+                                            <Layout size={32} className="text-slate-300 mb-3" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Empty visual slate</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* System Metadata Details */}
+                            <details className="group border border-slate-200 rounded-2xl bg-white overflow-hidden transition-all">
+                                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 text-xs font-black uppercase tracking-widest text-slate-400">
+                                    System Metadata
+                                    <ChevronDown size={14} className="group-open:rotate-180 transition-transform" />
+                                </summary>
+                                <div className="px-4 pb-5 space-y-4 border-t border-slate-100 mt-0 pt-4">
+                                    <div className="space-y-1.5">
+                                        <div className="text-[8px] font-black uppercase tracking-widest text-slate-300">DMP Prompt</div>
+                                        <div className="bg-slate-50 rounded-xl p-3 text-[10px] font-mono text-slate-500 line-clamp-4 leading-relaxed">
+                                            {selectedRow.dmp || "No DMP data found."}
+                                        </div>
                                     </div>
-
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
-                                                Company ID
-                                            </div>
-                                            <div className="text-[0.7rem] font-mono text-brand-dark/60 truncate">
-                                                {selectedRow.companyId || '—'}
-                                            </div>
+                                    <div className="grid grid-cols-2 gap-3 pb-2">
+                                        <div>
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-slate-300 mb-1">Row ID</div>
+                                            <div className="text-[10px] font-bold text-slate-400 truncate">{selectedRow.contentCalendarId}</div>
                                         </div>
-
-                                        <div className="space-y-1">
-                                            <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
-                                                Calendar ID
-                                            </div>
-                                            <div className="text-[0.7rem] font-mono text-brand-dark/60 truncate">
-                                                {selectedRow.contentCalendarId || '—'}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <div className="text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/40">
-                                                Created At
-                                            </div>
-                                            <div className="text-[0.7rem] font-mono text-brand-dark/60 truncate">
-                                                {selectedRow.created_at || '—'}
-                                            </div>
+                                        <div>
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-slate-300 mb-1">Company</div>
+                                            <div className="text-[10px] font-bold text-slate-400 truncate">{selectedRow.companyId}</div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </details>
+                            </details>
+                        </div>
                     </div>
 
                     {/* Footer */}
@@ -653,4 +629,30 @@ export function ViewContentModal({
             </div>
         </div>
     );
+}
+
+function statusKey(status: string) {
+    return (status || "Draft").toLowerCase().replace(/\s+/g, "-");
+}
+
+function statusBadgeClasses(key: string) {
+    switch (key) {
+        case "approved":
+            return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+        case "review":
+        case "needs-review":
+            return "bg-yellow-400/10 text-yellow-700 border-yellow-400/20";
+        case "design-complete":
+        case "design-completed":
+            return "bg-blue-400/10 text-blue-700 border-blue-400/20";
+        case "generating":
+        case "generate":
+            return "bg-indigo-400/10 text-indigo-600 border-indigo-400/20 animate-pulse";
+        case "pending":
+            return "bg-orange-500/10 text-orange-700 border-orange-500/20";
+        case "published":
+            return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+        default:
+            return "bg-slate-300/20 text-slate-600 border-slate-300/30";
+    }
 }

@@ -239,7 +239,34 @@ export const removeCollaborator = async (req, res) => {
   }
 };
 
+// GET /api/users/search?email=...
+export const searchUsers = async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email || email.length < 2) {
+      return res.json({ users: [] });
+    }
+
+    const { data: { users }, error: adminError } = await db.auth.admin.listUsers();
+    if (adminError) {
+      return res.status(500).json({ error: 'Failed to query users' });
+    }
+
+    // Filter users by email (prefix match or contains)
+    const filteredUsers = users
+      .filter(u => u.email.toLowerCase().includes(email.toLowerCase()))
+      .map(u => ({ id: u.id, email: u.email }))
+      .slice(0, 5); // Limit to top 5 results
+
+    return res.json({ users: filteredUsers });
+  } catch (err) {
+    console.error('searchUsers error', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 router.get('/collaborators/:companyId', getCollaboratorsByCompanyId);
+router.get('/users/search', searchUsers);
 router.post('/collaborators/:companyId', addCollaborator);
 router.delete('/collaborators/:companyId/:userId', removeCollaborator);
 
