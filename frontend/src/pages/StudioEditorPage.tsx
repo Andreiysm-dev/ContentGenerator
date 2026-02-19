@@ -236,6 +236,8 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
         }
 
         try {
+            if (!supabase) throw new Error('Supabase client not initialized');
+
             // 1. Upload/Copy Image to 'scheduled-assets' bucket
             let finalMediaUrls: string[] = [];
 
@@ -247,13 +249,13 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                     const blob = await response.blob();
                     const fileName = `${activeCompanyId}/${calendarId}/${Date.now()}.png`; // Organize by company/calendarId
 
-                    const { data: uploadData, error: uploadError } = await supabase.storage
+                    const { data: uploadData, error: uploadError } = await supabase!.storage
                         .from('scheduled-assets')
                         .upload(fileName, blob);
 
                     if (uploadError) throw uploadError;
 
-                    const { data: { publicUrl } } = supabase.storage
+                    const { data: { publicUrl } } = supabase!.storage
                         .from('scheduled-assets')
                         .getPublicUrl(fileName);
 
@@ -290,7 +292,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
 
             // Create payload for each unique content version
             for (const [text, accIds] of contentMap.entries()) {
-                const { error: insertError } = await supabase
+                const { error: insertError } = await supabase!
                     .from('scheduled_posts')
                     .insert({
                         company_id: activeCompanyId,
@@ -315,11 +317,11 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
         }
     };
 
-    const handleSave = async (newStatus: 'DRAFT' | 'READY' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT'): Promise<string | null> => {
+    const handleSave = async (newStatus: 'DRAFT' | 'READY' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT', isPublishing = false): Promise<string | null> => {
         // 1. Save Content Calendar Draft first
         // If create mode, this gets us the ID.
         const effectiveStatus = newStatus === 'SCHEDULED' ? 'SCHEDULED' : newStatus;
-        const savedId = await saveContentCalendar(effectiveStatus, newStatus === 'SCHEDULED' || newStatus === 'PUBLISHED');
+        const savedId = await saveContentCalendar(effectiveStatus, isPublishing || newStatus === 'SCHEDULED' || newStatus === 'PUBLISHED');
 
         if (!savedId) return null;
 
