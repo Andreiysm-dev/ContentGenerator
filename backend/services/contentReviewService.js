@@ -114,22 +114,31 @@ const safeParseReviewerText = (text) => {
   }
 
   const extractBetween = (startLabel, endLabel) => {
-    const startIdx = normalized.search(new RegExp(`^\\s*${startLabel}`, 'im'));
-    if (startIdx === -1) return '';
+    // Escape the label for regex use and allow for optional markdown # symbols and optional trailing colon
+    const labelPattern = startLabel.replace(/:$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const startRegex = new RegExp(`^\\s*(?:#+\\s*)?${labelPattern}:?\\s*`, 'im');
 
-    const afterStart = normalized.slice(startIdx).replace(new RegExp(`^\\s*${startLabel}.*?(\\r?\\n|$)`, 'im'), '');
+    const startMatch = normalized.match(startRegex);
+    if (!startMatch) return '';
+
+    const startIdx = startMatch.index;
+    const afterStart = normalized.slice(startIdx + startMatch[0].length);
+
     if (!endLabel) return afterStart.trim();
 
-    const endIdx = afterStart.search(new RegExp(`^\\s*${endLabel}`, 'im'));
-    if (endIdx === -1) return afterStart.trim();
+    const endLabelPattern = endLabel.replace(/:$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const endRegex = new RegExp(`^\\s*(?:#+\\s*)?${endLabelPattern}:?\\s*`, 'im');
 
-    return afterStart.slice(0, endIdx).trim();
+    const endMatch = afterStart.match(endRegex);
+    if (!endMatch) return afterStart.trim();
+
+    return afterStart.slice(0, endMatch.index).trim();
   };
 
-  const notesBlock = extractBetween('NOTES:', 'FINAL CAPTION:');
-  const finalCaption = extractBetween('FINAL CAPTION:', 'FINAL CTA:');
-  const finalCTA = extractBetween('FINAL CTA:', 'FINAL HASHTAGS:');
-  const finalHashtags = extractBetween('FINAL HASHTAGS:', null);
+  const notesBlock = extractBetween('NOTES', 'FINAL CAPTION');
+  const finalCaption = extractBetween('FINAL CAPTION', 'FINAL CTA');
+  const finalCTA = extractBetween('FINAL CTA', 'FINAL HASHTAGS');
+  const finalHashtags = extractBetween('FINAL HASHTAGS', null);
 
   const reviewNotes = notesBlock
     ? notesBlock
@@ -331,14 +340,19 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
   const { decision, reviewNotes, finalCaption, finalCTA, finalHashtags } = parsedText.value;
   const nextStatus = decision === 'NEEDS REVISION' ? 'Needs Revision' : 'Approved';
 
+  // Fallback to drafts if the reviewer failed to output mandatory sections
+  const safeCaption = (finalCaption && String(finalCaption).trim()) ? finalCaption : (contentCalendar.captionOutput || '');
+  const safeCTA = (finalCTA && String(finalCTA).trim()) ? finalCTA : (contentCalendar.ctaOuput || '');
+  const safeHashtags = (finalHashtags && String(finalHashtags).trim()) ? finalHashtags : (contentCalendar.hastagsOutput || '');
+
   const { data: updatedRows, error: saveError } = await db
     .from('contentCalendar')
     .update({
       reviewDecision: decision,
       reviewNotes: reviewNotes || null,
-      finalCaption: finalCaption || null,
-      finalCTA: finalCTA || null,
-      finalHashtags: finalHashtags || null,
+      finalCaption: safeCaption || null,
+      finalCTA: safeCTA || null,
+      finalHashtags: safeHashtags || null,
       status: writeStatus(nextStatus),
     })
     .eq('contentCalendarId', contentCalendarId)
@@ -477,14 +491,19 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
   const { decision, reviewNotes, finalCaption, finalCTA, finalHashtags } = parsedText.value;
   const nextStatus = decision === 'NEEDS REVISION' ? 'Needs Revision' : 'Approved';
 
+  // Fallback to drafts if the reviewer failed to output mandatory sections
+  const safeCaption = (finalCaption && String(finalCaption).trim()) ? finalCaption : (contentCalendar.captionOutput || '');
+  const safeCTA = (finalCTA && String(finalCTA).trim()) ? finalCTA : (contentCalendar.ctaOuput || '');
+  const safeHashtags = (finalHashtags && String(finalHashtags).trim()) ? finalHashtags : (contentCalendar.hastagsOutput || '');
+
   const { data: updatedRows, error: saveError } = await db
     .from('contentCalendar')
     .update({
       reviewDecision: decision,
       reviewNotes: reviewNotes || null,
-      finalCaption: finalCaption || null,
-      finalCTA: finalCTA || null,
-      finalHashtags: finalHashtags || null,
+      finalCaption: safeCaption || null,
+      finalCTA: safeCTA || null,
+      finalHashtags: safeHashtags || null,
       status: writeStatus(nextStatus),
     })
     .eq('contentCalendarId', contentCalendarId)

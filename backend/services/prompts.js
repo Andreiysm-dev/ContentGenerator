@@ -133,6 +133,7 @@ export const REVIEW_USER_PROMPT_TEMPLATE = [
     'FINAL HASHTAGS:',
     '<hashtags>',
     '',
+    'CRITICAL: You MUST output all three FINAL sections (CAPTION, CTA, HASHTAGS) even if no changes were made. AI laziness is forbidden. If sections are missing from draft, invent them based on brand rules.',
     'Do not include anything else.',
 ].join('\n');
 
@@ -285,14 +286,45 @@ export const BRAND_CAPABILITY_USER_PROMPT =
 export const WRITER_AGENT_SYSTEM_PROMPT =
     'You are a PROMPT ENGINEER.\n\nYou are generating a reusable CAPTION WRITER SYSTEM PROMPT.';
 
-export const WRITER_AGENT_USER_PROMPT =
-    'Inputs:\nBrand Pack:{{BRAND_PACK}}\nBrand Capabilities:{{BRAND_CAP}}\n\nTASK:\nGenerate a CAPTION WRITER SYSTEM PROMPT...';
+export const WRITER_AGENT_USER_PROMPT = `Inputs:
+Brand Pack: {{BRAND_PACK}}
+Brand Capabilities: {{BRAND_CAP}}
+
+TASK:
+Generate a CAPTION WRITER SYSTEM PROMPT for this brand.
+
+THE SYSTEM PROMPT YOU GENERATE MUST INSTRUCT THE WRITER TO:
+1. Embody the brand voice and tone defined in the Brand Pack.
+2. Use the Brand Capability Map as the source of truth for facts and offers.
+3. Structure captions with a clear hook, value-led body, and a strong CTA.
+4. Output in valid JSON format with "framework", "caption", "cta", and "hashtags".
+5. Always provide a relevant CTA and 3-8 hashtags even if not explicitly provided in the request.
+6. Follow all "Absolute Truths" and strictly avoid "Forbidden Words".
+
+OUTPUT THE FINAL SYSTEM PROMPT BELOW:`;
 
 export const REVIEWER_AGENT_SYSTEM_PROMPT =
     'You are a PROMPT ENGINEER.\n\nYou are generating a CAPTION REVIEWER & APPROVER SYSTEM PROMPT.';
 
-export const REVIEWER_AGENT_USER_PROMPT =
-    'Inputs:\nBrand Pack:{{BRAND_PACK}}\nBrand Capabilities:{{BRAND_CAP}}\n\nTASK:\nGenerate a CAPTION REVIEWER SYSTEM PROMPT...';
+export const REVIEWER_AGENT_USER_PROMPT = `Inputs:
+Brand Pack: {{BRAND_PACK}}
+Brand Capabilities: {{BRAND_CAP}}
+
+TASK:
+Generate a CAPTION REVIEWER SYSTEM PROMPT for this specific brand.
+
+This prompt will be used to instruct a "Reviewer AI" that audits social media captions.
+
+THE SYSTEM PROMPT YOU GENERATE MUST INSTRUCT THE REVIEWER TO:
+1. Act as a critical brand guardian and editor.
+2. Cross-reference every draft against the Brand Pack and Brand Capabilities provided above.
+3. Check for tone consistency, absolute truths, and forbidden words.
+4. Correct the content directly to make it "Review-Ready".
+5. ALWAYS output the results in the following sections: DECISION, NOTES, FINAL CAPTION, FINAL CTA, and FINAL HASHTAGS.
+6. MANDATORY RULE: The Reviewer MUST NEVER leave FINAL CTA or FINAL HASHTAGS empty. If the drafts are empty, the Reviewer must generate them using the Brand Capabilities and the primary goal of the content.
+7. If a user provided a specific CTA in the draft, the Reviewer MUST preserve it exactly unless it violates a hard compliance rule.
+
+OUTPUT THE FINAL SYSTEM PROMPT BELOW:`;
 
 export const VISUAL_IDENTITY_SYSTEM_PROMPT =
     'You are a VISUAL BRAND STRATEGIST and PROMPT ENGINEER.\n\nYour task is to generate a set of VISUAL IDENTITY GUIDELINES (System Instruction)...';

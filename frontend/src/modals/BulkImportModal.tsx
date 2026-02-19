@@ -151,26 +151,78 @@ export function BulkImportModal({
                                                                     placeholder="..."
                                                                     onPaste={(e) => {
                                                                         e.preventDefault();
-                                                                        const pasteData = e.clipboardData.getData('text');
-                                                                        const rows = pasteData.split(/\r?\n/).filter(line => line.length > 0);
+                                                                        let pasteData = e.clipboardData.getData('text');
+
+                                                                        // 1. Smart Cleanup: Detect if this is a markdown table with text around it
+                                                                        if (pasteData.includes('|')) {
+                                                                            const lines = pasteData.split(/\r?\n/);
+                                                                            const tableLines = lines.filter(l => l.includes('|'));
+                                                                            if (tableLines.length > 0) {
+                                                                                pasteData = tableLines.join('\n');
+                                                                            }
+                                                                        }
+
+                                                                        const rawLines = pasteData.split(/\r?\n/).filter(line => line.trim().length > 0);
+                                                                        let parsedRows: string[][] = [];
+
+                                                                        // Check for delimiters
+                                                                        const hasTabs = pasteData.includes('\t');
+                                                                        const hasPipes = pasteData.includes('|');
+
+                                                                        if (hasPipes) {
+                                                                            // Parse Markdown Table
+                                                                            parsedRows = rawLines
+                                                                                .filter(l => l.includes('|') && !l.includes('---'))
+                                                                                .map(l => {
+                                                                                    // Split by pipe and remove first/last empty elements if they exist (caused by | cell | cell |)
+                                                                                    let cells = l.split('|').map(c => c.trim());
+                                                                                    if (cells[0] === '') cells.shift();
+                                                                                    if (cells[cells.length - 1] === '') cells.pop();
+                                                                                    return cells;
+                                                                                });
+                                                                        } else if (hasTabs) {
+                                                                            // Standard Spreadsheet Paste
+                                                                            parsedRows = rawLines.map(l => l.split('\t').map(c => c.trim()));
+                                                                        } else {
+                                                                            // 2. ChatGPT/AI List Detection
+                                                                            // If we have multiple lines but no tabs/pipes, it's likely a vertical list
+                                                                            // We strip prefixes like "1. ", "- ", or "Field Name: "
+                                                                            const cleanLines = rawLines.map(l => {
+                                                                                // Strip "1. ", "- ", "* "
+                                                                                let s = l.replace(/^[0-9]+[\.\)]\s*|^[\-\*\u2022]\s*/, '').trim();
+                                                                                // Strip "Field: " if it exists
+                                                                                if (s.includes(':')) {
+                                                                                    const parts = s.split(':');
+                                                                                    // Only strip if the prefix is short (likely a label)
+                                                                                    if (parts[0].length < 25) {
+                                                                                        s = parts.slice(1).join(':').trim();
+                                                                                    }
+                                                                                }
+                                                                                return s;
+                                                                            });
+
+                                                                            // If pasting into the first column and we have a list that fits a single row (<= 9 items)
+                                                                            if (colIndex === 0 && cleanLines.length > 1 && cleanLines.length <= 9) {
+                                                                                parsedRows = [cleanLines]; // Transpose to a single row
+                                                                            } else {
+                                                                                parsedRows = cleanLines.map(l => [l]); // Standard vertical paste
+                                                                            }
+                                                                        }
+
+                                                                        // Apply the parsed rows to the grid
                                                                         const newPreview = [...bulkPreview];
-
-                                                                        rows.forEach((pRow, rIdx) => {
-                                                                            const cells = pRow.split('\t');
+                                                                        parsedRows.forEach((pRow, rIdx) => {
                                                                             const targetRowIdx = rowIndex + rIdx;
-
                                                                             if (!newPreview[targetRowIdx]) {
                                                                                 newPreview[targetRowIdx] = Array(9).fill('');
                                                                             }
-
-                                                                            cells.forEach((pCell, cIdx) => {
+                                                                            pRow.forEach((pCell, cIdx) => {
                                                                                 const targetColIdx = colIndex + cIdx;
                                                                                 if (targetColIdx < 9) {
                                                                                     newPreview[targetRowIdx][targetColIdx] = pCell;
                                                                                 }
                                                                             });
                                                                         });
-
                                                                         setBulkPreview(newPreview);
                                                                     }}
                                                                     onChange={(e) => {
