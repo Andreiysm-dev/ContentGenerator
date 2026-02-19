@@ -3105,6 +3105,7 @@ function App() {
                   element={
                     <SettingsPage
                       tab="overview"
+                      backendBaseUrl={backendBaseUrl}
                       notify={notify}
                       authedFetch={authedFetch}
                       setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
