@@ -2408,9 +2408,11 @@ function App() {
       return;
     }
 
-    const rows = parseBulkText(bulkText);
+    // Use the editable spreadsheet data directly
+    const rows = bulkPreview.filter(row => row.some(cell => cell && cell.trim() !== ''));
+
     if (!rows.length) {
-      notify('No rows to import.', 'error');
+      notify('No data found in rows. Please paste or type some content.', 'error');
       return;
     }
 

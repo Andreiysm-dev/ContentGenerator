@@ -50,8 +50,8 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
             className="relative z-10 inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-white/10 text-white border border-white/20 backdrop-blur-sm shadow-sm transition hover:bg-white/20 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
             onClick={() => {
               setBulkText("");
-              setBulkPreview([]);
-              setShowPreview(false);
+              setBulkPreview([Array(9).fill('')]);
+              setShowPreview(true); // Default to showing the grid
               setIsBulkModalOpen(true);
             }}
           >
@@ -132,25 +132,14 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-1.5">
                   <label className="block text-xs font-bold text-brand-dark/70 uppercase tracking-wider ml-1">Content Type</label>
-                  <div className="relative">
-                    <select
-                      name="contentType"
-                      value={form.contentType}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl appearance-none cursor-pointer"
-                    >
-                      <option value="">Select content type</option>
-                      <option value="Promo">Promo</option>
-                      <option value="Educational">Educational</option>
-                      <option value="Story">Story</option>
-                      <option value="Testimonial">Testimonial</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-brand-dark/50">
-                      <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                      </svg>
-                    </div>
-                  </div>
+                  <input
+                    type="text"
+                    name="contentType"
+                    placeholder="e.g., Educational, Story, Promo"
+                    value={form.contentType}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl"
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="block text-xs font-bold text-brand-dark/70 uppercase tracking-wider ml-1">Target Audience</label>
@@ -165,26 +154,14 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="block text-xs font-bold text-brand-dark/70 uppercase tracking-wider ml-1">Primary Goal</label>
-                  <div className="relative">
-                    <select
-                      name="primaryGoal"
-                      value={form.primaryGoal}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl appearance-none cursor-pointer"
-                    >
-                      <option value="">Select a goal</option>
-                      <option value="Awareness">Awareness</option>
-                      <option value="Engagement">Engagement</option>
-                      <option value="Traffic">Traffic</option>
-                      <option value="Leads">Leads</option>
-                      <option value="Sales">Sales</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-brand-dark/50">
-                      <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                      </svg>
-                    </div>
-                  </div>
+                  <input
+                    type="text"
+                    name="primaryGoal"
+                    placeholder="e.g., Awareness, Engagement, Traffic"
+                    value={form.primaryGoal}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl"
+                  />
                 </div>
               </div>
             </div>
@@ -211,25 +188,14 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider ml-1">Promo Type</label>
-                  <div className="relative">
-                    <select
-                      name="promoType"
-                      value={form.promoType}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl appearance-none cursor-pointer"
-                    >
-                      <option value="">Select promo type</option>
-                      <option value="Launch">Launch</option>
-                      <option value="Discount">Discount</option>
-                      <option value="Evergreen">Evergreen</option>
-                      <option value="Event">Event</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-brand-dark/50">
-                      <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                      </svg>
-                    </div>
-                  </div>
+                  <input
+                    type="text"
+                    name="promoType"
+                    placeholder="e.g., Launch, Discount, Evergreen"
+                    value={form.promoType}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl"
+                  />
                 </div>
               </div>
             </div>

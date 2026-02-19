@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface BulkImportModalProps {
     isOpen: boolean;
@@ -27,6 +27,8 @@ export function BulkImportModal({
     parseBulkText,
     handleBulkImport,
 }: BulkImportModalProps) {
+    const [addCount, setAddCount] = useState(1);
+
     if (!isOpen) return null;
 
     return (
@@ -39,7 +41,7 @@ export function BulkImportModal({
                 if (e.target === e.currentTarget) onClose();
             }}
         >
-            <div className="w-full max-w-5xl">
+            <div className="w-full max-w-[98vw] lg:max-w-[95vw] xl:max-w-[1600px]">
                 <div className="rounded-2xl border border-slate-200/60 bg-white shadow-xl overflow-hidden flex flex-col">
                     {/* Header */}
                     <div className="flex items-center justify-between gap-4 border-b border-slate-200/60 p-6 bg-gradient-to-b from-white to-slate-50/50">
@@ -60,111 +62,191 @@ export function BulkImportModal({
                     </div>
 
                     {/* Body */}
-                    <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
-                        {!showPreview ? (
-                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                                <p className="text-sm text-brand-dark/60 leading-relaxed">
-                                    Paste rows from your sheet below. We'll format everything and show a preview before anything is
-                                    imported.
-                                </p>
-                                <textarea
-                                    className="w-full text-sm font-mono bg-slate-50 border border-slate-200 rounded-xl p-4 text-brand-dark/80 outline-none focus:border-[#3fa9f5]/30 focus:bg-white transition-all min-h-[300px]"
-                                    rows={10}
-                                    value={bulkText}
-                                    onChange={(e) => setBulkText(e.target.value)}
-                                    placeholder="Paste rows copied from Google Sheets or Excel"
-                                    spellCheck={false}
-                                />
-                            </div>
-                        ) : (
-                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-sm font-bold tracking-wide text-brand-dark uppercase">Import Preview</h3>
-                                    <div className="h-px flex-1 bg-gradient-to-r from-slate-200/70 to-transparent" />
-                                    <span className="text-xs text-brand-dark/40 italic">Check your data before importing</span>
+                    <div className="p-6 space-y-6 overflow-y-auto max-h-[75vh]">
+                        <div className="flex flex-col gap-6">
+                            {/* Toolbar */}
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-700 shadow-2xl">
+                                <div className="space-y-1">
+                                    <h3 className="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">Bulk Spreadsheet Mode</h3>
+                                    <p className="text-[10px] font-bold text-slate-400">Paste directly into cells or type to edit. Column order must match the headers.</p>
                                 </div>
-
-                                {bulkPreview.length > 0 ? (
-                                    <div className="border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left border-collapse">
-                                                <thead className="bg-slate-50 border-b border-slate-200/60">
-                                                    <tr>
-                                                        {[
-                                                            'Date', 'Brand highlight (80%)', 'Cross promo (20%)', 'Theme',
-                                                            'Content type', 'Target audience',
-                                                            'Primary goal', 'CTA', 'Promo type'
-                                                        ].map((col) => (
-                                                            <th key={col} className="px-4 py-3 text-[0.65rem] font-bold uppercase tracking-widest text-brand-dark/50 whitespace-nowrap">
-                                                                {col}
-                                                            </th>
-                                                        ))}
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100 bg-white">
-                                                    {bulkPreview.map((row, rowIndex) => (
-                                                        <tr key={rowIndex} className="hover:bg-slate-50/50 transition-colors">
-                                                            {row.slice(0, 9).map((cell, cellIndex) => (
-                                                                <td key={cellIndex} className="px-4 py-2.5 text-xs text-brand-dark/80 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
-                                                                    {cell || '—'}
-                                                                </td>
-                                                            ))}
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const headers = ['Date', 'Brand highlight (80%)', 'Cross promo (20%)', 'Theme', 'Content type', 'Target audience', 'Primary goal', 'CTA', 'Promo type'];
+                                            navigator.clipboard.writeText(headers.join('\t'));
+                                            // Simple custom notification logic if needed, otherwise alert is fine for now
+                                            alert('Excel headers copied! Paste them into your sheet to prepare your data.');
+                                        }}
+                                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[10px] font-black bg-blue-600/10 text-blue-400 border border-blue-500/20 transition hover:bg-blue-600/20 active:scale-95"
+                                    >
+                                        Copy Headers
+                                    </button>
+                                    <div className="flex items-center bg-slate-800 rounded-xl border border-slate-700 p-1">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="50"
+                                            value={addCount}
+                                            onChange={(e) => setAddCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                                            className="w-12 bg-transparent text-white text-[10px] font-black text-center outline-none border-none focus:ring-0"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const newRows = Array.from({ length: addCount }, () => Array(9).fill(''));
+                                                setBulkPreview([...bulkPreview, ...newRows]);
+                                            }}
+                                            className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-[10px] font-black bg-emerald-500 text-white transition hover:bg-emerald-600 active:scale-95 whitespace-nowrap"
+                                        >
+                                            Add {addCount > 1 ? addCount : ''} Rows
+                                        </button>
                                     </div>
-                                ) : (
-                                    <div className="p-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                                        <p className="text-sm text-brand-dark/40">No data to preview. Try pasting again.</p>
-                                    </div>
-                                )}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (confirm('Clear all data?')) {
+                                                setBulkPreview([Array(9).fill('')]);
+                                                setBulkText('');
+                                            }
+                                        }}
+                                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[10px] font-black bg-rose-600/10 text-rose-400 border border-rose-500/20 transition hover:bg-rose-600/20 active:scale-95"
+                                    >
+                                        Clear All
+                                    </button>
+                                </div>
                             </div>
-                        )}
+
+                            {/* Spreadsheet Grid */}
+                            <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xl bg-white group/grid">
+                                <div className="overflow-x-auto max-h-[500px]">
+                                    <table className="w-full text-left border-collapse table-fixed">
+                                        <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-30">
+                                            <tr>
+                                                <th className="w-10 px-2 py-3 text-[90px] font-black text-slate-300 text-center opacity-20 select-none">#</th>
+                                                {[
+                                                    'Date', 'Brand Highlight', 'Cross Promo', 'Theme',
+                                                    'Content Type', 'Audience', 'Goal', 'CTA', 'Promo Type'
+                                                ].map((col) => (
+                                                    <th key={col} className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 border-l border-slate-200 first:border-l-0">
+                                                        {col}
+                                                    </th>
+                                                ))}
+                                                <th className="w-12 border-l border-slate-200"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {bulkPreview.length > 0 ? (
+                                                bulkPreview.map((row, rowIndex) => (
+                                                    <tr key={rowIndex} className="hover:bg-blue-50/30 transition-colors group/row">
+                                                        <td className="px-2 py-3 text-[10px] font-black text-slate-400 text-center bg-slate-50/50 group-hover/row:bg-blue-100/50 transition-colors select-none">
+                                                            {rowIndex + 1}
+                                                        </td>
+                                                        {row.slice(0, 9).map((cell, colIndex) => (
+                                                            <td key={colIndex} className="p-0 border-l border-slate-100 first:border-l-0 relative focus-within:ring-2 focus-within:ring-blue-500/30 focus-within:z-10">
+                                                                <input
+                                                                    type="text"
+                                                                    value={cell}
+                                                                    placeholder="..."
+                                                                    onPaste={(e) => {
+                                                                        e.preventDefault();
+                                                                        const pasteData = e.clipboardData.getData('text');
+                                                                        const rows = pasteData.split(/\r?\n/).filter(line => line.length > 0);
+                                                                        const newPreview = [...bulkPreview];
+
+                                                                        rows.forEach((pRow, rIdx) => {
+                                                                            const cells = pRow.split('\t');
+                                                                            const targetRowIdx = rowIndex + rIdx;
+
+                                                                            if (!newPreview[targetRowIdx]) {
+                                                                                newPreview[targetRowIdx] = Array(9).fill('');
+                                                                            }
+
+                                                                            cells.forEach((pCell, cIdx) => {
+                                                                                const targetColIdx = colIndex + cIdx;
+                                                                                if (targetColIdx < 9) {
+                                                                                    newPreview[targetRowIdx][targetColIdx] = pCell;
+                                                                                }
+                                                                            });
+                                                                        });
+
+                                                                        setBulkPreview(newPreview);
+                                                                    }}
+                                                                    onChange={(e) => {
+                                                                        const newPreview = [...bulkPreview];
+                                                                        newPreview[rowIndex][colIndex] = e.target.value;
+                                                                        setBulkPreview(newPreview);
+                                                                    }}
+                                                                    className="w-full px-3 py-3 text-xs font-bold text-slate-800 bg-transparent outline-none border-none placeholder:text-slate-200"
+                                                                />
+                                                            </td>
+                                                        ))}
+                                                        <td className="px-2 py-3 text-center border-l border-slate-100">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newPreview = bulkPreview.filter((_, i) => i !== rowIndex);
+                                                                    setBulkPreview(newPreview.length ? newPreview : [Array(9).fill('')]);
+                                                                }}
+                                                                className="opacity-0 group-hover/row:opacity-100 transition-opacity p-1 text-slate-300 hover:text-rose-500"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={11} className="py-20 text-center">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-300">
+                                                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                                </svg>
+                                                            </div>
+                                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No data. Click "Add Row" or Paste here.</p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {bulkPreview.length > 0 && bulkPreview.some(r => r.some(c => c)) && (
+                                <div className="flex items-center justify-center p-3 bg-blue-50 rounded-xl border border-blue-100 animate-in fade-in zoom-in duration-300">
+                                    <p className="text-[11px] font-bold text-blue-700 flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                        Spreadsheet ready. Review your {bulkPreview.length} rows and click Import to save to calendar.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Footer */}
                     <div className="flex items-center justify-end gap-3 border-t border-slate-200/60 p-6 bg-slate-50/30">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px]"
+                            className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold bg-white text-slate-500 border border-slate-200 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px]"
                         >
                             Cancel
                         </button>
-                        {showPreview ? (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPreview(false)}
-                                    className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold bg-white text-[#3fa9f5] border border-[#3fa9f5]/20 shadow-sm transition hover:bg-[#3fa9f5]/5 active:translate-y-[1px]"
-                                >
-                                    Back to paste
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={isImporting}
-                                    onClick={handleBulkImport}
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] disabled:opacity-40"
-                                >
-                                    {isImporting ? 'Importing…' : 'Import'}
-                                    {isImporting && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>}
-                                </button>
-                            </>
-                        ) : (
-                            <button
-                                type="button"
-                                className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] disabled:opacity-40"
-                                disabled={!bulkText.trim()}
-                                onClick={() => {
-                                    setBulkPreview(parseBulkText(bulkText));
-                                    setShowPreview(true);
-                                }}
-                            >
-                                Preview import
-                            </button>
-                        )}
+                        <button
+                            type="button"
+                            disabled={isImporting || !bulkPreview.length || !bulkPreview.some(r => r.some(c => c))}
+                            onClick={handleBulkImport}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-black bg-blue-600 text-white shadow-lg shadow-blue-500/20 ring-1 ring-inset ring-black/5 transition hover:bg-blue-700 active:bg-blue-800 active:translate-y-[1px] disabled:opacity-40 disabled:shadow-none"
+                        >
+                            {isImporting ? 'Importing…' : `Import ${bulkPreview.filter(r => r.some(c => c)).length} Rows`}
+                            {isImporting && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>}
+                        </button>
                     </div>
                 </div>
             </div>
