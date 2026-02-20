@@ -3634,6 +3634,7 @@ function App() {
           isOpen={isOnboardingOpen}
           onComplete={handleOnboardingComplete}
           notify={notify}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         <AddCompanyModal

@@ -12,6 +12,7 @@ interface OnboardingModalProps {
     isOpen: boolean;
     onComplete: (data: OnboardingData | null) => void;
     notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
+    isAiAssistantOpen?: boolean;
 }
 
 export interface OnboardingData {
