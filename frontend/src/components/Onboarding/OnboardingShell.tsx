@@ -6,18 +6,20 @@ interface OnboardingShellProps {
     totalSteps: number;
     onClose?: () => void;
     children: React.ReactNode;
+    isAiAssistantOpen?: boolean;
 }
 
 export function OnboardingShell({
     currentStep,
     totalSteps,
     onClose,
-    children
+    children,
+    isAiAssistantOpen
 }: OnboardingShellProps) {
     const progress = (currentStep / totalSteps) * 100;
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-100/60 backdrop-blur-md animate-in fade-in duration-300">
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-slate-100/60 backdrop-blur-md animate-in fade-in duration-300 transition-all ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}>
             {/* Background Ambience */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-blue-100/40 to-purple-100/40 rounded-full blur-[120px] animate-pulse" />

@@ -122,19 +122,9 @@ export async function generateBrandRulesSystem(payload = {}) {
     temperature: 1,
   });
 
-  const visualPromise = callOpenAIText({
-    systemPrompt: VISUAL_IDENTITY_SYSTEM_PROMPT,
-    userPrompt: VISUAL_IDENTITY_USER_PROMPT
-      .replaceAll('{{BRAND_PACK}}', brandPack)
-      .replaceAll('{{BRAND_CAP}}', brandCapability)
-      .replaceAll('{{FORM_ANSWER}}', formAnswerText),
-    temperature: 1,
-  });
-
-  const [writerRes, reviewerRes, visualRes] = await Promise.all([
+  const [writerRes, reviewerRes] = await Promise.all([
     writerPromise,
     reviewerPromise,
-    visualPromise,
   ]);
 
   if (!writerRes.ok) {
@@ -147,10 +137,8 @@ export async function generateBrandRulesSystem(payload = {}) {
   }
   const reviewPrompt1 = (reviewerRes.content || '').trim();
 
-  // Visual identity is technically optional if it fails, but better to be consistent
-  // The current logic allowed it to be null if failed? Let's check original code.
-  // Original: const systemInstruction = visualRes.ok ? (visualRes.content || '').trim() : null;
-  const systemInstruction = visualRes.ok ? (visualRes.content || '').trim() : null;
+  // Visual identity is no longer generated during initial onboarding
+  const systemInstruction = null;
 
   const emojiRule =
     typeof formAnswer === 'object' && formAnswer
@@ -194,5 +182,61 @@ export async function generateBrandRulesSystem(payload = {}) {
       systemInstruction,
       emojiRule: emojiRule != null ? String(emojiRule) : null,
     },
+  };
+}
+
+export async function generateVisualIdentitySystem(payload = {}) {
+  const { companyId, brandKbId, visualOnboardingState } = payload || {};
+
+  if (!brandKbId) return { ok: false, status: 400, error: 'brandKbId is required' };
+
+  // 1) Fetch existing brandKB to get Brand Pack and Capabilities
+  const { data: brandKB, error: fetchError } = await db
+    .from('brandKB')
+    .select('brandPack, brandCapability, form_answer')
+    .eq('brandKbId', brandKbId)
+    .single();
+
+  if (fetchError || !brandKB) {
+    return { ok: false, status: 404, error: 'Brand knowledge base entry not found' };
+  }
+
+  const { brandPack, brandCapability, form_answer } = brandKB;
+  const formAnswerText = typeof form_answer === 'string' ? form_answer : JSON.stringify(form_answer);
+  const visualStateText = JSON.stringify(visualOnboardingState);
+
+  // 2) Generate Visual Identity Guidelines
+  // We use the VISUAL_IDENTITY_USER_PROMPT but inject the specific wizard results as well
+  const visualRes = await callOpenAIText({
+    systemPrompt: VISUAL_IDENTITY_SYSTEM_PROMPT,
+    userPrompt: VISUAL_IDENTITY_USER_PROMPT
+      .replaceAll('{{BRAND_PACK}}', brandPack || '')
+      .replaceAll('{{BRAND_CAP}}', brandCapability || '')
+      .replaceAll('{{FORM_ANSWER}}', `${formAnswerText}\n\nUSER VISUAL PREFERENCES: ${visualStateText}`),
+    temperature: 1,
+  });
+
+  if (!visualRes.ok) {
+    return { ok: false, status: 500, error: `Visual Identity generation failed: ${visualRes.error}` };
+  }
+
+  const systemInstruction = (visualRes.content || '').trim();
+
+  // 3) Update the database
+  const { data: updatedRows, error: updateError } = await db
+    .from('brandKB')
+    .update({ systemInstruction })
+    .eq('brandKbId', brandKbId)
+    .select();
+
+  if (updateError) {
+    return { ok: false, status: 500, error: 'Failed to save visual identity guidelines' };
+  }
+
+  return {
+    ok: true,
+    status: 200,
+    systemInstruction,
+    brandKB: updatedRows?.[0] || null,
   };
 }

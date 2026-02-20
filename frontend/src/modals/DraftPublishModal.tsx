@@ -15,6 +15,7 @@ interface DraftPublishModalProps {
     copiedField: string | null;
     handleUploadDesigns: (files: FileList | null) => Promise<void>;
     isUploadingDesigns: boolean;
+    isAiAssistantOpen?: boolean;
 }
 
 export function DraftPublishModal({
@@ -32,6 +33,7 @@ export function DraftPublishModal({
     copiedField,
     handleUploadDesigns,
     isUploadingDesigns,
+    isAiAssistantOpen
 }: DraftPublishModalProps) {
     if (!isOpen || !selectedRow) return null;
 
@@ -62,7 +64,7 @@ export function DraftPublishModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
+            className={`fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6 transition-all duration-300 ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-label="Draft & publish content"

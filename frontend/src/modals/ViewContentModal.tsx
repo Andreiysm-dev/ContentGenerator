@@ -31,6 +31,7 @@ interface ViewContentModalProps {
     activeCompanyId?: string;
     setBrandKbId: (id: string | null) => void;
     setSystemInstruction: (instruction: string) => void;
+    isAiAssistantOpen?: boolean;
 }
 
 export function ViewContentModal({
@@ -56,6 +57,7 @@ export function ViewContentModal({
     activeCompanyId,
     setBrandKbId,
     setSystemInstruction,
+    isAiAssistantOpen
 }: ViewContentModalProps) {
     const navigate = useNavigate();
     const [isManualApproving, setIsManualApproving] = useState(false);
@@ -136,7 +138,7 @@ export function ViewContentModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
+            className={`fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-black/40 p-4 sm:p-6 transition-all duration-300 ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-label="Content Details"
@@ -595,16 +597,16 @@ export function ViewContentModal({
 
                         <button
                             type="button"
-                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['approved', 'design completed', 'design-complete', 'design-completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['approved', 'design completed', 'design-complete', 'design-completed', 'ready'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
                                 ? 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-700'
                                 : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
                                 }`}
                             disabled={
-                                !['approved', 'design completed', 'design-complete', 'design-completed'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                                !['approved', 'design completed', 'design-complete', 'design-completed', 'ready'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
                             }
                             onClick={() => {
                                 const status = getStatusValue(selectedRow.status).trim().toLowerCase();
-                                if (!['approved', 'design completed', 'design-complete', 'design-completed'].includes(status)) return;
+                                if (!['approved', 'design completed', 'design-complete', 'design-completed', 'ready'].includes(status)) return;
 
                                 const companyId = selectedRow?.companyId ?? activeCompanyId;
                                 if (companyId) {

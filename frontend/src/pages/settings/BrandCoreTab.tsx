@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import type { CompanySettingsShellProps } from "../SettingsPage";
 import { Card, StatusPill, Input, Textarea, Select, Pill } from "../SettingsPage";
-import { Sparkles } from "lucide-react";
+import { Sparkles, HelpCircle } from "lucide-react";
 
 export function BrandCoreTab(props: CompanySettingsShellProps) {
     const {
@@ -656,7 +656,17 @@ export function BrandCoreTab(props: CompanySettingsShellProps) {
                                                 </div>
                                             </>
                                         ) : (
-                                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-wrap max-h-72 overflow-y-auto">{systemInstruction || "—"}</div>
+                                            <div className="space-y-4">
+                                                {!systemInstruction && (
+                                                    <div className="p-4 bg-[#3fa9f5]/5 border border-[#3fa9f5]/20 rounded-2xl flex gap-3 items-start">
+                                                        <HelpCircle className="text-[#3fa9f5] mt-0.5 flex-shrink-0" size={18} />
+                                                        <p className="text-xs font-bold text-[#3fa9f5] leading-relaxed">
+                                                            Visual identity is currently empty. This will be generated through a dedicated flow on the Image Hub page.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 whitespace-pre-wrap max-h-72 overflow-y-auto">{systemInstruction || "—"}</div>
+                                            </div>
                                         )}
                                     </Card>
                                 </div>

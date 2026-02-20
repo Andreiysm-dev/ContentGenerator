@@ -12,6 +12,7 @@ interface BulkImportModalProps {
     isImporting: boolean;
     parseBulkText: (text: string) => string[][];
     handleBulkImport: () => Promise<void>;
+    isAiAssistantOpen?: boolean;
 }
 
 export function BulkImportModal({
@@ -26,6 +27,7 @@ export function BulkImportModal({
     isImporting,
     parseBulkText,
     handleBulkImport,
+    isAiAssistantOpen
 }: BulkImportModalProps) {
     const [addCount, setAddCount] = useState(1);
 
@@ -33,7 +35,7 @@ export function BulkImportModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
+            className={`fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6 transition-all duration-300 ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-label="Bulk Import"

@@ -321,7 +321,7 @@ function App() {
 
   const handleDraftPublishIntent = async () => {
     if (!selectedRow) return;
-    const nextStatus = draftPublishIntent === 'ready' ? 'Approved' : selectedRow.status ?? '';
+    const nextStatus = draftPublishIntent === 'ready' ? 'Ready' : selectedRow.status ?? '';
     const nextPostStatus = draftPublishIntent === 'ready' ? 'ready' : 'draft';
     const payload = {
       status: nextStatus,
@@ -669,7 +669,7 @@ function App() {
   const statusOptions = [
     '',
     'Generate',
-    'Approved',
+    'Ready',
     'Revisioned',
     'Design Completed',
     'Scheduled',
@@ -1542,8 +1542,6 @@ function App() {
       // Filter by tab mode
       if (isPublishedTab) {
         if (!isPublished) return false;
-      } else {
-        if (isPublished) return false;
       }
 
       // Filter by status dropdown
@@ -1969,7 +1967,7 @@ function App() {
 
     calendarRows.forEach((row) => {
       const status = getStatusValue(row.status).trim().toLowerCase();
-      if (status === 'approved') counts.approved += 1;
+      if (status === 'ready' || status === 'approved') counts.approved += 1;
       else if (status === 'review') counts.review += 1;
       else if (status === 'generate') counts.generate += 1;
       else if (status === 'scheduled') counts.scheduled += 1; // Count scheduled items
@@ -2146,7 +2144,8 @@ function App() {
     const validRows = rowsToProcess.filter((row) => {
       if (!row.companyId) return false;
       if (activeCompanyId && row.companyId !== activeCompanyId) return false;
-      if (getStatusValue(row.status).trim().toLowerCase() !== 'approved') return false;
+      const s = getStatusValue(row.status).trim().toLowerCase();
+      if (s !== 'ready' && s !== 'approved') return false;
       return true;
     });
 
@@ -2882,6 +2881,9 @@ function App() {
                     <ContentPlannerPage
                       activeCompanyId={activeCompanyId}
                       authedFetch={authedFetch}
+                      notify={notify}
+                      backendBaseUrl={backendBaseUrl}
+                      calendarRows={calendarRows}
                       initialItems={preDefinedPlan || undefined}
                       onAddToCalendar={async (items: any[]) => {
                         setPreDefinedPlan(null); // Clear once used
@@ -3067,6 +3069,7 @@ function App() {
                       activeCompanyId={activeCompanyId}
                       brandKbId={brandKbId}
                       systemInstruction={systemInstruction}
+                      setSystemInstruction={setSystemInstruction}
                       backendBaseUrl={backendBaseUrl}
                       getStatusValue={getStatusValue}
                       getImageGeneratedUrl={getImageGeneratedUrl}
@@ -3642,6 +3645,7 @@ function App() {
           setNewCompanyDescription={setNewCompanyDescription}
           onSubmit={handleAddCompany}
           notify={notify}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         <CsvExportModal
@@ -3653,6 +3657,7 @@ function App() {
           setCsvFieldSelection={setCsvFieldSelection}
           csvFieldDefinitions={csvFieldDefinitions}
           handleExportCsv={handleExportCsv}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         <CopyModal
@@ -3666,6 +3671,7 @@ function App() {
           copyFieldDefinitions={copyFieldDefinitions}
           copySuccessMessage={copySuccessMessage}
           handleCopySpreadsheet={handleCopySpreadsheet}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         <DraftPublishModal
@@ -3683,6 +3689,7 @@ function App() {
           copiedField={copiedField}
           handleUploadDesigns={handleUploadDesigns}
           isUploadingDesigns={isUploadingDesigns}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         <BulkImportModal
@@ -3697,6 +3704,7 @@ function App() {
           isImporting={isImporting}
           parseBulkText={parseBulkText}
           handleBulkImport={handleBulkImport}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         <ViewContentModal
@@ -3722,6 +3730,7 @@ function App() {
           activeCompanyId={activeCompanyId}
           setBrandKbId={setBrandKbId}
           setSystemInstruction={setSystemInstruction}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         <ImageGenerationModal
@@ -3751,6 +3760,7 @@ function App() {
           imageModalReopenTimeoutRef={imageModalReopenTimeoutRef}
           getImageGeneratedSignature={getImageGeneratedSignature}
           startWaitingForImageUpdate={startWaitingForImageUpdate}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         {
@@ -3776,6 +3786,7 @@ function App() {
           isOpen={isConfirmOpen}
           config={confirmConfig}
           onResolve={resolveConfirm}
+          isAiAssistantOpen={isAiAssistantOpen}
         />
 
         {/* Product Tour */}

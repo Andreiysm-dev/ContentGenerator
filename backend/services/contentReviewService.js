@@ -267,7 +267,7 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
     return { ok: false, status: 409, error: 'Review already running', code: 'ALREADY_REVIEWING' };
   }
 
-  const reviewAllowed = ['Review', 'Approved', 'Needs Revision'].includes(state);
+  const reviewAllowed = ['Review', 'Ready', 'Needs Revision'].includes(state);
   if (!reviewAllowed) {
     return { ok: false, status: 409, error: `Review blocked for status: ${state}`, code: 'STATUS_BLOCKED' };
   }
@@ -338,7 +338,7 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
   }
 
   const { decision, reviewNotes, finalCaption, finalCTA, finalHashtags } = parsedText.value;
-  const nextStatus = decision === 'NEEDS REVISION' ? 'Needs Revision' : 'Approved';
+  const nextStatus = decision === 'NEEDS REVISION' ? 'Needs Revision' : 'Ready';
 
   // Fallback to drafts if the reviewer failed to output mandatory sections
   const safeCaption = (finalCaption && String(finalCaption).trim()) ? finalCaption : (contentCalendar.captionOutput || '');
@@ -418,7 +418,7 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
     return { ok: false, status: 409, error: 'Review already running', code: 'ALREADY_REVIEWING' };
   }
 
-  const reviewAllowed = ['Review', 'Approved', 'Needs Revision'].includes(effectiveState);
+  const reviewAllowed = ['Review', 'Ready', 'Needs Revision'].includes(effectiveState);
   if (!reviewAllowed) {
     return { ok: false, status: 409, error: `Review blocked for status: ${effectiveState}`, code: 'STATUS_BLOCKED' };
   }
@@ -489,7 +489,7 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
   }
 
   const { decision, reviewNotes, finalCaption, finalCTA, finalHashtags } = parsedText.value;
-  const nextStatus = decision === 'NEEDS REVISION' ? 'Needs Revision' : 'Approved';
+  const nextStatus = decision === 'NEEDS REVISION' ? 'Needs Revision' : 'Ready';
 
   // Fallback to drafts if the reviewer failed to output mandatory sections
   const safeCaption = (finalCaption && String(finalCaption).trim()) ? finalCaption : (contentCalendar.captionOutput || '');

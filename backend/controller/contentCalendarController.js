@@ -38,6 +38,29 @@ export const createContentCalendar = async (req, res) => {
             console.error('Error creating contentCalendar:', error);
             return res.status(500).json({ error: 'Failed to create content calendar', details: error.message });
         }
+
+        // Automatic Queueing Logic: If status is set to Scheduled, move to scheduled_posts for the scheduler service
+        if (row && (row.status === 'Scheduled' || row.status === 'SCHEDULED') && row.scheduled_at) {
+            try {
+                const postPayload = {
+                    company_id: row.companyId,
+                    content_calendar_id: row.contentCalendarId,
+                    scheduled_at: row.scheduled_at,
+                    status: 'PENDING',
+                    content: row.finalCaption || row.captionOutput || '',
+                    media_urls: row.imageGenerated ? [row.imageGenerated] : (row.imageGeneratedUrl ? [row.imageGeneratedUrl] : []),
+                    account_ids: row.channels || []
+                };
+
+                // On creation, we just insert
+                await db
+                    .from('scheduled_posts')
+                    .insert([postPayload]);
+            } catch (queueErr) {
+                console.error('Failed to auto-queue post on creation:', queueErr);
+            }
+        }
+
         return res.status(201).json({ contentCalendar: row });
     } catch (err) {
         console.error('createContentCalendar error:', err);
@@ -247,6 +270,44 @@ export const updateContentCalendar = async (req, res) => {
             console.error('Error updating contentCalendar:', error);
             return res.status(500).json({ error: 'Failed to update content calendar' });
         }
+
+        // Automatic Queueing Logic: If status is set to Scheduled, move to scheduled_posts for the scheduler service
+        if (row && (row.status === 'Scheduled' || row.status === 'SCHEDULED') && row.scheduled_at) {
+            try {
+                const { data: existingPost } = await db
+                    .from('scheduled_posts')
+                    .select('id')
+                    .eq('content_calendar_id', id)
+                    .maybeSingle();
+
+                const postPayload = {
+                    company_id: row.companyId,
+                    content_calendar_id: row.contentCalendarId,
+                    scheduled_at: row.scheduled_at,
+                    status: 'PENDING',
+                    content: row.finalCaption || row.captionOutput || '',
+                    media_urls: row.imageGenerated ? [row.imageGenerated] : (row.imageGeneratedUrl ? [row.imageGeneratedUrl] : []),
+                    account_ids: row.channels || []
+                };
+
+                if (existingPost) {
+                    // Update existing queue entry
+                    await db
+                        .from('scheduled_posts')
+                        .update({ ...postPayload, updated_at: new Date().toISOString() })
+                        .eq('id', existingPost.id);
+                } else {
+                    // Insert new queue entry
+                    await db
+                        .from('scheduled_posts')
+                        .insert([postPayload]);
+                }
+            } catch (queueErr) {
+                console.error('Failed to auto-queue post:', queueErr);
+                // We don't fail the main request, but log the error
+            }
+        }
+
         return res.status(200).json({ contentCalendar: row });
     } catch (err) {
         console.error('updateContentCalendar error:', err);
@@ -325,7 +386,8 @@ export const batchGenerateImages = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { rowIds, brandKbId, systemInstruction, provider, model } = req.body || {};
+        const { rowIds, brandKbId, systemInstruction, provider, model, aspectRatio } = req.body;
+
         if (!Array.isArray(rowIds) || rowIds.length === 0) {
             return res.status(400).json({ error: 'rowIds must be a non-empty array.' });
         }
@@ -378,6 +440,7 @@ export const batchGenerateImages = async (req, res) => {
                     systemInstruction: systemInstruction ?? '',
                     provider,
                     model,
+                    aspectRatio,
                 });
 
                 if (result.ok) {

@@ -14,6 +14,7 @@ interface CsvExportModalProps {
     setCsvFieldSelection: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
     csvFieldDefinitions: CsvFieldDefinition[];
     handleExportCsv: () => void;
+    isAiAssistantOpen?: boolean;
 }
 
 export function CsvExportModal({
@@ -25,12 +26,13 @@ export function CsvExportModal({
     setCsvFieldSelection,
     csvFieldDefinitions,
     handleExportCsv,
+    isAiAssistantOpen
 }: CsvExportModalProps) {
     if (!isOpen) return null;
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            className={`fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4 transition-all duration-300 ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-label="Export CSV"

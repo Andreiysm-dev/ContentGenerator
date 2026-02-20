@@ -29,6 +29,14 @@ export const callFalAiPredict = async ({
         // Official Fal.ai endpoint structure: https://fal.ai/models/fal-ai/flux-pro/api
         const endpoint = `https://fal.run/${model}`;
 
+        // Map standard ratios to Fal-specific strings
+        let falImageSize = 'square';
+        if (aspectRatio === '1:1') falImageSize = 'square';
+        else if (aspectRatio === '16:9') falImageSize = 'landscape_16_9';
+        else if (aspectRatio === '9:16') falImageSize = 'portrait_9_16';
+        else if (aspectRatio === '4:5') falImageSize = 'portrait_4_5'; // fal-ai/flux-pro supports this
+        else if (aspectRatio === '4:3') falImageSize = 'landscape_4_3';
+
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -37,7 +45,7 @@ export const callFalAiPredict = async ({
             },
             body: JSON.stringify({
                 prompt: prompt,
-                image_size: aspectRatio === '1:1' ? 'square' : aspectRatio, // Map 1:1 to "square" if needed, though Fal might accept "square" directly
+                image_size: falImageSize,
                 safety_tolerance: "2", // 1 (strict) to 6 (permissive)
             })
         });

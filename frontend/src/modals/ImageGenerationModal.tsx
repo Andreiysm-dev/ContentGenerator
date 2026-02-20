@@ -33,6 +33,7 @@ interface ImageGenerationModalProps {
     imageModalReopenTimeoutRef: React.MutableRefObject<number | null>;
     getImageGeneratedSignature: (row: any | null) => string | null;
     startWaitingForImageUpdate: (baseSignature: string | null) => void;
+    isAiAssistantOpen?: boolean;
 }
 
 export function ImageGenerationModal({
@@ -62,6 +63,7 @@ export function ImageGenerationModal({
     imageModalReopenTimeoutRef,
     getImageGeneratedSignature,
     startWaitingForImageUpdate,
+    isAiAssistantOpen,
 }: ImageGenerationModalProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [showModelSelection, setShowModelSelection] = useState(false);
@@ -77,7 +79,7 @@ export function ImageGenerationModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
+            className={`fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6 transition-all duration-300 ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-label="Generate Visual"

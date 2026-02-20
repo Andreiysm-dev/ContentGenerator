@@ -44,10 +44,10 @@ router.post('/content-calendar/batch-generate-image', batchGenerateImages);
 router.post('/content-calendar/:contentCalendarId/generate-dmp', async (req, res) => {
     try {
         const { contentCalendarId } = req.params;
-        const { systemInstruction, provider, model } = req.body;
+        const { systemInstruction, provider, model, designReferences, aspectRatio, imageContext, imageMood, imageLighting } = req.body;
         const userId = req.user?.id;
         const { generateDmpForCalendarRow } = await import('../services/imageGenerationService.js');
-        const result = await generateDmpForCalendarRow(contentCalendarId, { userId, systemInstruction, provider, model });
+        const result = await generateDmpForCalendarRow(contentCalendarId, { userId, systemInstruction, provider, model, designReferences, aspectRatio, imageContext, imageMood, imageLighting });
         if (!result.ok) {
             return res.status(result.status || 500).json({ error: result.error });
         }
@@ -62,10 +62,10 @@ router.post('/content-calendar/:contentCalendarId/generate-dmp', async (req, res
 router.post('/content-calendar/:contentCalendarId/generate-image-from-dmp', async (req, res) => {
     try {
         const { contentCalendarId } = req.params;
-        const { dmp, provider, model } = req.body;
+        const { dmp, provider, model, aspectRatio } = req.body;
         const userId = req.user?.id;
         const { generateImageFromCustomDmp } = await import('../services/imageGenerationService.js');
-        const result = await generateImageFromCustomDmp(contentCalendarId, dmp, { userId, provider, model });
+        const result = await generateImageFromCustomDmp(contentCalendarId, dmp, { userId, provider, model, aspectRatio });
         if (!result.ok) {
             return res.status(result.status || 500).json({ error: result.error });
         }
@@ -139,6 +139,22 @@ router.post('/content-calendar/review-content-bulk', async (req, res) => {
         return res.status(200).json({ summary: result.summary });
     } catch (err) {
         console.error('Bulk review content endpoint error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST - /api/content-calendar/analyze-brand-visuals
+router.post('/content-calendar/analyze-brand-visuals', async (req, res) => {
+    try {
+        const { images } = req.body;
+        const { analyzeBrandVisuals } = await import('../services/imageGenerationService.js');
+        const result = await analyzeBrandVisuals(images);
+        if (!result.ok) {
+            return res.status(500).json({ error: result.error });
+        }
+        return res.status(200).json({ analysis: result.analysis });
+    } catch (err) {
+        console.error('Analyze brand visuals error:', err);
         return res.status(500).json({ error: 'Internal server error' });
     }
 });

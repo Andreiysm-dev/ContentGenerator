@@ -37,7 +37,7 @@ const checkScheduledPosts = async () => {
         }
 
         if (postsToProcess && postsToProcess.length > 0) {
-            console.log(`Scheduler found ${postsToProcess.length} post(s) to process.`);
+
             for (const post of postsToProcess) {
                 await processPost(post);
             }
@@ -86,8 +86,6 @@ const processPost = async (post) => {
             }
 
             accounts = fetchedAccounts || [];
-        } else {
-            console.warn(`No account IDs found for post ${post.id}`);
         }
 
         // 3. Post to each account
@@ -136,7 +134,7 @@ const processPost = async (post) => {
                 .eq('contentCalendarId', post.content_calendar_id);
         }
 
-        console.log(`Processed scheduled post ${post.id}: ${finalStatus}`);
+
 
     } catch (error) {
         console.error(`Critically failed to process post ${post.id}:`, error);

@@ -557,14 +557,7 @@ export function CalendarPage(props: CalendarPageProps) {
                 {isBatchGenerating ? <Activity className="w-3 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                 Generate
               </button>
-              <button
-                onClick={handleBatchGenerateImages}
-                disabled={isBatchGeneratingImages}
-                className="px-5 py-2 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all flex items-center gap-2"
-              >
-                {isBatchGeneratingImages ? <Activity className="w-3 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                Visuals
-              </button>
+
               <button
                 onClick={handleDeleteSelected}
                 disabled={isBatchDeleting}

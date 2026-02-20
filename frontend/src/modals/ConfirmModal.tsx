@@ -10,18 +10,20 @@ interface ConfirmModalProps {
         confirmVariant?: 'primary' | 'danger';
     } | null;
     onResolve: (value: boolean) => void;
+    isAiAssistantOpen?: boolean;
 }
 
 export function ConfirmModal({
     isOpen,
     config,
     onResolve,
+    isAiAssistantOpen
 }: ConfirmModalProps) {
     if (!isOpen || !config) return null;
 
     return (
         <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4"
+            className={`fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4 transition-all duration-300 ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
@@ -50,8 +52,8 @@ export function ConfirmModal({
                     <button
                         type="button"
                         className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-bold shadow-sm ring-1 ring-inset ring-black/5 transition active:translate-y-[1px] ${config.confirmVariant === 'danger'
-                                ? 'bg-red-500 text-white hover:bg-red-600'
-                                : 'bg-[#3fa9f5] text-white hover:bg-[#2f97e6]'
+                            ? 'bg-red-500 text-white hover:bg-red-600'
+                            : 'bg-[#3fa9f5] text-white hover:bg-[#2f97e6]'
                             }`}
                         onClick={() => onResolve(true)}
                     >

@@ -43,7 +43,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
     const [platform, setPlatform] = useState<'linkedin' | 'twitter'>('linkedin');
     const [scheduleDate, setScheduleDate] = useState('');
     const [isScheduleEnabled, setIsScheduleEnabled] = useState(false);
-    const [status, setStatus] = useState<'DRAFT' | 'READY' | 'SCHEDULED' | 'PUBLISHED'>('DRAFT');
+    const [status, setStatus] = useState<'DRAFT' | 'READY' | 'SCHEDULED' | 'PUBLISHED' | 'For Approval'>('DRAFT');
     const [isUploading, setIsUploading] = useState(false);
     const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
     const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
@@ -167,7 +167,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
         }
     };
 
-    const saveContentCalendar = async (newStatus: 'DRAFT' | 'REVIEWED' | 'READY' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT', isPublishing = false): Promise<string | null> => {
+    const saveContentCalendar = async (newStatus: 'DRAFT' | 'REVIEWED' | 'READY' | 'SCHEDULED' | 'PUBLISHED' | 'For Approval' = 'DRAFT', isPublishing = false): Promise<string | null> => {
         if (!activeCompanyId) return null;
         setIsSaving(true);
 
@@ -207,8 +207,8 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                 const data = await res.json();
                 const savedId = data.contentCalendar?.contentCalendarId || data.contentCalendarId || contentId;
 
-                if (!contentId && !isPublishing && newStatus !== 'SCHEDULED') {
-                    navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${savedId}`);
+                if (!contentId && !isPublishing && newStatus !== 'SCHEDULED' && newStatus !== 'READY' && newStatus !== 'For Approval') {
+                    navigate(`/company/${encodeURIComponent(activeCompanyId || '')}/studio/${savedId}`);
                 }
                 return savedId;
             } else {
@@ -318,7 +318,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
         }
     };
 
-    const handleSave = async (newStatus: 'DRAFT' | 'REVIEWED' | 'READY' | 'SCHEDULED' | 'PUBLISHED' = 'DRAFT', isPublishing = false): Promise<string | null> => {
+    const handleSave = async (newStatus: 'DRAFT' | 'REVIEWED' | 'READY' | 'SCHEDULED' | 'PUBLISHED' | 'For Approval' = 'DRAFT', isPublishing = false): Promise<string | null> => {
         // 1. Save Content Calendar Draft first
         // If create mode, this gets us the ID.
         const effectiveStatus = newStatus === 'SCHEDULED' ? 'SCHEDULED' : newStatus;
@@ -337,9 +337,11 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
             }
         }
 
-        if (newStatus === 'DRAFT' || newStatus === 'READY' || newStatus === 'REVIEWED') {
+        if (newStatus === 'DRAFT' || newStatus === 'REVIEWED') {
             notify(contentId ? 'Saved changes' : 'Created new post', 'success');
-            if (newStatus === 'READY') notify('Post sent for supervisor review', 'info');
+        } else if (newStatus === 'For Approval') {
+            notify('Post sent for supervisor review', 'info');
+            navigate(`/company/${encodeURIComponent(activeCompanyId || '')}/studio`, { state: { activeTab: 'approvals' } });
         }
 
         return savedId;
@@ -548,7 +550,14 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                         </button>
 
                         <button
-                            onClick={() => handleSave('READY')}
+                            onClick={() => {
+                                if (!isScheduleEnabled || !scheduleDate) {
+                                    notify('Please set a schedule date before sending for review', 'info');
+                                    setIsScheduleEnabled(true); // Helper to show the schedule input
+                                    return;
+                                }
+                                handleSave('For Approval');
+                            }}
                             disabled={isSaving}
                             className="px-4 py-2 rounded-lg bg-purple-600/20 text-purple-200 border border-purple-500/30 text-xs font-bold hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50 flex items-center gap-2"
                         >
@@ -559,14 +568,15 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                         <div className="relative">
                             <button
                                 onClick={() => setShowPostConfirmation(!showPostConfirmation)}
-                                disabled={isSaving}
+                                disabled={isSaving || selectedAccountIds.length === 0}
                                 className={`
-                                    px-6 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg
+                                    px-6 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-2 shadow-lg
                                     ${isScheduleEnabled
                                         ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/20'
                                         : 'bg-emerald-500 text-white hover:bg-emerald-400 shadow-emerald-900/20'
                                     }
                                 `}
+                                title={selectedAccountIds.length === 0 ? "Select at least one destination to post" : ""}
                             >
                                 {isScheduleEnabled ? <Calendar className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
                                 {isScheduleEnabled ? 'Schedule' : 'Post'}
@@ -964,6 +974,6 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                     </div>
                 </div>
             </div>
-        </main>
+        </main >
     );
 }

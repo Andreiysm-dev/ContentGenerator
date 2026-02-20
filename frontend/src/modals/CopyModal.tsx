@@ -13,6 +13,7 @@ interface CopyModalProps {
     copyFieldDefinitions: CopyFieldDefinition[];
     copySuccessMessage: string;
     handleCopySpreadsheet: () => void;
+    isAiAssistantOpen?: boolean;
 }
 
 export function CopyModal({
@@ -23,6 +24,7 @@ export function CopyModal({
     copyFieldDefinitions,
     copySuccessMessage,
     handleCopySpreadsheet,
+    isAiAssistantOpen
 }: CopyModalProps) {
     if (!isOpen) return null;
 
@@ -32,7 +34,7 @@ export function CopyModal({
 
     return (
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+            className={`fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4 transition-all duration-300 ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-label="Copy content for spreadsheet"

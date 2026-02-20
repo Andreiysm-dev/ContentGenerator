@@ -4,13 +4,30 @@ import { sendNotification, sendTeamNotification } from './notificationService.js
 import { callReplicatePredict } from './replicateService.js';
 import { callFalAiPredict } from './falService.js';
 
-const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => {
+const callOpenAIText = async ({ systemPrompt, userPrompt, images = [], temperature = 1 }) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return { ok: false, error: 'Missing OPENAI_API_KEY' };
   }
 
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+  // Construct message content
+  let userMessageContent = [];
+
+  if (images && images.length > 0) {
+    userMessageContent.push({ type: 'text', text: userPrompt || '' });
+    for (const img of images) {
+      userMessageContent.push({
+        type: 'image_url',
+        image_url: {
+          url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`
+        }
+      });
+    }
+  } else {
+    userMessageContent = userPrompt || '';
+  }
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -23,7 +40,7 @@ const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => 
       temperature,
       messages: [
         { role: 'system', content: systemPrompt || '' },
-        { role: 'user', content: userPrompt || '' },
+        { role: 'user', content: userMessageContent },
       ],
     }),
   });
@@ -94,7 +111,7 @@ const callImagenPredict = async ({ model, prompt }) => {
     ],
     parameters: {
       sampleCount: 1,
-      aspectRatio: '1:1',
+      aspectRatio: opts.aspectRatio || '1:1',
       sampleImageSize: '2K' // Upgraded to 2K for premium quality
     }
   };
@@ -211,13 +228,34 @@ export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
       : (brandKB?.systemInstruction ?? '');
 
   const openAiSystem = IMAGE_GENERATION_SYSTEM_PROMPT;
-  const openAiUser = IMAGE_GENERATION_USER_PROMPT;
+  let openAiUser = IMAGE_GENERATION_USER_PROMPT;
+
+  if (opts.designReferences && opts.designReferences.length > 0) {
+    openAiUser += '\n\nIMPORTANT: Use the attached reference images as a visual anchor and stylistic inspiration for the Style Guide. Adapt the mood, composition, and artistic details to suit the brand rules while remaining faithful to the references provided.';
+  }
+
+  if (opts.imageContext && opts.imageContext.trim()) {
+    openAiUser += `\n\nSCENE CONTEXT: The user has specified the following scene description: "${opts.imageContext}". Use this as the core subject matter.`;
+  }
+
+  if (opts.imageMood && opts.imageMood !== 'Brand Default') {
+    openAiUser += `\n\nMOOD OVERRIDE: The user requested a "${opts.imageMood}" mood. Adapt the visual style to reflect this while maintaining brand consistency where possible.`;
+  }
+
+  if (opts.imageLighting && opts.imageLighting !== 'Brand Default') {
+    openAiUser += `\n\nLIGHTING OVERRIDE: The user requested "${opts.imageLighting}" lighting. Ensure the scene is lit according to this specification.`;
+  }
+
+  if (opts.aspectRatio) {
+    openAiUser += `\n\nASPECT RATIO: The design should be optimized for a ${opts.aspectRatio} aspect ratio. Ensure the composition and focal points are balanced for this specific framing.`;
+  }
 
   const openAiRes = await callOpenAIText({
     systemPrompt: openAiSystem.replaceAll('{{brandKB.systemInstruction}}', systemInstruction || ''),
     userPrompt: openAiUser
       .replaceAll('{{contentCalendar.finalCaption}}', String(row.finalCaption || row.captionOutput || ''))
       .replaceAll('{{contentCalendar.finalCTA}}', String(row.finalCTA || row.cta || '')),
+    images: opts.designReferences || [],
     temperature: 1,
   });
 
@@ -279,7 +317,7 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     const replicateRes = await callReplicatePredict({
       prompt: fullPrompt,
       model: model,
-      aspectRatio: '1:1'
+      aspectRatio: opts.aspectRatio || '1:1'
     });
 
     if (!replicateRes.ok) {
@@ -298,7 +336,7 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     const falRes = await callFalAiPredict({
       prompt: fullPrompt,
       model: model,
-      aspectRatio: 'square'
+      aspectRatio: opts.aspectRatio || 'square'
     });
 
     if (!falRes.ok) {
@@ -319,6 +357,7 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     const imagenRes = await callImagenPredict({
       model: model,
       prompt: fullPrompt,
+      aspectRatio: opts.aspectRatio || '1:1',
     });
 
     if (!imagenRes.ok) {
@@ -408,7 +447,7 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     const replicateRes = await callReplicatePredict({
       prompt: dmp.trim(),
       model: model,
-      aspectRatio: '1:1'
+      aspectRatio: opts.aspectRatio || '1:1'
     });
 
     if (!replicateRes.ok) {
@@ -426,7 +465,7 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     const falRes = await callFalAiPredict({
       prompt: dmp.trim(),
       model: model,
-      aspectRatio: 'square'
+      aspectRatio: opts.aspectRatio || 'square'
     });
 
     if (!falRes.ok) {
@@ -445,6 +484,7 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     const imagenRes = await callImagenPredict({
       model: model,
       prompt: dmp.trim(),
+      aspectRatio: opts.aspectRatio || '1:1',
     });
 
     if (!imagenRes.ok) {
@@ -496,4 +536,39 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
       imageGenerated: uploadRes.path,
     },
   };
+}
+
+export async function analyzeBrandVisuals(images = []) {
+  if (!images || images.length === 0) {
+    return { ok: false, error: 'No images provided' };
+  }
+
+  const systemPrompt = `You are a high-end Brand Identity Strategist. 
+Analyze the provided inspiration images and extract a definitive "Visual Identity Summary".
+Identify colors, typography style, imagery mood, and preferred composition.
+
+Output your analysis in a structured format:
+COLORS: <Primary Hex>, <Secondary Hex>
+FONTS: <Type Style>
+MOOD: <Mood Description>
+COMPOSITION: <Layout Style>
+VIBE: <Detailed 2-sentence description of the aesthetic rules>`;
+
+  const userPrompt = `Analyze these brand inspiration images and define the visual rules for our AI system.`;
+
+
+  const res = await callOpenAIText({
+    systemPrompt,
+    userPrompt,
+    images: images,
+    temperature: 0.7
+  });
+
+  if (!res.ok) {
+    console.error('[analyzeBrandVisuals] OpenAI call failed:', res.error);
+    return res;
+  }
+
+
+  return { ok: true, analysis: res.content };
 }

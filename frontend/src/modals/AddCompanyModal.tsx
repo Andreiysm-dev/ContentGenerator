@@ -9,6 +9,7 @@ interface AddCompanyModalProps {
   setNewCompanyDescription: (value: string) => void;
   onSubmit: () => Promise<void>;
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
+  isAiAssistantOpen?: boolean;
 }
 
 export function AddCompanyModal({
@@ -20,12 +21,13 @@ export function AddCompanyModal({
   setNewCompanyDescription,
   onSubmit,
   notify,
+  isAiAssistantOpen
 }: AddCompanyModalProps) {
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className={`fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4 transition-all duration-300 ${isAiAssistantOpen ? 'pr-[400px]' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label="Add Company"

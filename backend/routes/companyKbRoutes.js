@@ -5,6 +5,7 @@ import {
     getBrandKBById,
     getBrandKBsByCompanyId,
     generateBrandRulesForBrandKB,
+    generateVisualIdentityForBrandKB,
     updateBrandKB,
     deleteBrandKB,
     deleteBrandKBsByCompanyId
@@ -33,6 +34,9 @@ router.put('/brandkb/:id', updateBrandKB);
 
 // GENERATE - POST /api/brandkb/:id/generate-rules
 router.post('/brandkb/:id/generate-rules', generateBrandRulesForBrandKB);
+
+// GENERATE VISUAL - POST /api/brandkb/:id/generate-visual-identity
+router.post('/brandkb/:id/generate-visual-identity', generateVisualIdentityForBrandKB);
 
 // DELETE - DELETE /api/brandkb/:id (delete one)
 router.delete('/brandkb/:id', deleteBrandKB);

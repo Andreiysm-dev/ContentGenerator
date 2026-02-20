@@ -52,7 +52,7 @@ export interface OnboardingData {
     competitiveEdge?: string[];
 }
 
-export function OnboardingModal({ isOpen, onComplete, notify }: OnboardingModalProps) {
+export function OnboardingModal({ isOpen, onComplete, notify, isAiAssistantOpen }: OnboardingModalProps) {
     // Navigation State
     const [step, setStep] = useState(1);
 
@@ -243,6 +243,7 @@ export function OnboardingModal({ isOpen, onComplete, notify }: OnboardingModalP
             currentStep={step}
             totalSteps={7}
             onClose={() => onComplete(null)}
+            isAiAssistantOpen={isAiAssistantOpen}
         >
             {/* AI Suggestion Banner */}
             {extractedBrandData && (

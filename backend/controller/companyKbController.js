@@ -1,16 +1,76 @@
 import db from '../database/db.js';
-import { generateBrandRulesSystem } from '../services/brandRulesService.js';
+import { generateBrandRulesSystem, generateVisualIdentitySystem } from '../services/brandRulesService.js';
+
+
+export const generateVisualIdentityForBrandKB = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { visualOnboardingState } = req.body;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { data: brandKB, error: brandKBError } = await db
+            .from('brandKB')
+            .select('brandKbId, companyId')
+            .eq('brandKbId', id)
+            .single();
+
+        if (brandKBError || !brandKB) {
+            return res.status(404).json({ error: 'Brand knowledge base entry not found' });
+        }
+
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids')
+            .eq('companyId', brandKB.companyId)
+            .single();
+
+        if (companyError || !company) {
+            return res.status(404).json({ error: 'Company not found' });
+        }
+
+        if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        if (!visualOnboardingState) {
+            return res.status(400).json({ error: 'Missing visualOnboardingState' });
+        }
+
+        const result = await generateVisualIdentitySystem({
+            companyId: brandKB.companyId,
+            brandKbId: brandKB.brandKbId,
+            visualOnboardingState,
+        });
+
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error });
+        }
+
+        return res.status(200).json({
+            message: 'Visual identity generated successfully',
+            brandKB: result.brandKB,
+            systemInstruction: result.systemInstruction,
+        });
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
 
 // CREATE - Add a new brand knowledge base entry
 export const createBrandKB = async (req, res) => {
     try {
-        const { 
-            brandPack, 
-            brandCapability, 
-            writerAgent, 
+        const {
+            brandPack,
+            brandCapability,
+            writerAgent,
             reviewPrompt1,
-            emojiRule, 
-            companyId, 
+            emojiRule,
+            companyId,
             systemInstruction,
             imageSystemPrompt,
             imageUserText,
@@ -20,8 +80,8 @@ export const createBrandKB = async (req, res) => {
 
         // Validate required fields
         if (!companyId) {
-            return res.status(400).json({ 
-                error: 'Company ID is required' 
+            return res.status(400).json({
+                error: 'Company ID is required'
             });
         }
         if (!userId) {
@@ -79,20 +139,20 @@ export const createBrandKB = async (req, res) => {
 
         if (brandKBError) {
             console.error('Error creating brandKB:', brandKBError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to create brand knowledge base entry',
-                details: brandKBError.message 
+                details: brandKBError.message
             });
         }
 
-        return res.status(201).json({ 
+        return res.status(201).json({
             message: 'Brand knowledge base entry created successfully',
-            brandKB: brandKB[0] 
+            brandKB: brandKB[0]
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -130,20 +190,20 @@ export const getAllBrandKBs = async (req, res) => {
 
         if (brandKBError) {
             console.error('Error fetching brandKBs:', brandKBError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to fetch brand knowledge base entries',
-                details: brandKBError.message 
+                details: brandKBError.message
             });
         }
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             brandKBs,
-            count: brandKBs.length 
+            count: brandKBs.length
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -179,20 +239,20 @@ export const getBrandKBsByCompanyId = async (req, res) => {
 
         if (brandKBError) {
             console.error('Error fetching brandKBs:', brandKBError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to fetch brand knowledge base entries',
-                details: brandKBError.message 
+                details: brandKBError.message
             });
         }
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             brandKBs,
-            count: brandKBs.length 
+            count: brandKBs.length
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -214,14 +274,14 @@ export const getBrandKBById = async (req, res) => {
 
         if (brandKBError) {
             if (brandKBError.code === 'PGRST116') {
-                return res.status(404).json({ 
-                    error: 'Brand knowledge base entry not found' 
+                return res.status(404).json({
+                    error: 'Brand knowledge base entry not found'
                 });
             }
             console.error('Error fetching brandKB:', brandKBError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to fetch brand knowledge base entry',
-                details: brandKBError.message 
+                details: brandKBError.message
             });
         }
 
@@ -242,8 +302,8 @@ export const getBrandKBById = async (req, res) => {
         return res.status(200).json({ brandKB });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -281,12 +341,12 @@ export const updateBrandKB = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
-        const { 
-            brandPack, 
-            brandCapability, 
-            writerAgent, 
+        const {
+            brandPack,
+            brandCapability,
+            writerAgent,
             reviewPrompt1,
-            emojiRule, 
+            emojiRule,
             companyId,
             systemInstruction,
             imageSystemPrompt,
@@ -308,8 +368,8 @@ export const updateBrandKB = async (req, res) => {
         if (form_answer !== undefined) updateData.form_answer = form_answer;
 
         if (Object.keys(updateData).length === 0) {
-            return res.status(400).json({ 
-                error: 'No fields to update' 
+            return res.status(400).json({
+                error: 'No fields to update'
             });
         }
 
@@ -321,26 +381,26 @@ export const updateBrandKB = async (req, res) => {
 
         if (brandKBError) {
             console.error('Error updating brandKB:', brandKBError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to update brand knowledge base entry',
-                details: brandKBError.message 
+                details: brandKBError.message
             });
         }
 
         if (!brandKB || brandKB.length === 0) {
-            return res.status(404).json({ 
-                error: 'Brand knowledge base entry not found' 
+            return res.status(404).json({
+                error: 'Brand knowledge base entry not found'
             });
         }
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             message: 'Brand knowledge base entry updated successfully',
-            brandKB: brandKB[0] 
+            brandKB: brandKB[0]
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -446,26 +506,26 @@ export const deleteBrandKB = async (req, res) => {
 
         if (brandKBError) {
             console.error('Error deleting brandKB:', brandKBError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to delete brand knowledge base entry',
-                details: brandKBError.message 
+                details: brandKBError.message
             });
         }
 
         if (!brandKB || brandKB.length === 0) {
-            return res.status(404).json({ 
-                error: 'Brand knowledge base entry not found' 
+            return res.status(404).json({
+                error: 'Brand knowledge base entry not found'
             });
         }
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             message: 'Brand knowledge base entry deleted successfully',
-            brandKB: brandKB[0] 
+            brandKB: brandKB[0]
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -501,21 +561,21 @@ export const deleteBrandKBsByCompanyId = async (req, res) => {
 
         if (brandKBError) {
             console.error('Error deleting brandKBs:', brandKBError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to delete brand knowledge base entries',
-                details: brandKBError.message 
+                details: brandKBError.message
             });
         }
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             message: `Deleted ${brandKBs.length} brand knowledge base entries`,
             count: brandKBs.length,
-            brandKBs 
+            brandKBs
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
