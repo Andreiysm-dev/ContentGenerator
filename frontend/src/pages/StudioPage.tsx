@@ -71,8 +71,6 @@ export function StudioPage({
 
   const drafts = allRows.filter(r =>
     (
-      r.normalizedStatus === "needs revision" ||
-      r.normalizedStatus === "draft" ||
       r.normalizedStatus === "design completed" ||
       r.normalizedStatus === "ready"
     ) &&
@@ -87,9 +85,7 @@ export function StudioPage({
 
   const approvals = allRows.filter(r =>
     r.normalizedStatus === "approved" ||
-    r.normalizedStatus === "for approval" ||
-    r.normalizedStatus === "reviewed" ||
-    r.normalizedStatus === "reviewing"
+    r.normalizedStatus === "for approval"
   );
 
   const scheduled = allRows.filter(r =>
@@ -139,12 +135,23 @@ export function StudioPage({
           rowChans = raw.split(',').map(c => c.trim().toLowerCase());
         }
 
+        // Precise matching for published posts
+        if (activeTab === 'published' && r.social_account_id) {
+          return r.social_account_id === selectedChannelId;
+        }
+
         return rowChans.some(c => {
           if (!c) return false;
           // Match by UUID/ID
           if (c === selectedChannelId?.toLowerCase()) return true;
-          // Fuzzy match by provider name
-          if (provider && (c.includes(provider) || provider.includes(c))) return true;
+
+          // Fuzzy match by provider name - ONLY if there's no specific social_account_id
+          // or if the account provider matches and the post is NOT yet published to a specific ID
+          if (provider && (c.includes(provider) || provider.includes(c))) {
+            // If it's a published post but has a DIFFERENT account ID, don't match
+            if (r.social_account_id && r.social_account_id !== selectedChannelId) return false;
+            return true;
+          }
           return false;
         });
       });
@@ -189,12 +196,21 @@ export function StudioPage({
         rowChans = raw.split(',').map(c => c.trim().toLowerCase());
       }
 
+      // Precise matching for published posts
+      if (activeTab === 'published' && r.social_account_id) {
+        return r.social_account_id === chanId;
+      }
+
       return rowChans.some(c => {
         if (!c) return false;
         // Match by UUID/ID
         if (c === chanId?.toLowerCase()) return true;
-        // Fuzzy match by provider name
-        if (provider && (c.includes(provider) || provider.includes(c))) return true;
+
+        // Fuzzy match by provider name 
+        if (provider && (c.includes(provider) || provider.includes(c))) {
+          if (r.social_account_id && r.social_account_id !== chanId) return false;
+          return true;
+        }
         return false;
       });
     }).length;
@@ -286,8 +302,12 @@ export function StudioPage({
                     : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300 hover:scale-105 shadow-sm'
                     }`}
                 >
-                  <div className={`w-full h-full flex items-center justify-center transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>
-                    {getPlatformIcon(acc.provider)}
+                  <div className={`w-full h-full flex items-center justify-center transition-colors overflow-hidden rounded-xl ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {acc.profile_picture ? (
+                      <img src={acc.profile_picture} alt={acc.provider} className="w-full h-full object-cover" />
+                    ) : (
+                      getPlatformIcon(acc.provider)
+                    )}
                   </div>
 
                   {getChannelCount(acc.id) > 0 && (
@@ -303,7 +323,7 @@ export function StudioPage({
                     }`} />
 
                   <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap shadow-xl z-[100]">
-                    {acc.provider_account_name || acc.provider}
+                    {acc.profile_name || acc.provider}
                   </div>
                 </button>
               );

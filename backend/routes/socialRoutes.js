@@ -83,6 +83,7 @@ router.post('/social/:companyId/publish', async (req, res) => {
                 .update({
                     social_post_id: socialPostId,
                     social_provider: provider,
+                    social_account_id: accountId,
                     status: 'PUBLISHED' // Also update status if publishing from Studio
                 })
                 .eq('contentCalendarId', contentCalendarId);

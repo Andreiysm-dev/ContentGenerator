@@ -14,8 +14,8 @@ import { handleBrandChat as brandChatHandler } from '../controller/brandChatCont
 
 const router = express.Router();
 
-// CHAT - POST /api/brandkb/chat
-router.post('/brandkb/chat', brandChatHandler);
+// CHAT - POST /api/brandkb/:id/chat
+router.post('/brandkb/:id/chat', brandChatHandler);
 
 // CREATE - POST /api/brandkb
 router.post('/brandkb', createBrandKB);

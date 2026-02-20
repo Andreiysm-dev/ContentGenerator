@@ -39,6 +39,7 @@ export const CAPTION_USER_PROMPT_TEMPLATE = [
     '- Emoji Rule must be followed exactly.',
     '- Do NOT use markdown (**bold**, headings, bullets).',
     '- Do NOT add labels like “Context”, “Overview”, or explanations.',
+    '- The caption MUST always end with the specified or chosen CTA as its final sentence or paragraph.',
     '',
     'FORMATTING RULES (CRITICAL)',
     '- The caption MAY contain multiple paragraphs.',
@@ -110,6 +111,7 @@ export const REVIEW_USER_PROMPT_TEMPLATE = [
     '- If you are satisfied with the original hashtags, you MUST still copy them into the FINAL HASHTAGS section. Never leave it empty.',
     '',
     'Additional CTA Rule (NON-NEGOTIABLE)',
+    '- Every FINAL CAPTION must explicitly include the FINAL CTA as its closing call-to-action.',
     '- If the user-provided CTA ({{ctaOuput}}) is non-empty, FINAL CTA MUST match it exactly (verbatim, character-for-character). Do NOT paraphrase, shorten, expand, translate, or replace it.',
     '- Only if Draft CTA is missing/empty/null may you improve/select a CTA based on Brand Pack and Capability Map.',
     '',
@@ -299,9 +301,9 @@ Generate a CAPTION WRITER SYSTEM PROMPT for this brand. This will be the master 
 THE SYSTEM PROMPT YOU GENERATE MUST INSTRUCT THE WRITER TO:
 1. Embody the brand voice and tone defined in the Brand Pack.
 2. Use the Brand Capability Map as the source of truth for facts and offers.
-3. Structure captions with a clear hook, value-led body, and a strong CTA.
+3. Structure captions with a clear hook, value-led body, and a strong CTA at the very end of the text.
 4. Output the FINISHED caption in valid JSON format with "framework", "caption", "cta", and "hashtags".
-5. Always provide a relevant CTA and 3-8 hashtags even if not explicitly provided in the request.
+5. Always provide a relevant CTA and 3-8 hashtags even if not explicitly provided in the request. Ensure the CTA is also written as the final line of the "caption" field.
 6. Follow all "Absolute Truths" and strictly avoid "Forbidden Words".
 
 FORMATTING RULES FOR THIS TASK:
@@ -332,7 +334,8 @@ THE SYSTEM PROMPT YOU GENERATE MUST INSTRUCT THE REVIEWER TO:
 4. Correct the content directly to make it "Review-Ready".
 5. ALWAYS output the results in the following sections: DECISION, NOTES, FINAL CAPTION, FINAL CTA, and FINAL HASHTAGS.
 6. MANDATORY RULE: The Reviewer MUST NEVER leave FINAL CTA or FINAL HASHTAGS empty. If the drafts are empty, the Reviewer must generate them using the Brand Capabilities and the primary goal of the content.
-7. If a user provided a specific CTA in the draft, the Reviewer MUST preserve it exactly unless it violates a hard compliance rule.
+7. The FINAL CAPTION MUST always end with the FINAL CTA as its last paragraph or sentence.
+8. If a user provided a specific CTA in the draft, the Reviewer MUST preserve it exactly unless it violates a hard compliance rule.
 
 FORMATTING RULES FOR THIS TASK:
 - Output the System Prompt as a clean, Markdown-formatted professional instruction sheet.

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { CompanySettingsShellProps } from "../SettingsPage";
 import { Card, StatusPill, Input, Textarea, Select, Pill } from "../SettingsPage";
 import { Sparkles, HelpCircle } from "lucide-react";
+import { BrandAssistant } from "../../components/BrandAssistant";
 
 export function BrandCoreTab(props: CompanySettingsShellProps) {
     const {
@@ -135,6 +136,24 @@ export function BrandCoreTab(props: CompanySettingsShellProps) {
                         </>
                     )}
 
+
+                    {hasBrandIntelligenceConfigured && brandKbId && (
+                        <BrandAssistant
+                            brandKbId={brandKbId!}
+                            currentBrandData={{
+                                brandPack: brandPack,
+                                brandCapability: brandCapability,
+                                writerAgent: aiWriterSystemPrompt,
+                                reviewPrompt1: aiWriterUserPrompt,
+                                systemInstruction: systemInstruction,
+                                emojiRule: emojiRule
+                            }}
+                            onUpdate={() => loadBrandKB(false, true)}
+                            authedFetch={authedFetch}
+                            notify={notify}
+                            backendBaseUrl={props.backendBaseUrl}
+                        />
+                    )}
 
                     <button className="btn btn-secondary btn-sm bg-white" type="button" onClick={() => loadBrandKB(false, true)}>
                         Refresh

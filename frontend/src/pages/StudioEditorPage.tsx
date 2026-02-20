@@ -342,6 +342,8 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
         } else if (newStatus === 'For Approval') {
             notify('Post sent for supervisor review', 'info');
             navigate(`/company/${encodeURIComponent(activeCompanyId || '')}/studio`, { state: { activeTab: 'approvals' } });
+        } else if (newStatus === 'SCHEDULED') {
+            navigate(`/company/${encodeURIComponent(activeCompanyId || '')}/studio`, { state: { activeTab: 'scheduled' } });
         }
 
         return savedId;
@@ -451,6 +453,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
             if (successCount > 0) {
                 notify(`Published successfully to ${successCount} platform(s)${failCount > 0 ? `, but failed for ${failCount}` : ''}!`, successCount > 0 && failCount === 0 ? 'success' : 'info');
                 setStatus('PUBLISHED');
+                navigate(`/company/${encodeURIComponent(activeCompanyId || '')}/studio`, { state: { activeTab: 'published' } });
             } else if (failCount > 0) {
                 notify('Failed to publish to all selected platforms', 'error');
             }

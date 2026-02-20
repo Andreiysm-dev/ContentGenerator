@@ -1,52 +1,73 @@
-import fetch from 'node-fetch';
+/**
+ * Brand Chat Service
+ * Handles AI-driven refinements to the Brand Core (brandPack, brandCapability, writerAgent, etc.)
+ */
+export const processBrandChat = async ({ currentBrandData, message, history = [] }) => {
+    try {
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            return { ok: false, error: "Missing OPENAI_API_KEY" };
+        }
 
-const BRAND_CHAT_SYSTEM_PROMPT = `You are the Brand Intelligence Assistant for an AI-powered content generation platform.
-Your task is to help users manage their "Brand Core" (Identity, Facts, Writing Rules, and Visual Rules).
+        const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-Current Brand Core data:
-{{BRAND_CORE_JSON}}
+        const systemPrompt = `
+You are an expert Brand Strategist and AI Prompt Engineer.
+Your goal is to help the user refine their Brand Core settings by interpreting their natural language descriptions.
 
-Guidelines:
-1. Helpfulness: Answer questions about the brand core and explain what each section does.
-2. Conversational Updates: When a user asks to change or update something (e.g., "Change our writing style to be more professional" or "Our primary colors are blue and white"), you must propose the specific updates to the Brand Core fields.
-3. Full Content Persistence: If you are updating a field, you MUST provide the FULL, UPDATED content for that field. Do NOT just provide the new snippet or a summary of the change. You must incorporate the user's request into the existing content of that field (found in the JSON above) to ensure no existing information is lost unless explicitly requested by the user.
-4. Structured Output: You MUST ALWAYS return a JSON response with the following format:
+CURRENT BRAND DATA:
+---
+BRAND PACK: 
+${currentBrandData.brandPack || "Not set"}
+
+BRAND CAPABILITIES:
+${currentBrandData.brandCapability || "Not set"}
+
+WRITER SYSTEM PROMPT:
+${currentBrandData.writerAgent || "Not set"}
+
+REVIEWER SYSTEM PROMPT:
+${currentBrandData.reviewPrompt1 || "Not set"}
+
+VISUAL IDENTITY / IMAGE RULES:
+${currentBrandData.systemInstruction || "Not set"}
+
+EMOJI RULE:
+${currentBrandData.emojiRule || "Not set"}
+---
+
+TASK:
+1. Analyze the user's request. 
+2. Determine which fields in the Brand Core need refinement (it could be one, multiple, or all).
+3. Provide the FULL, UPDATED content for each affected field. 
+4. Provide a brief, professional response explaining what you changed and why.
+
+STRICT OUTPUT FORMAT (JSON ONLY):
 {
-  "response": "Your natural language response to the user here. Summarize what you changed.",
-  "updates": {
-    "brandPack": "FULL updated text or null",
-    "brandCapability": "FULL updated text or null",
-    "writerAgent": "FULL updated text or null",
-    "reviewPrompt1": "FULL updated text or null",
-    "systemInstruction": "FULL updated text or null",
-    "emojiRule": "FULL updated text or null"
+  "response": "Your professional explanation to the user",
+  "updatedFields": {
+    "brandPack": "string or null if unchanged",
+    "brandCapability": "string or null if unchanged",
+    "writerAgent": "string or null if unchanged",
+    "reviewPrompt1": "string or null if unchanged",
+    "systemInstruction": "string or null if unchanged",
+    "emojiRule": "string or null if unchanged"
   }
 }
-- Set fields in "updates" ONLY if they need to change based on the user's request. 
-- If no update is needed, set the field to null or keep the "updates" object empty.
-- "systemInstruction" maps to "Visual & Image Rules".
-- Always be polite and professional.
-- If the user's request is vague, ask for clarification in the "response" and keep "updates" empty.
+
+STRICT RULES:
+- IMPORTANT: When a field is affected, YOU MUST return its COMPLETE new content. DO NOT return just the changes or a summary. You must incorporate the user's request into the existing data and return the whole strategic document for that field.
+- If a field is not affected by the user's request, set it to null in the "updatedFields" object.
+- Maintain the professional, high-authority tone of the existing documents.
+- Keep the structure (Markdown headings, bullets) of the existing documents unless asked to change it.
+- Ensure the result is valid JSON.
 `;
 
-export async function processBrandChat({ brandKB, message }) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-        return { ok: false, error: 'Missing OPENAI_API_KEY' };
-    }
+        const historyMessages = history.map(m => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content
+        })).slice(-10);
 
-    const brandCoreJson = JSON.stringify({
-        brandPack: brandKB.brandPack,
-        brandCapability: brandKB.brandCapability,
-        writerAgent: brandKB.writerAgent,
-        reviewPrompt1: brandKB.reviewPrompt1,
-        systemInstruction: brandKB.systemInstruction,
-        emojiRule: brandKB.emojiRule
-    }, null, 2);
-
-    const systemPrompt = BRAND_CHAT_SYSTEM_PROMPT.replace('{{BRAND_CORE_JSON}}', brandCoreJson);
-
-    try {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -54,9 +75,10 @@ export async function processBrandChat({ brandKB, message }) {
                 Authorization: `Bearer ${apiKey}`,
             },
             body: JSON.stringify({
-                model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+                model,
                 messages: [
                     { role: 'system', content: systemPrompt },
+                    ...historyMessages,
                     { role: 'user', content: message }
                 ],
                 temperature: 0.7,
@@ -66,7 +88,7 @@ export async function processBrandChat({ brandKB, message }) {
 
         if (!res.ok) {
             const errorText = await res.text();
-            return { ok: false, error: `LLM Error: ${res.status} - ${errorText}` };
+            throw new Error(`OpenAI error: ${res.status} - ${errorText}`);
         }
 
         const data = await res.json();
@@ -75,10 +97,11 @@ export async function processBrandChat({ brandKB, message }) {
         return {
             ok: true,
             response: content.response,
-            updates: content.updates || {}
+            updatedFields: content.updatedFields
         };
-    } catch (error) {
-        console.error('Brand Chat Service Error:', error);
-        return { ok: false, error: 'Failed to process brand chat' };
+
+    } catch (err) {
+        console.error("Brand Chat Service Error:", err);
+        return { ok: false, error: err.message };
     }
-}
+};

@@ -1,24 +1,39 @@
 import db from '../database/db.js';
 import { processBrandChat } from '../services/brandChatService.js';
 
+/**
+ * Handle Brand Chat
+ * Refines brand knowledge base fields via AI conversation
+ */
 export const handleBrandChat = async (req, res) => {
     try {
-        const { companyId, message } = req.body;
+        const { message, currentBrandData, history } = req.body;
+        const { id: brandKbId } = req.params;
         const userId = req.user?.id;
 
-        if (!companyId || !message) {
-            return res.status(400).json({ error: 'Company ID and message are required' });
+        if (!brandKbId || !message) {
+            return res.status(400).json({ error: 'Brand KB ID and message are required' });
         }
 
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        // 1. Verify access
+        // 1. Fetch the row and verify access
+        const { data: brandKB, error: brandKBError } = await db
+            .from('brandKB')
+            .select('*')
+            .eq('brandKbId', brandKbId)
+            .single();
+
+        if (brandKBError || !brandKB) {
+            return res.status(404).json({ error: 'Brand knowledge base entry not found' });
+        }
+
         const { data: company, error: companyError } = await db
             .from('company')
             .select('user_id, collaborator_ids')
-            .eq('companyId', companyId)
+            .eq('companyId', brandKB.companyId)
             .single();
 
         if (companyError || !company) {
@@ -29,62 +44,51 @@ export const handleBrandChat = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
-        // 2. Fetch current brand KB
-        const { data: brandKB, error: brandKBError } = await db
-            .from('brandKB')
-            .select('*')
-            .eq('companyId', companyId)
-            .maybeSingle();
+        // 2. Process chat
+        // Use currentBrandData from body if provided (might be draft in frontend), else fallback to DB
+        const dataToUse = currentBrandData || {
+            brandPack: brandKB.brandPack,
+            brandCapability: brandKB.brandCapability,
+            writerAgent: brandKB.writerAgent,
+            reviewPrompt1: brandKB.reviewPrompt1,
+            systemInstruction: brandKB.systemInstruction,
+            emojiRule: brandKB.emojiRule
+        };
 
-        if (brandKBError) {
-            return res.status(500).json({ error: 'Failed to fetch brand knowledge base' });
-        }
-
-        if (!brandKB) {
-            return res.status(404).json({ error: 'Brand knowledge base not found for this company. Please complete basic setup first.' });
-        }
-
-        // 3. Process chat
-        const result = await processBrandChat({ brandKB, message });
+        const result = await processBrandChat({ currentBrandData: dataToUse, message, history });
 
         if (!result.ok) {
             return res.status(500).json({ error: result.error });
         }
 
-        // 4. If there are updates, apply them
-        let updatedBrandKB = brandKB;
-        if (result.updates && Object.keys(result.updates).length > 0) {
-            const updatePayload = {};
-            // Only update fields that are provided and not null
-            for (const [key, value] of Object.entries(result.updates)) {
-                if (value !== null && value !== undefined) {
-                    updatePayload[key] = value;
-                }
+        // 3. Persist the changes
+        const updatePayload = {};
+        const fields = ['brandPack', 'brandCapability', 'writerAgent', 'reviewPrompt1', 'systemInstruction', 'emojiRule'];
+
+        let hasChanges = false;
+        for (const field of fields) {
+            if (result.updatedFields[field] !== null && result.updatedFields[field] !== undefined) {
+                updatePayload[field] = result.updatedFields[field];
+                hasChanges = true;
             }
+        }
 
-            if (Object.keys(updatePayload).length > 0) {
-                const { data: updated, error: updateError } = await db
-                    .from('brandKB')
-                    .update(updatePayload)
-                    .eq('brandKbId', brandKB.brandKbId)
-                    .select()
-                    .single();
+        if (hasChanges) {
+            const { error: updateError } = await db
+                .from('brandKB')
+                .update(updatePayload)
+                .eq('brandKbId', brandKbId);
 
-                if (updateError) {
-                    console.error('Failed to update brandKB from chat:', updateError);
-                    // We still return the response, but maybe with a warning? 
-                    // For now, let's just fail or ignore? 
-                    // Better to return the error so user knows it didn't save.
-                    return res.status(500).json({ error: 'AI proposed updates but failed to save them.' });
-                }
-                updatedBrandKB = updated;
+            if (updateError) {
+                console.error('Failed to update Brand KB from chat:', updateError);
+                return res.status(500).json({ error: 'AI proposed update but failed to save it.' });
             }
         }
 
         return res.status(200).json({
             response: result.response,
-            updatesApplied: Object.keys(result.updates).length > 0,
-            brandKB: updatedBrandKB
+            updatedFields: result.updatedFields,
+            brandKB: { ...brandKB, ...updatePayload }
         });
 
     } catch (error) {
