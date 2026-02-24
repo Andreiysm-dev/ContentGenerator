@@ -12,7 +12,10 @@ import accountRoutes from './routes/accountRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import socialRoutes from './routes/socialRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import auditRoutes from './routes/auditRoutes.js';
 import assistantRoutes from './routes/assistantRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
 import authMiddleware from "./middleware/auth.js";
 
 dotenv.config();
@@ -31,7 +34,7 @@ const corsOptions = {
   origin: true, // Reflect the request origin
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id', 'X-Impersonate-User'],
   optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
 };
 
@@ -40,6 +43,7 @@ app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // Note the leading slash in mount paths
+app.use("/api/public", publicRoutes); // Publicly accessible system info
 app.use("/api", websiteAnalyzerRoutes); // Before auth - needed for onboarding
 app.use("/api", authMiddleware);
 app.use("/api", companyRoutes);
@@ -53,5 +57,7 @@ app.use("/api", authRoutes);
 app.use("/api", socialRoutes);
 app.use("/api", aiRoutes);
 app.use("/api", assistantRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/audit", auditRoutes);
 
 app.listen(PORT, () => { });

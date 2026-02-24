@@ -3,8 +3,9 @@ import { IMAGE_GENERATION_SYSTEM_PROMPT, IMAGE_GENERATION_USER_PROMPT } from './
 import { sendNotification, sendTeamNotification } from './notificationService.js';
 import { callReplicatePredict } from './replicateService.js';
 import { callFalAiPredict } from './falService.js';
+import { logApiUsage } from './apiUsageService.js';
 
-const callOpenAIText = async ({ systemPrompt, userPrompt, images = [], temperature = 1 }) => {
+const callOpenAIText = async ({ systemPrompt, userPrompt, images = [], temperature = 1, companyId, userId }) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return { ok: false, error: 'Missing OPENAI_API_KEY' };
@@ -59,6 +60,20 @@ const callOpenAIText = async ({ systemPrompt, userPrompt, images = [], temperatu
   }
 
   const content = data?.choices?.[0]?.message?.content;
+
+  // Log Usage
+  if (data?.usage) {
+    await logApiUsage({
+      companyId,
+      userId,
+      provider: 'openai',
+      model: model,
+      type: 'completion',
+      inputTokens: data.usage.prompt_tokens,
+      outputTokens: data.usage.completion_tokens
+    });
+  }
+
   return { ok: true, content: typeof content === 'string' ? content : '', rawEnvelope: data };
 };
 
@@ -95,7 +110,7 @@ const cleanPromptForImagen = (prompt) => {
     .trim();
 };
 
-const callImagenPredict = async ({ model, prompt }) => {
+const callImagenPredict = async ({ model, prompt, companyId, userId, aspectRatio }) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return { ok: false, error: 'Missing GEMINI_API_KEY' };
@@ -149,6 +164,16 @@ const callImagenPredict = async ({ model, prompt }) => {
     return { ok: false, error: 'Missing bytesBase64Encoded in prediction', raw: data };
   }
 
+  // Log Usage
+  await logApiUsage({
+    companyId,
+    userId,
+    provider: 'google',
+    model: actualModel,
+    type: 'image_generation',
+    metadata: { aspectRatio: body.parameters.aspectRatio }
+  });
+
   return { ok: true, base64, raw: data };
 };
 
@@ -168,7 +193,7 @@ const uploadGeneratedImage = async ({ companyId, contentCalendarId, imageBytes, 
   return { ok: true, path: data?.path || path };
 };
 
-const loadContentCalendarRow = async ({ contentCalendarId, userId }) => {
+const loadContentCalendarRow = async ({ contentCalendarId, userId, requiredPermission = null }) => {
   const { data: row, error } = await db
     .from('contentCalendar')
     .select('*')
@@ -181,7 +206,7 @@ const loadContentCalendarRow = async ({ contentCalendarId, userId }) => {
 
   const { data: company, error: companyError } = await db
     .from('company')
-    .select('user_id, collaborator_ids, companyName')
+    .select('user_id, collaborator_ids, companyName, custom_roles, collaborator_roles')
     .eq('companyId', row.companyId)
     .single();
 
@@ -189,8 +214,20 @@ const loadContentCalendarRow = async ({ contentCalendarId, userId }) => {
     return { ok: false, status: 404, error: 'Company not found' };
   }
 
-  if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+  // Owner check
+  if (company.user_id === userId) {
+    // Proceed
+  } else if (!(company.collaborator_ids?.includes(userId))) {
     return { ok: false, status: 403, error: 'Forbidden' };
+  } else if (requiredPermission) {
+    // Permission check for collaborator
+    const userRoleName = company.collaborator_roles?.[userId];
+    if (userRoleName) {
+      const roleDef = company.custom_roles?.find(r => r.name === userRoleName);
+      if (roleDef && roleDef.permissions && roleDef.permissions[requiredPermission] === false) {
+        return { ok: false, status: 403, error: `Member lacks '${requiredPermission}' permission.` };
+      }
+    }
   }
 
   // Fetch user metadata for triggeredByName
@@ -204,7 +241,7 @@ export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
   const userId = opts.userId;
   if (!userId) return { ok: false, status: 401, error: 'Unauthorized' };
 
-  const loaded = await loadContentCalendarRow({ contentCalendarId, userId });
+  const loaded = await loadContentCalendarRow({ contentCalendarId, userId, requiredPermission: 'canGenerate' });
   if (!loaded.ok) return loaded;
 
   const row = loaded.row;
@@ -257,6 +294,8 @@ export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
       .replaceAll('{{contentCalendar.finalCTA}}', String(row.finalCTA || row.cta || '')),
     images: opts.designReferences || [],
     temperature: 1,
+    companyId: row.companyId,
+    userId: userId
   });
 
   if (!openAiRes.ok) {
@@ -282,7 +321,7 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
   if (!userId) return { ok: false, status: 401, error: 'Unauthorized' };
 
   // 1. Load row to check for existing DMP
-  const loaded = await loadContentCalendarRow({ contentCalendarId, userId });
+  const loaded = await loadContentCalendarRow({ contentCalendarId, userId, requiredPermission: 'canGenerate' });
   if (!loaded.ok) return loaded;
 
   let row = loaded.row;
@@ -317,7 +356,9 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     const replicateRes = await callReplicatePredict({
       prompt: fullPrompt,
       model: model,
-      aspectRatio: opts.aspectRatio || '1:1'
+      aspectRatio: opts.aspectRatio || '1:1',
+      companyId: row.companyId,
+      userId: userId
     });
 
     if (!replicateRes.ok) {
@@ -336,7 +377,9 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     const falRes = await callFalAiPredict({
       prompt: fullPrompt,
       model: model,
-      aspectRatio: opts.aspectRatio || 'square'
+      aspectRatio: opts.aspectRatio || 'square',
+      companyId: row.companyId,
+      userId: userId
     });
 
     if (!falRes.ok) {
@@ -358,6 +401,8 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
       model: model,
       prompt: fullPrompt,
       aspectRatio: opts.aspectRatio || '1:1',
+      companyId: row.companyId,
+      userId: userId
     });
 
     if (!imagenRes.ok) {
@@ -421,7 +466,7 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     return { ok: false, status: 400, error: 'dmp is required' };
   }
 
-  const loaded = await loadContentCalendarRow({ contentCalendarId, userId });
+  const loaded = await loadContentCalendarRow({ contentCalendarId, userId, requiredPermission: 'canGenerate' });
   if (!loaded.ok) return loaded;
 
   const row = loaded.row;
@@ -447,7 +492,9 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     const replicateRes = await callReplicatePredict({
       prompt: dmp.trim(),
       model: model,
-      aspectRatio: opts.aspectRatio || '1:1'
+      aspectRatio: opts.aspectRatio || '1:1',
+      companyId: row.companyId,
+      userId: userId
     });
 
     if (!replicateRes.ok) {
@@ -465,7 +512,9 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     const falRes = await callFalAiPredict({
       prompt: dmp.trim(),
       model: model,
-      aspectRatio: opts.aspectRatio || 'square'
+      aspectRatio: opts.aspectRatio || 'square',
+      companyId: row.companyId,
+      userId: userId
     });
 
     if (!falRes.ok) {
@@ -485,6 +534,8 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
       model: model,
       prompt: dmp.trim(),
       aspectRatio: opts.aspectRatio || '1:1',
+      companyId: row.companyId,
+      userId: userId
     });
 
     if (!imagenRes.ok) {

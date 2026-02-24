@@ -1,5 +1,5 @@
-import fetch from 'node-fetch';
 import db from '../database/db.js';
+import { logApiUsage } from './apiUsageService.js';
 
 const ASSISTANT_SYSTEM_PROMPT = `You are the "ContentGenerator Command Center Hub", a master AI orchestrator for a marketing platform.
 You combine the powers of a Navigation Assistant, a Brand Identity Expert, and a Design Prompt Strategist.
@@ -106,6 +106,21 @@ export async function processAssistantChat({ userId, companyId, message, history
         if (!res.ok) throw new Error(`OpenAI error: ${res.status}`);
 
         const data = await res.json();
+
+        // Log Usage
+        if (data?.usage) {
+            await logApiUsage({
+                companyId,
+                userId,
+                provider: 'openai',
+                model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+                type: 'completion',
+                inputTokens: data.usage.prompt_tokens,
+                outputTokens: data.usage.completion_tokens,
+                metadata: { intent: 'assistant_chat' }
+            });
+        }
+
         const content = JSON.parse(data.choices[0].message.content);
 
         return {

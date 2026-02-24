@@ -60,6 +60,13 @@ interface ImageHubPageProps {
         cancelLabel: string;
     }) => Promise<boolean>;
     setSelectedRow: React.Dispatch<React.SetStateAction<any | null>>;
+    userPermissions?: {
+        canApprove: boolean;
+        canGenerate: boolean;
+        canCreate: boolean;
+        canDelete: boolean;
+        isOwner: boolean;
+    };
 }
 
 export function ImageHubPage({
@@ -76,7 +83,14 @@ export function ImageHubPage({
     getImageGeneratedUrl,
     getImageGeneratedSignature,
     requestConfirm,
-    setSelectedRow
+    setSelectedRow,
+    userPermissions = {
+        canApprove: false,
+        canGenerate: false,
+        canCreate: false,
+        canDelete: false,
+        isOwner: false
+    }
 }: ImageHubPageProps) {
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
     const [dmpDraft, setDmpDraft] = useState('');
@@ -642,7 +656,8 @@ export function ImageHubPage({
                         <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                             <button
                                 onClick={() => !systemInstruction ? setIsVisualOnboardingOpen(true) : setIsEditingBrandRules(true)}
-                                className="w-full flex items-center justify-center gap-2 p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200 group"
+                                disabled={!userPermissions?.canApprove}
+                                className="w-full flex items-center justify-center gap-2 p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200 group disabled:opacity-50 disabled:hover:bg-slate-900"
                             >
                                 {!systemInstruction ? (
                                     <>
@@ -1230,9 +1245,9 @@ export function ImageHubPage({
                                                 <div className="flex gap-3 mb-4">
                                                     <button
                                                         onClick={handleGenerate}
-                                                        disabled={isGeneratingImage || isEditingDmp || !dmpDraft.trim()}
+                                                        disabled={isGeneratingImage || isEditingDmp || !dmpDraft.trim() || !userPermissions?.canGenerate}
                                                         className="flex-1 py-4 bg-[#3fa9f5] text-white rounded-2xl text-base font-black shadow-lg shadow-blue-200/50 hover:bg-[#2f97e6] hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
-                                                        title={!dmpDraft.trim() ? "Generate Style Guide first (Step 1)" : "Create high-res visual"}
+                                                        title={!userPermissions?.canGenerate ? "You don't have permission to generate images" : !dmpDraft.trim() ? "Generate Style Guide first (Step 1)" : "Create high-res visual"}
                                                     >
                                                         {isGeneratingImage ? (
                                                             <>
@@ -1308,7 +1323,8 @@ export function ImageHubPage({
                                                                 if (!proceed) return;
                                                                 handleGenerateStyleGuide();
                                                             }}
-                                                            className="w-full py-2.5 rounded-xl border border-rose-200 text-[10px] font-bold uppercase text-rose-600 hover:bg-rose-50 transition-colors"
+                                                            disabled={!userPermissions?.canGenerate}
+                                                            className="w-full py-2.5 rounded-xl border border-rose-200 text-[10px] font-bold uppercase text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
                                                         >
                                                             Force Style Reset
                                                         </button>
@@ -1349,528 +1365,534 @@ export function ImageHubPage({
                         )}
                     </div>
                 </div>
-            </section>
+            </section >
 
             {/* Lightbox / Zoom Modal */}
-            {isZoomModalOpen && getImageGeneratedUrl(selectedRow) && (
-                <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300"
-                    onClick={() => setIsZoomModalOpen(false)}
-                >
-                    <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl" />
-
-                    <button
-                        className="absolute top-6 right-6 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all z-20 shadow-2xl"
+            {
+                isZoomModalOpen && getImageGeneratedUrl(selectedRow) && (
+                    <div
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300"
                         onClick={() => setIsZoomModalOpen(false)}
                     >
-                        <X size={24} />
-                    </button>
+                        <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl" />
 
-                    <div
-                        className="relative z-10 max-w-7xl w-full h-full flex items-center justify-center"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <img
-                            src={getImageGeneratedUrl(selectedRow)!}
-                            alt="Visual Detail"
-                            className="max-w-full max-h-full object-contain rounded-3xl shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-500"
-                        />
+                        <button
+                            className="absolute top-6 right-6 p-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all z-20 shadow-2xl"
+                            onClick={() => setIsZoomModalOpen(false)}
+                        >
+                            <X size={24} />
+                        </button>
 
-                        <div className="absolute bottom-[-40px] left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/5 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Theme</span>
-                                <span className="text-sm font-bold text-white truncate max-w-sm">{selectedRow?.theme}</span>
-                            </div>
-                            <div className="w-px h-8 bg-white/10 mx-2" />
-                            <button
-                                onClick={handleDownload}
-                                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-black shadow-xl hover:bg-blue-700 transition-all active:scale-95"
-                            >
-                                <Download size={14} />
-                                Download High-Res
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Visual & Image rules Modal */}
-            {isEditingBrandRules && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsEditingBrandRules(false)} />
+                        <div
+                            className="relative z-10 max-w-7xl w-full h-full flex items-center justify-center"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <img
+                                src={getImageGeneratedUrl(selectedRow)!}
+                                alt="Visual Detail"
+                                className="max-w-full max-h-full object-contain rounded-3xl shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-500"
+                            />
 
-                    <div className="relative z-10 w-full max-w-3xl bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
-                        <header className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
-                                    <Settings2 size={24} />
+                            <div className="absolute bottom-[-40px] left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/5 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Theme</span>
+                                    <span className="text-sm font-bold text-white truncate max-w-sm">{selectedRow?.theme}</span>
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Visual & Image rules</h3>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Visual Identity & Aesthetic Standards</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setIsEditingBrandRules(false)}
-                                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
-                            >
-                                <X size={24} />
-                            </button>
-                        </header>
-
-                        <div className="p-8 space-y-6">
-                            <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100/50 flex gap-4 items-start">
-                                <HelpCircle className="text-blue-500 mt-1 flex-shrink-0" size={18} />
-                                <p className="text-xs font-medium text-slate-600 leading-relaxed">
-                                    These rules act as the **foundation** for every design prompt generated. Define your brand's color palette, logo placement preferences, photography style (e.g., "minimalist", "vibrant", "high-contrast"), and any forbidden elements.
-                                </p>
-                            </div>
-
-                            <div className="relative overflow-hidden rounded-3xl border-2 border-slate-100 focus-within:border-blue-500/30 transition-all shadow-inner bg-slate-50/30">
-                                <div className="absolute top-4 left-4 p-2 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200 flex items-center gap-2 z-10">
-                                    <Sparkles size={14} className="text-blue-500" />
-                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Main Rules Engine</span>
-                                </div>
-                                <textarea
-                                    value={brandRulesDraft}
-                                    onChange={(e) => setBrandRulesDraft(e.target.value)}
-                                    className="w-full h-[400px] p-8 pt-16 text-sm font-medium text-slate-700 bg-transparent outline-none resize-none leading-relaxed"
-                                    placeholder="e.g. Always use centered typography. Logo should be in top-right corner. Use a soft pastel color palette with high-key lighting..."
-                                />
-                            </div>
-
-                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                                <div className="w-px h-8 bg-white/10 mx-2" />
                                 <button
-                                    onClick={() => setIsEditingBrandRules(false)}
-                                    className="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 transition-colors"
+                                    onClick={handleDownload}
+                                    className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-black shadow-xl hover:bg-blue-700 transition-all active:scale-95"
                                 >
-                                    Discard Changes
+                                    <Download size={14} />
+                                    Download High-Res
                                 </button>
-                                <div className="flex gap-4">
-                                    <button
-                                        onClick={() => {
-                                            setIsEditingBrandRules(false);
-                                            setIsVisualOnboardingOpen(true);
-                                            setVisualOnboardingStep(1);
-                                        }}
-                                        className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
-                                    >
-                                        <Palette size={14} />
-                                        Open Wizard
-                                    </button>
-                                    <button
-                                        onClick={() => handleSaveBrandRules()}
-                                        disabled={isGeneratingImage}
-                                        className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
-                                    >
-                                        {isGeneratingImage ? 'Saving...' : (
-                                            <>
-                                                <CheckCircle2 size={18} />
-                                                Save Visual Identity
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-            {isVisualOnboardingOpen && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xl" onClick={() => setIsVisualOnboardingOpen(false)} />
+                )
+            }
+            {/* Visual & Image rules Modal */}
+            {
+                isEditingBrandRules && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsEditingBrandRules(false)} />
 
-                    <div className="relative z-10 w-full max-w-4xl bg-white rounded-[3rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col h-[85vh] animate-in zoom-in-95 duration-500">
-                        {/* Progress Header */}
-                        <div className="px-12 pt-12 pb-8 bg-white border-b border-slate-50 relative z-20">
-                            <div className="flex items-center justify-between mb-8">
-                                <div className="flex items-center gap-6">
-                                    <div className="p-4 bg-blue-600 text-white rounded-[2rem] shadow-2xl shadow-blue-200">
-                                        <Palette size={32} />
+                        <div className="relative z-10 w-full max-w-3xl bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
+                            <header className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
+                                        <Settings2 size={24} />
                                     </div>
                                     <div>
-                                        <h3 className="text-3xl font-black text-slate-900 tracking-tight">Design System Onboarding</h3>
-                                        <div className="flex items-center gap-3 mt-1">
-                                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-md">Step {visualOnboardingStep} of 5</p>
-                                            <div className="w-1 h-1 bg-slate-300 rounded-full" />
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Building your visual identity</p>
-                                        </div>
+                                        <h3 className="text-xl font-black text-slate-900 tracking-tight">Visual & Image rules</h3>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Visual Identity & Aesthetic Standards</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setIsVisualOnboardingOpen(false)} className="p-3 hover:bg-slate-100 rounded-full transition-colors group">
-                                    <X size={28} className="text-slate-400 group-hover:text-slate-600" />
+                                <button
+                                    onClick={() => setIsEditingBrandRules(false)}
+                                    className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
+                                >
+                                    <X size={24} />
                                 </button>
-                            </div>
+                            </header>
 
-                            <div className="flex gap-3">
-                                {[1, 2, 3, 4, 5].map(s => (
-                                    <div
-                                        key={s}
-                                        className={`h-2 flex-1 rounded-full transition-all duration-700 relative overflow-hidden ${s <= visualOnboardingStep ? 'bg-blue-600' : 'bg-slate-100'}`}
-                                    >
-                                        {s === visualOnboardingStep && (
-                                            <div className="absolute inset-0 bg-white/20 animate-pulse" />
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Step Content */}
-                        <div className="flex-1 px-12 overflow-y-auto custom-scrollbar space-y-10 py-10">
-                            {visualOnboardingStep === 1 && (
-                                <div className="animate-in slide-in-from-right-8 duration-700 space-y-10 max-w-2xl">
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                                                <Sparkles size={18} />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Visual Inspiration (Optional)</label>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Upload images you love and we'll extract the "DNA" of your brand.</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-3 gap-6">
-                                            {[0, 1, 2].map((idx) => (
-                                                <div key={idx} className="aspect-square rounded-[2rem] border-4 border-dashed border-slate-100 bg-slate-50/50 flex flex-col items-center justify-center relative group overflow-hidden hover:border-blue-200 hover:bg-white transition-all cursor-pointer shadow-inner">
-                                                    {brandInspirationImages[idx] ? (
-                                                        <>
-                                                            <img src={brandInspirationImages[idx]} className="w-full h-full object-cover" />
-                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setBrandInspirationImages(prev => prev.filter((_, i) => i !== idx));
-                                                                    }}
-                                                                    className="p-3 bg-white rounded-full text-slate-900 shadow-2xl"
-                                                                >
-                                                                    <X size={18} />
-                                                                </button>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <div className="p-4 bg-white rounded-2xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
-                                                                <ImagePlus size={24} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-                                                            </div>
-                                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Add Image</span>
-                                                            <input
-                                                                type="file"
-                                                                accept="image/*"
-                                                                className="absolute inset-0 opacity-0 cursor-pointer"
-                                                                onChange={(e) => {
-                                                                    const file = e.target.files?.[0];
-                                                                    if (file) {
-                                                                        const url = URL.createObjectURL(file);
-                                                                        setBrandInspirationImages(p => [...p, url].slice(0, 3));
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {brandInspirationImages.length > 0 && (
-                                            <div className="animate-in fade-in slide-in-from-top-4 duration-500 pt-4">
-                                                <button
-                                                    onClick={handleAnalyzeBrand}
-                                                    disabled={isAnalyzingBrand}
-                                                    className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-slate-200 hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-4 relative overflow-hidden"
-                                                >
-                                                    {isAnalyzingBrand ? (
-                                                        <>
-                                                            <RefreshCw size={20} className="animate-spin text-blue-400" />
-                                                            <span>Extracting Brand DNA...</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Zap size={20} className="text-amber-400" />
-                                                            <span>Analyze & Auto-Fill Wizard</span>
-                                                        </>
-                                                    )}
-                                                </button>
-                                                <p className="text-center text-[9px] font-bold text-slate-400 mt-4 uppercase tracking-widest">Our AI Vision will scan colors, fonts, and moods to save you time.</p>
-                                            </div>
-                                        )}
-                                    </div>
+                            <div className="p-8 space-y-6">
+                                <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100/50 flex gap-4 items-start">
+                                    <HelpCircle className="text-blue-500 mt-1 flex-shrink-0" size={18} />
+                                    <p className="text-xs font-medium text-slate-600 leading-relaxed">
+                                        These rules act as the **foundation** for every design prompt generated. Define your brand's color palette, logo placement preferences, photography style (e.g., "minimalist", "vibrant", "high-contrast"), and any forbidden elements.
+                                    </p>
                                 </div>
-                            )}
 
-                            {visualOnboardingStep === 2 && (
-                                <div className="animate-in slide-in-from-right-8 duration-700 space-y-10 max-w-2xl">
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                                <RefreshCw size={18} />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Fast Track: Crawler (Optional)</label>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">We'll scan your site for colors and descriptions</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-3">
-                                            <input
-                                                type="text"
-                                                value={websiteUrl}
-                                                onChange={(e) => setWebsiteUrl(e.target.value)}
-                                                placeholder="https://yourwebsite.com"
-                                                className="flex-1 p-5 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white transition-all shadow-inner"
-                                            />
-                                            <button
-                                                onClick={handleAnalyzeWebsiteForVisuals}
-                                                disabled={isAnalyzingWebsite || !websiteUrl}
-                                                className="px-8 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-2"
-                                            >
-                                                {isAnalyzingWebsite ? <RefreshCw size={16} className="animate-spin" /> : <Zap size={16} />}
-                                                {isAnalyzingWebsite ? 'Scanning...' : 'Scan Site'}
-                                            </button>
-                                        </div>
+                                <div className="relative overflow-hidden rounded-3xl border-2 border-slate-100 focus-within:border-blue-500/30 transition-all shadow-inner bg-slate-50/30">
+                                    <div className="absolute top-4 left-4 p-2 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200 flex items-center gap-2 z-10">
+                                        <Sparkles size={14} className="text-blue-500" />
+                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Main Rules Engine</span>
                                     </div>
-
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                                                <Monitor size={18} />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Brand Vibe & Style</label>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Tell us the personality of your brand's visuals</p>
-                                            </div>
-                                        </div>
-                                        <textarea
-                                            value={visualOnboardingState.vibeDescription}
-                                            onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, vibeDescription: e.target.value }))}
-                                            placeholder="e.g. A modern, high-tech vibe with clean lines and lots of white space. It should feel premium and trustworthy but also innovative..."
-                                            className="w-full h-48 p-6 bg-slate-50 border border-slate-100 rounded-[2rem] text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white transition-all text-slate-600 leading-relaxed shadow-inner"
-                                        />
-                                    </div>
+                                    <textarea
+                                        value={brandRulesDraft}
+                                        onChange={(e) => setBrandRulesDraft(e.target.value)}
+                                        className="w-full h-[400px] p-8 pt-16 text-sm font-medium text-slate-700 bg-transparent outline-none resize-none leading-relaxed"
+                                        placeholder="e.g. Always use centered typography. Logo should be in top-right corner. Use a soft pastel color palette with high-key lighting..."
+                                    />
                                 </div>
-                            )}
 
-                            {visualOnboardingStep === 3 && (
-                                <div className="animate-in slide-in-from-right-8 duration-700 space-y-10 max-w-2xl">
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2 text-blue-600">
-                                            <Zap size={20} />
-                                            <h4 className="text-lg font-black tracking-tight">Your Brand Colors</h4>
-                                        </div>
-                                        <p className="text-sm font-bold text-slate-400">These will be used for gradients, overlays, and UI elements.</p>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-10">
-                                        <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-100 flex flex-col items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Accent</span>
-                                            <div className="relative group">
-                                                <input
-                                                    type="color"
-                                                    value={visualOnboardingState.primaryColor}
-                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, primaryColor: e.target.value }))}
-                                                    className="w-32 h-32 rounded-[2.5rem] cursor-pointer border-8 border-white shadow-xl group-hover:scale-105 transition-transform"
-                                                />
-                                            </div>
-                                            <input
-                                                type="text"
-                                                value={visualOnboardingState.primaryColor}
-                                                onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, primaryColor: e.target.value }))}
-                                                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-3 text-center text-sm font-black uppercase tracking-widest text-slate-600 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none"
-                                            />
-                                        </div>
-                                        <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-100 flex flex-col items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Secondary Accent</span>
-                                            <div className="relative group">
-                                                <input
-                                                    type="color"
-                                                    value={visualOnboardingState.secondaryColor}
-                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                                                    className="w-32 h-32 rounded-[2.5rem] cursor-pointer border-8 border-white shadow-xl group-hover:scale-105 transition-transform"
-                                                />
-                                            </div>
-                                            <input
-                                                type="text"
-                                                value={visualOnboardingState.secondaryColor}
-                                                onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                                                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-3 text-center text-sm font-black uppercase tracking-widest text-slate-600 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {visualOnboardingStep === 4 && (
-                                <div className="animate-in slide-in-from-right-8 duration-700 space-y-12">
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                                <Type size={18} />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Font Style & Preview</label>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Select a typography vibe for your text overlays</p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {[
-                                                { id: 'Modern Sans-Serif', label: 'Modern Sans', class: 'font-sans', preview: 'Inter / Roboto' },
-                                                { id: 'Elegant Serif', label: 'Elegant Serif', class: 'font-serif', preview: 'Playfair / Times' },
-                                                { id: 'Bold & Industrial', label: 'Bold Display', class: 'font-sans font-black uppercase tracking-tighter', preview: 'IMPACT / BLACK' },
-                                                { id: 'Playful & Rounded', label: 'Playful Rounded', class: 'font-sans rounded-xl', preview: 'Fredoka / Nunito' },
-                                                { id: 'Minimalist Mono', label: 'Minimalist Mono', class: 'font-mono', preview: 'Fira / Courier' },
-                                                { id: 'Other', label: 'Custom Option', class: '', preview: 'Define your own' }
-                                            ].map(item => (
-                                                <button
-                                                    key={item.id}
-                                                    onClick={() => setVisualOnboardingState(prev => ({ ...prev, fontStyle: item.id }))}
-                                                    className={`w-full p-6 rounded-[2rem] text-left transition-all border-2 flex flex-col gap-2 ${visualOnboardingState.fontStyle === item.id ? 'bg-blue-600 border-blue-600 shadow-xl shadow-blue-100 scale-[1.03] z-10' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-200'}`}
-                                                >
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${visualOnboardingState.fontStyle === item.id ? 'text-blue-100' : 'text-slate-400'}`}>{item.label}</span>
-                                                    <span className={`text-xl ${item.class} ${visualOnboardingState.fontStyle === item.id ? 'text-white' : 'text-slate-900'}`}>{item.preview}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {visualOnboardingState.fontStyle === 'Other' && (
-                                            <div className="animate-in slide-in-from-top-2 duration-300 pt-2">
-                                                <input
-                                                    type="text"
-                                                    value={visualOnboardingState.customFont}
-                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, customFont: e.target.value }))}
-                                                    placeholder="e.g. Gotham Rounded Bold or a handwriting font..."
-                                                    className="w-full p-4 bg-blue-50 border border-blue-100 rounded-2xl text-sm font-bold text-blue-900 outline-none placeholder:text-blue-300"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                                                <Camera size={18} />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Imagery Mood</label>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Determine the photography aesthetic</p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            {['Clean & Bright', 'Dark & Moody', 'Vibrant & Pop', 'Soft Pastels', 'Vintage / Retro', 'Scientific / Technical', 'High Luxury', 'Street / Candid', 'Other'].map(mood => (
-                                                <button
-                                                    key={mood}
-                                                    onClick={() => setVisualOnboardingState(prev => ({ ...prev, imageryMood: mood }))}
-                                                    className={`p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${visualOnboardingState.imageryMood === mood ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg' : 'bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100'}`}
-                                                >
-                                                    {mood}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {visualOnboardingState.imageryMood === 'Other' && (
-                                            <div className="animate-in slide-in-from-top-2 duration-300">
-                                                <textarea
-                                                    value={visualOnboardingState.customImageryMood}
-                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, customImageryMood: e.target.value }))}
-                                                    placeholder="Describe your imagery mood in detail (e.g. grainy black and white film style showing urban architectures)..."
-                                                    className="w-full h-24 p-5 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-bold text-emerald-900 outline-none placeholder:text-emerald-300 shadow-inner"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {visualOnboardingStep === 5 && (
-                                <div className="animate-in slide-in-from-right-8 duration-700 space-y-12 max-w-2xl">
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                                                <Layout size={18} />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Composition Style</label>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">How should the elements be arranged?</p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {[
-                                                { id: 'Minimalist', desc: 'Lots of negative space, centered focus' },
-                                                { id: 'Full Page Photo', desc: 'Edge-to-edge imagery with light overlays' },
-                                                { id: 'Split Screen', desc: 'Distinct sections for text and imagery' },
-                                                { id: 'Dynamic Motion', desc: 'Action-oriented, diagonal lines, high energy' }
-                                            ].map(item => (
-                                                <button
-                                                    key={item.id}
-                                                    onClick={() => setVisualOnboardingState(prev => ({ ...prev, compositionStyle: item.id }))}
-                                                    className={`w-full p-6 rounded-[2rem] text-left border-2 transition-all flex flex-col gap-1 ${visualOnboardingState.compositionStyle === item.id ? 'bg-amber-600 border-amber-600 shadow-xl shadow-amber-100 scale-[1.03] z-10' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-200'}`}
-                                                >
-                                                    <span className={`text-base font-black tracking-tight ${visualOnboardingState.compositionStyle === item.id ? 'text-white' : 'text-slate-900'}`}>{item.id}</span>
-                                                    <span className={`text-[9px] font-bold ${visualOnboardingState.compositionStyle === item.id ? 'text-amber-100' : 'text-slate-400'}`}>{item.desc}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
-                                                <EyeOff size={18} />
-                                            </div>
-                                            <div>
-                                                <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Visual Guardrails</label>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">What should the AI absolutely never do?</p>
-                                            </div>
-                                        </div>
-                                        <textarea
-                                            value={visualOnboardingState.forbiddenElements}
-                                            onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, forbiddenElements: e.target.value }))}
-                                            placeholder="e.g. No low-quality stock photos, no bright red, no cursive fonts, no generic corporate suits..."
-                                            className="w-full h-32 p-6 bg-slate-50 border border-slate-100 rounded-[2rem] text-sm font-medium outline-none focus:ring-4 focus:ring-rose-500/10 focus:bg-white shadow-inner"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer Actions */}
-                        <footer className="px-12 py-10 border-t border-slate-100 flex items-center justify-between bg-white relative z-20">
-                            <button
-                                onClick={() => visualOnboardingStep > 1 && setVisualOnboardingStep(v => v - 1)}
-                                className={`flex items-center gap-3 px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest transition-all ${visualOnboardingStep === 1 ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'}`}
-                            >
-                                <ChevronLeft size={20} />
-                                Previous Step
-                            </button>
-
-                            <div className="flex gap-4">
-                                {visualOnboardingStep < 5 ? (
+                                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                     <button
-                                        onClick={() => setVisualOnboardingStep(v => v + 1)}
-                                        className="flex items-center gap-4 px-12 py-4 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-slate-200 hover:bg-slate-800 active:scale-95 transition-all group"
+                                        onClick={() => setIsEditingBrandRules(false)}
+                                        className="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 transition-colors"
                                     >
-                                        Next Step
-                                        <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                        Discard Changes
                                     </button>
-                                ) : (
-                                    <button
-                                        onClick={handleGenerateVisualIdentity}
-                                        disabled={isGeneratingImage}
-                                        className="flex items-center gap-4 px-12 py-4 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
-                                    >
-                                        {isGeneratingImage ?
-                                            <span className="flex items-center gap-3">
-                                                <RefreshCw size={20} className="animate-spin" />
-                                                Creating Identity...
-                                            </span>
-                                            : (
+                                    <div className="flex gap-4">
+                                        <button
+                                            onClick={() => {
+                                                setIsEditingBrandRules(false);
+                                                setIsVisualOnboardingOpen(true);
+                                                setVisualOnboardingStep(1);
+                                            }}
+                                            className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+                                        >
+                                            <Palette size={14} />
+                                            Open Wizard
+                                        </button>
+                                        <button
+                                            onClick={() => handleSaveBrandRules()}
+                                            disabled={isGeneratingImage}
+                                            className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {isGeneratingImage ? 'Saving...' : (
                                                 <>
-                                                    <ShieldCheck size={20} />
-                                                    Finalize & Generate
+                                                    <CheckCircle2 size={18} />
+                                                    Save Visual Identity
                                                 </>
                                             )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+            {
+                isVisualOnboardingOpen && (
+                    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xl" onClick={() => setIsVisualOnboardingOpen(false)} />
+
+                        <div className="relative z-10 w-full max-w-4xl bg-white rounded-[3rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col h-[85vh] animate-in zoom-in-95 duration-500">
+                            {/* Progress Header */}
+                            <div className="px-12 pt-12 pb-8 bg-white border-b border-slate-50 relative z-20">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div className="flex items-center gap-6">
+                                        <div className="p-4 bg-blue-600 text-white rounded-[2rem] shadow-2xl shadow-blue-200">
+                                            <Palette size={32} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-3xl font-black text-slate-900 tracking-tight">Design System Onboarding</h3>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-md">Step {visualOnboardingStep} of 5</p>
+                                                <div className="w-1 h-1 bg-slate-300 rounded-full" />
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Building your visual identity</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIsVisualOnboardingOpen(false)} className="p-3 hover:bg-slate-100 rounded-full transition-colors group">
+                                        <X size={28} className="text-slate-400 group-hover:text-slate-600" />
                                     </button>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    {[1, 2, 3, 4, 5].map(s => (
+                                        <div
+                                            key={s}
+                                            className={`h-2 flex-1 rounded-full transition-all duration-700 relative overflow-hidden ${s <= visualOnboardingStep ? 'bg-blue-600' : 'bg-slate-100'}`}
+                                        >
+                                            {s === visualOnboardingStep && (
+                                                <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Step Content */}
+                            <div className="flex-1 px-12 overflow-y-auto custom-scrollbar space-y-10 py-10">
+                                {visualOnboardingStep === 1 && (
+                                    <div className="animate-in slide-in-from-right-8 duration-700 space-y-10 max-w-2xl">
+                                        <div className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                                    <Sparkles size={18} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Visual Inspiration (Optional)</label>
+                                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">Upload images you love and we'll extract the "DNA" of your brand.</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-6">
+                                                {[0, 1, 2].map((idx) => (
+                                                    <div key={idx} className="aspect-square rounded-[2rem] border-4 border-dashed border-slate-100 bg-slate-50/50 flex flex-col items-center justify-center relative group overflow-hidden hover:border-blue-200 hover:bg-white transition-all cursor-pointer shadow-inner">
+                                                        {brandInspirationImages[idx] ? (
+                                                            <>
+                                                                <img src={brandInspirationImages[idx]} className="w-full h-full object-cover" />
+                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setBrandInspirationImages(prev => prev.filter((_, i) => i !== idx));
+                                                                        }}
+                                                                        className="p-3 bg-white rounded-full text-slate-900 shadow-2xl"
+                                                                    >
+                                                                        <X size={18} />
+                                                                    </button>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="p-4 bg-white rounded-2xl mb-2 shadow-sm group-hover:scale-110 transition-transform">
+                                                                    <ImagePlus size={24} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                                                                </div>
+                                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Add Image</span>
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                                    onChange={(e) => {
+                                                                        const file = e.target.files?.[0];
+                                                                        if (file) {
+                                                                            const url = URL.createObjectURL(file);
+                                                                            setBrandInspirationImages(p => [...p, url].slice(0, 3));
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {brandInspirationImages.length > 0 && (
+                                                <div className="animate-in fade-in slide-in-from-top-4 duration-500 pt-4">
+                                                    <button
+                                                        onClick={handleAnalyzeBrand}
+                                                        disabled={isAnalyzingBrand}
+                                                        className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-slate-200 hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-4 relative overflow-hidden"
+                                                    >
+                                                        {isAnalyzingBrand ? (
+                                                            <>
+                                                                <RefreshCw size={20} className="animate-spin text-blue-400" />
+                                                                <span>Extracting Brand DNA...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Zap size={20} className="text-amber-400" />
+                                                                <span>Analyze & Auto-Fill Wizard</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                    <p className="text-center text-[9px] font-bold text-slate-400 mt-4 uppercase tracking-widest">Our AI Vision will scan colors, fonts, and moods to save you time.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {visualOnboardingStep === 2 && (
+                                    <div className="animate-in slide-in-from-right-8 duration-700 space-y-10 max-w-2xl">
+                                        <div className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                                    <RefreshCw size={18} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Fast Track: Crawler (Optional)</label>
+                                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">We'll scan your site for colors and descriptions</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <input
+                                                    type="text"
+                                                    value={websiteUrl}
+                                                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                                                    placeholder="https://yourwebsite.com"
+                                                    className="flex-1 p-5 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white transition-all shadow-inner"
+                                                />
+                                                <button
+                                                    onClick={handleAnalyzeWebsiteForVisuals}
+                                                    disabled={isAnalyzingWebsite || !websiteUrl}
+                                                    className="px-8 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-2"
+                                                >
+                                                    {isAnalyzingWebsite ? <RefreshCw size={16} className="animate-spin" /> : <Zap size={16} />}
+                                                    {isAnalyzingWebsite ? 'Scanning...' : 'Scan Site'}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                                    <Monitor size={18} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Brand Vibe & Style</label>
+                                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">Tell us the personality of your brand's visuals</p>
+                                                </div>
+                                            </div>
+                                            <textarea
+                                                value={visualOnboardingState.vibeDescription}
+                                                onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, vibeDescription: e.target.value }))}
+                                                placeholder="e.g. A modern, high-tech vibe with clean lines and lots of white space. It should feel premium and trustworthy but also innovative..."
+                                                className="w-full h-48 p-6 bg-slate-50 border border-slate-100 rounded-[2rem] text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white transition-all text-slate-600 leading-relaxed shadow-inner"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {visualOnboardingStep === 3 && (
+                                    <div className="animate-in slide-in-from-right-8 duration-700 space-y-10 max-w-2xl">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 text-blue-600">
+                                                <Zap size={20} />
+                                                <h4 className="text-lg font-black tracking-tight">Your Brand Colors</h4>
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-400">These will be used for gradients, overlays, and UI elements.</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-10">
+                                            <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-100 flex flex-col items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Primary Accent</span>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="color"
+                                                        value={visualOnboardingState.primaryColor}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, primaryColor: e.target.value }))}
+                                                        className="w-32 h-32 rounded-[2.5rem] cursor-pointer border-8 border-white shadow-xl group-hover:scale-105 transition-transform"
+                                                    />
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={visualOnboardingState.primaryColor}
+                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, primaryColor: e.target.value }))}
+                                                    className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-3 text-center text-sm font-black uppercase tracking-widest text-slate-600 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none"
+                                                />
+                                            </div>
+                                            <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-100 flex flex-col items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Secondary Accent</span>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="color"
+                                                        value={visualOnboardingState.secondaryColor}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                                                        className="w-32 h-32 rounded-[2.5rem] cursor-pointer border-8 border-white shadow-xl group-hover:scale-105 transition-transform"
+                                                    />
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={visualOnboardingState.secondaryColor}
+                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                                                    className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-3 text-center text-sm font-black uppercase tracking-widest text-slate-600 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {visualOnboardingStep === 4 && (
+                                    <div className="animate-in slide-in-from-right-8 duration-700 space-y-12">
+                                        <div className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                                    <Type size={18} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Font Style & Preview</label>
+                                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">Select a typography vibe for your text overlays</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {[
+                                                    { id: 'Modern Sans-Serif', label: 'Modern Sans', class: 'font-sans', preview: 'Inter / Roboto' },
+                                                    { id: 'Elegant Serif', label: 'Elegant Serif', class: 'font-serif', preview: 'Playfair / Times' },
+                                                    { id: 'Bold & Industrial', label: 'Bold Display', class: 'font-sans font-black uppercase tracking-tighter', preview: 'IMPACT / BLACK' },
+                                                    { id: 'Playful & Rounded', label: 'Playful Rounded', class: 'font-sans rounded-xl', preview: 'Fredoka / Nunito' },
+                                                    { id: 'Minimalist Mono', label: 'Minimalist Mono', class: 'font-mono', preview: 'Fira / Courier' },
+                                                    { id: 'Other', label: 'Custom Option', class: '', preview: 'Define your own' }
+                                                ].map(item => (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => setVisualOnboardingState(prev => ({ ...prev, fontStyle: item.id }))}
+                                                        className={`w-full p-6 rounded-[2rem] text-left transition-all border-2 flex flex-col gap-2 ${visualOnboardingState.fontStyle === item.id ? 'bg-blue-600 border-blue-600 shadow-xl shadow-blue-100 scale-[1.03] z-10' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-200'}`}
+                                                    >
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest ${visualOnboardingState.fontStyle === item.id ? 'text-blue-100' : 'text-slate-400'}`}>{item.label}</span>
+                                                        <span className={`text-xl ${item.class} ${visualOnboardingState.fontStyle === item.id ? 'text-white' : 'text-slate-900'}`}>{item.preview}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {visualOnboardingState.fontStyle === 'Other' && (
+                                                <div className="animate-in slide-in-from-top-2 duration-300 pt-2">
+                                                    <input
+                                                        type="text"
+                                                        value={visualOnboardingState.customFont}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, customFont: e.target.value }))}
+                                                        placeholder="e.g. Gotham Rounded Bold or a handwriting font..."
+                                                        className="w-full p-4 bg-blue-50 border border-blue-100 rounded-2xl text-sm font-bold text-blue-900 outline-none placeholder:text-blue-300"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                                                    <Camera size={18} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Imagery Mood</label>
+                                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">Determine the photography aesthetic</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {['Clean & Bright', 'Dark & Moody', 'Vibrant & Pop', 'Soft Pastels', 'Vintage / Retro', 'Scientific / Technical', 'High Luxury', 'Street / Candid', 'Other'].map(mood => (
+                                                    <button
+                                                        key={mood}
+                                                        onClick={() => setVisualOnboardingState(prev => ({ ...prev, imageryMood: mood }))}
+                                                        className={`p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${visualOnboardingState.imageryMood === mood ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg' : 'bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100'}`}
+                                                    >
+                                                        {mood}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {visualOnboardingState.imageryMood === 'Other' && (
+                                                <div className="animate-in slide-in-from-top-2 duration-300">
+                                                    <textarea
+                                                        value={visualOnboardingState.customImageryMood}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, customImageryMood: e.target.value }))}
+                                                        placeholder="Describe your imagery mood in detail (e.g. grainy black and white film style showing urban architectures)..."
+                                                        className="w-full h-24 p-5 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-bold text-emerald-900 outline-none placeholder:text-emerald-300 shadow-inner"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {visualOnboardingStep === 5 && (
+                                    <div className="animate-in slide-in-from-right-8 duration-700 space-y-12 max-w-2xl">
+                                        <div className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                                                    <Layout size={18} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Composition Style</label>
+                                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">How should the elements be arranged?</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {[
+                                                    { id: 'Minimalist', desc: 'Lots of negative space, centered focus' },
+                                                    { id: 'Full Page Photo', desc: 'Edge-to-edge imagery with light overlays' },
+                                                    { id: 'Split Screen', desc: 'Distinct sections for text and imagery' },
+                                                    { id: 'Dynamic Motion', desc: 'Action-oriented, diagonal lines, high energy' }
+                                                ].map(item => (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => setVisualOnboardingState(prev => ({ ...prev, compositionStyle: item.id }))}
+                                                        className={`w-full p-6 rounded-[2rem] text-left border-2 transition-all flex flex-col gap-1 ${visualOnboardingState.compositionStyle === item.id ? 'bg-amber-600 border-amber-600 shadow-xl shadow-amber-100 scale-[1.03] z-10' : 'bg-slate-50 border-slate-100 hover:bg-slate-100 hover:border-slate-200'}`}
+                                                    >
+                                                        <span className={`text-base font-black tracking-tight ${visualOnboardingState.compositionStyle === item.id ? 'text-white' : 'text-slate-900'}`}>{item.id}</span>
+                                                        <span className={`text-[9px] font-bold ${visualOnboardingState.compositionStyle === item.id ? 'text-amber-100' : 'text-slate-400'}`}>{item.desc}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
+                                                    <EyeOff size={18} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-black text-slate-700 uppercase tracking-widest">Visual Guardrails</label>
+                                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">What should the AI absolutely never do?</p>
+                                                </div>
+                                            </div>
+                                            <textarea
+                                                value={visualOnboardingState.forbiddenElements}
+                                                onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, forbiddenElements: e.target.value }))}
+                                                placeholder="e.g. No low-quality stock photos, no bright red, no cursive fonts, no generic corporate suits..."
+                                                className="w-full h-32 p-6 bg-slate-50 border border-slate-100 rounded-[2rem] text-sm font-medium outline-none focus:ring-4 focus:ring-rose-500/10 focus:bg-white shadow-inner"
+                                            />
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                        </footer>
+
+                            {/* Footer Actions */}
+                            <footer className="px-12 py-10 border-t border-slate-100 flex items-center justify-between bg-white relative z-20">
+                                <button
+                                    onClick={() => visualOnboardingStep > 1 && setVisualOnboardingStep(v => v - 1)}
+                                    className={`flex items-center gap-3 px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest transition-all ${visualOnboardingStep === 1 ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'}`}
+                                >
+                                    <ChevronLeft size={20} />
+                                    Previous Step
+                                </button>
+
+                                <div className="flex gap-4">
+                                    {visualOnboardingStep < 5 ? (
+                                        <button
+                                            onClick={() => setVisualOnboardingStep(v => v + 1)}
+                                            className="flex items-center gap-4 px-12 py-4 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-slate-200 hover:bg-slate-800 active:scale-95 transition-all group"
+                                        >
+                                            Next Step
+                                            <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={handleGenerateVisualIdentity}
+                                            disabled={isGeneratingImage}
+                                            className="flex items-center gap-4 px-12 py-4 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
+                                        >
+                                            {isGeneratingImage ?
+                                                <span className="flex items-center gap-3">
+                                                    <RefreshCw size={20} className="animate-spin" />
+                                                    Creating Identity...
+                                                </span>
+                                                : (
+                                                    <>
+                                                        <ShieldCheck size={20} />
+                                                        Finalize & Generate
+                                                    </>
+                                                )}
+                                        </button>
+                                    )}
+                                </div>
+                            </footer>
+                        </div>
                     </div>
-                </div>
-            )}
-        </main>
+                )
+            }
+        </main >
     );
 }

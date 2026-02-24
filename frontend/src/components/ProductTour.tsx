@@ -27,6 +27,12 @@ const TOUR_STEPS: TourStep[] = [
         placement: 'right',
     },
     {
+        target: '[data-tour="company-settings"]',
+        title: '⚙️ Company Settings',
+        description: '🎯 Brand Intelligence starts here! Configure your voice, audience, and AI preferences to get personalized content.',
+        placement: 'right',
+    },
+    {
         target: '[data-tour="planner"]',
         title: '🎯 Content Planner',
         description: 'Define your goals and let AI structure your long-term campaign strategy and scheduled posts.',
@@ -97,15 +103,9 @@ const TOUR_STEPS: TourStep[] = [
         title: '👤 Profile & Security',
         description: 'Manage your personal account, update your avatar, and configure security preferences.',
         placement: 'left',
-    },
-    {
-        target: '[data-tour="company-settings"]',
-        title: '⚙️ Company Settings',
-        description: '🎯 Finalize your Brand Intelligence here! Configure your voice, audience, and AI preferences to get personalized content.',
-        placement: 'right',
         highlight: true,
-        ctaText: 'Go to Settings',
-        navigateTo: 'settings/brand-intelligence',
+        ctaText: 'View Profile',
+        navigateTo: 'profile',
     },
 ];
 

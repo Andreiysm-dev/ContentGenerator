@@ -3,23 +3,25 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft,
     Image as ImageIcon,
+    AlertCircle,
     Calendar,
     Send,
     Save,
     MoreVertical,
     Clock,
     CheckCircle2,
-    AlertCircle,
     Loader2,
     Plus,
     FileText,
     Eye,
     Globe,
     Layers,
-    SendHorizontal
+    SendHorizontal,
+    Check
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { ImageGenerationModal } from '../modals/ImageGenerationModal';
+import { DateTimePicker } from '../components/DateTimePicker';
 
 interface StudioEditorPageProps {
     activeCompanyId?: string;
@@ -52,6 +54,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
     });
     const [activePlatformTab, setActivePlatformTab] = useState('master');
     const [showPostConfirmation, setShowPostConfirmation] = useState(false);
+    const [supervisorComments, setSupervisorComments] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -78,29 +81,37 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                 setCaption(row.finalCaption || row.captionOutput || '');
                 setHashtags(row.finalHashtags || row.hastagsOutput || '');
                 setMediaUrl(row.imageGenerated || row.imageGeneratedUrl || null);
+                setSupervisorComments(row.supervisor_comments || null);
                 let fallbackDate = '';
                 if (row.scheduled_at) {
                     fallbackDate = new Date(row.scheduled_at).toISOString().slice(0, 16);
                 } else if (row.date) {
                     try {
-                        let dateObj = new Date(row.date);
-                        // Fix for 2001 year issue if date didn't have a year
-                        if (dateObj.getFullYear() <= 2001 || isNaN(dateObj.getFullYear())) {
-                            const components = row.date.split(/[-/ ]/);
-                            // If it's something like "Feb 19" or "02-19"
-                            dateObj = new Date();
-                            // This is a bit naive but handle standard month/day strings
-                            const parsed = new Date(row.date);
-                            if (!isNaN(parsed.getTime())) {
-                                dateObj = parsed;
-                                if (dateObj.getFullYear() <= 2001) {
-                                    dateObj.setFullYear(new Date().getFullYear());
+                        const dateParts = row.date.split('-');
+                        let dateObj: Date;
+                        if (dateParts.length === 3) {
+                            // YYYY-MM-DD
+                            dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]), 9, 0);
+                        } else {
+                            dateObj = new Date(row.date);
+                            if (dateObj.getFullYear() <= 2001 || isNaN(dateObj.getFullYear())) {
+                                const parsed = new Date(row.date);
+                                if (!isNaN(parsed.getTime())) {
+                                    dateObj = parsed;
+                                    if (dateObj.getFullYear() <= 2001) {
+                                        dateObj.setFullYear(new Date().getFullYear());
+                                    }
+                                } else {
+                                    dateObj = new Date();
                                 }
                             }
+                            dateObj.setHours(9, 0, 0, 0);
                         }
-                        // Default to 9:00 AM
-                        dateObj.setHours(9, 0, 0, 0);
-                        fallbackDate = dateObj.toISOString().slice(0, 16);
+
+                        const year = dateObj.getFullYear();
+                        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                        const day = String(dateObj.getDate()).padStart(2, '0');
+                        fallbackDate = `${year}-${month}-${day}T09:00`;
                     } catch (e) {
                         console.warn('Failed to parse row.date:', row.date);
                     }
@@ -181,9 +192,11 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                 imageGenerated: mediaUrl, // DB column is imageGenerated
                 status: newStatus,
                 // Only set scheduled_at on the content calendar if NOT using the new system (or for display)
-                scheduled_at: newStatus === 'SCHEDULED' && scheduleDate ? new Date(scheduleDate).toISOString() : null,
+                scheduled_at: (newStatus === 'SCHEDULED' || newStatus === 'For Approval') && isScheduleEnabled && scheduleDate ? new Date(scheduleDate).toISOString() :
+                    (newStatus === 'For Approval' && !isScheduleEnabled) ? new Date().toISOString() : null,
                 channels: selectedAccountIds, // Save selected accounts
-                draft_caption: JSON.stringify(remixes) // Persist remixes here
+                draft_caption: JSON.stringify(remixes), // Persist remixes here
+                supervisor_comments: newStatus === 'For Approval' ? null : supervisorComments
             };
 
             let url = `${backendBaseUrl}/api/content-calendar`;
@@ -506,40 +519,48 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-3 bg-slate-800/80 p-1.5 rounded-xl border border-white/10 mr-2">
-                            <button
-                                onClick={() => {
-                                    const newState = !isScheduleEnabled;
-                                    setIsScheduleEnabled(newState);
-                                    if (newState && !scheduleDate) {
-                                        // Set default date to future if enabling
-                                        const now = new Date();
-                                        now.setHours(now.getHours() + 1, 0, 0, 0); // Next hour flat
-                                        setScheduleDate(now.toISOString().slice(0, 16));
-                                    }
-                                }}
-                                className={`
-                                    relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ring-0
-                                    ${isScheduleEnabled ? 'bg-blue-500' : 'bg-slate-600'}
-                                `}
-                            >
-                                <span
-                                    aria-hidden="true"
-                                    className={`
-                                        pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
-                                        ${isScheduleEnabled ? 'translate-x-4' : 'translate-x-0'}
-                                    `}
-                                />
-                            </button>
-                            <div className={`flex items-center gap-2 transition-all ${isScheduleEnabled ? 'opacity-100' : 'opacity-40 grayscale pointer-events-none'}`}>
-                                <Calendar className="w-3.5 h-3.5 text-white/70" />
-                                <input
-                                    type="datetime-local"
-                                    value={scheduleDate}
-                                    onChange={(e) => setScheduleDate(e.target.value)}
-                                    disabled={!isScheduleEnabled}
-                                    className="bg-transparent border-none text-xs font-bold text-white focus:ring-0 p-0 w-[180px] [&::-webkit-calendar-picker-indicator]:invert"
-                                />
+                        <div className="flex items-center gap-4 bg-slate-900/40 backdrop-blur-xl px-5 py-2.5 rounded-[1.5rem] border border-white/10 shadow-2xl group transition-all hover:bg-slate-900/60">
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#3fa9f5] flex items-center gap-1.5">
+                                        <Clock className="w-3 h-3" />
+                                        Scheduling
+                                    </span>
+                                    <button
+                                        onClick={() => {
+                                            const newState = !isScheduleEnabled;
+                                            setIsScheduleEnabled(newState);
+                                            if (newState && !scheduleDate) {
+                                                const now = new Date();
+                                                now.setHours(9, 0, 0, 0); // Default to 9 AM
+                                                const year = now.getFullYear();
+                                                const month = String(now.getMonth() + 1).padStart(2, '0');
+                                                const day = String(now.getDate()).padStart(2, '0');
+                                                setScheduleDate(`${year}-${month}-${day}T09:00`);
+                                            }
+                                        }}
+                                        className={`
+                                            relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 focus:outline-none 
+                                            ${isScheduleEnabled ? 'bg-[#3fa9f5] shadow-[0_0_10px_rgba(63,169,245,0.4)]' : 'bg-slate-700'}
+                                        `}
+                                    >
+                                        <span
+                                            aria-hidden="true"
+                                            className={`
+                                                pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-300 ease-in-out
+                                                ${isScheduleEnabled ? 'translate-x-4' : 'translate-x-0'}
+                                            `}
+                                        />
+                                    </button>
+                                </div>
+
+                                <div className={`flex items-center gap-2 transition-all duration-500 w-full ${isScheduleEnabled ? 'opacity-100 translate-y-0' : 'opacity-20 translate-y-1 grayscale pointer-events-none'}`}>
+                                    <DateTimePicker
+                                        value={scheduleDate}
+                                        onChange={setScheduleDate}
+                                        disabled={!isScheduleEnabled}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -552,21 +573,6 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                             Save Draft
                         </button>
 
-                        <button
-                            onClick={() => {
-                                if (!isScheduleEnabled || !scheduleDate) {
-                                    notify('Please set a schedule date before sending for review', 'info');
-                                    setIsScheduleEnabled(true); // Helper to show the schedule input
-                                    return;
-                                }
-                                handleSave('For Approval');
-                            }}
-                            disabled={isSaving}
-                            className="px-4 py-2 rounded-lg bg-purple-600/20 text-purple-200 border border-purple-500/30 text-xs font-bold hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50 flex items-center gap-2"
-                        >
-                            <SendHorizontal className="h-3.5 w-3.5" />
-                            Send for Review
-                        </button>
 
                         <div className="relative">
                             <button
@@ -596,12 +602,12 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                                             </div>
                                             <div>
                                                 <h4 className="text-slate-900 font-bold text-sm">
-                                                    {isScheduleEnabled ? 'Confirm Schedule?' : 'Post Immediately?'}
+                                                    {isScheduleEnabled ? 'Send for Approval?' : 'Send for Approval?'}
                                                 </h4>
                                                 <p className="text-xs text-slate-500 mt-1 px-2">
                                                     {isScheduleEnabled
-                                                        ? `This post will automatically go live on ${new Date(scheduleDate).toLocaleString()} to your selected channels.`
-                                                        : `This will instantly publish your content to all selected channels. This cannot be undone.`
+                                                        ? `This post will be reviewed and once approved, go live on ${new Date(scheduleDate).toLocaleString()}.`
+                                                        : `This post will be sent for review and once approved, will be published immediately.`
                                                     }
                                                 </p>
                                             </div>
@@ -615,11 +621,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        if (isScheduleEnabled) {
-                                                            handleSave('SCHEDULED');
-                                                        } else {
-                                                            handlePublish();
-                                                        }
+                                                        handleSave('For Approval');
                                                         setShowPostConfirmation(false);
                                                     }}
                                                     className={`
@@ -645,6 +647,19 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                 {/* Left: Editor (60%) */}
                 <div className="flex-[3] min-w-[500px] overflow-y-auto bg-white border-r border-slate-200 p-8 pt-6">
                     <div className="max-w-3xl mx-auto space-y-10">
+                        {supervisorComments && (
+                            <div className="bg-rose-50 border border-rose-100 p-5 rounded-[2rem] animate-in fade-in slide-in-from-top-4 duration-700">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="p-2 bg-rose-100 rounded-xl">
+                                        <AlertCircle className="w-4 h-4 text-rose-600" />
+                                    </div>
+                                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-rose-600">Supervisor Feedback</h4>
+                                </div>
+                                <p className="text-sm font-medium text-rose-900 leading-relaxed italic ml-1">
+                                    "{supervisorComments}"
+                                </p>
+                            </div>
+                        )}
 
                         {/* 1. Account Selection */}
                         <div className="space-y-4">

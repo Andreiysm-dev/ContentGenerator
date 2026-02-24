@@ -19,6 +19,7 @@ import {
   Lightbulb,
   Send,
   Sparkles,
+  AlertCircle,
   SendHorizontal,
   XCircle,
   CheckCircle,
@@ -39,6 +40,13 @@ interface DraftsPageProps {
   connectedAccounts?: any[];
   authedFetch?: any;
   backendBaseUrl?: string;
+  userPermissions?: {
+    canApprove: boolean;
+    canGenerate: boolean;
+    canCreate: boolean;
+    canDelete: boolean;
+    isOwner: boolean;
+  };
 }
 
 type TabType = 'drafts' | 'approvals' | 'scheduled' | 'published';
@@ -54,7 +62,14 @@ export function StudioPage({
   activeCompanyId,
   connectedAccounts,
   authedFetch,
-  backendBaseUrl
+  backendBaseUrl,
+  userPermissions = {
+    canApprove: false,
+    canGenerate: false,
+    canCreate: false,
+    canDelete: false,
+    isOwner: false
+  }
 }: DraftsPageProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -62,6 +77,8 @@ export function StudioPage({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [denyingRowId, setDenyingRowId] = useState<string | null>(null);
+  const [denialComment, setDenialComment] = useState('');
 
   // Filtering Logic
   const allRows = calendarRows.map(row => ({
@@ -72,7 +89,8 @@ export function StudioPage({
   const drafts = allRows.filter(r =>
     (
       r.normalizedStatus === "design completed" ||
-      r.normalizedStatus === "ready"
+      r.normalizedStatus === "ready" ||
+      r.normalizedStatus === "needs revision"
     ) &&
     r.normalizedStatus !== "idea" &&
     r.normalizedStatus !== "approved" &&
@@ -236,13 +254,16 @@ export function StudioPage({
 
 
 
-  const handleUpdateStatus = async (row: any, newStatus: string) => {
+  const handleUpdateStatus = async (row: any, newStatus: string, comments?: string) => {
     if (!authedFetch || !backendBaseUrl) return;
     try {
       const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${row.contentCalendarId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({
+          status: newStatus,
+          supervisor_comments: comments
+        })
       });
       if (res.ok) {
         notify(`Status updated to ${newStatus.toLowerCase()}!`, 'success');
@@ -519,7 +540,9 @@ export function StudioPage({
                         <div className="p-6 space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                              {row.date || 'TBD'}
+                              {((activeTab === 'scheduled' || activeTab === 'approvals') && row.scheduled_at)
+                                ? new Date(row.scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                : (row.date || 'TBD')}
                             </span>
                             <div className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest ${activeTab === 'published' ? 'bg-emerald-50 text-emerald-600' :
                               activeTab === 'scheduled' ? 'bg-amber-50 text-amber-600' :
@@ -540,52 +563,83 @@ export function StudioPage({
                             {caption || <span className="text-slate-300 italic">No caption generated yet.</span>}
                           </p>
 
-                          <div className="flex flex-col gap-2 pt-2 border-t border-slate-50">
-                            <button
-                              onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
-                              className="w-full py-3 px-4 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all duration-300 uppercase tracking-widest"
-                            >
-                              Edit Details
-                            </button>
+                          {row.supervisor_comments && (
+                            <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
+                              <div className="flex items-center gap-2 mb-1">
+                                <AlertCircle className="w-3 h-3 text-rose-500" />
+                                <span className="text-[9px] font-black uppercase tracking-wider text-rose-500">Revision Notes</span>
+                              </div>
+                              <p className="text-[11px] font-medium text-rose-900 leading-relaxed italic line-clamp-2">
+                                "{row.supervisor_comments}"
+                              </p>
+                            </div>
+                          )}
 
-                            {activeTab === 'drafts' && (
+                          <div className="flex flex-col gap-2 pt-2 border-t border-slate-50">
+                            {userPermissions.canCreate && (
                               <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!row.scheduled_at) {
-                                    notify('Please set a schedule date in details before sending for review', 'info');
-                                    activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`);
-                                    return;
-                                  }
-                                  handleUpdateStatus(row, 'For Approval');
-                                }}
-                                className="w-full py-3 px-4 bg-purple-50 border border-purple-100 rounded-xl text-[10px] font-black text-purple-600 hover:bg-purple-600 hover:text-white transition-all duration-300 uppercase tracking-widest flex items-center justify-center gap-2"
+                                onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
+                                className="w-full py-3 px-4 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all duration-300 uppercase tracking-widest"
                               >
-                                <SendHorizontal className="w-3.5 h-3.5" />
-                                Send for Review
+                                Edit Details
                               </button>
                             )}
 
-                            {activeTab === 'approvals' && (
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Needs Revision'); }}
-                                  className="flex-1 py-3 px-4 bg-rose-50 border border-rose-100 rounded-xl text-[10px] font-black text-rose-600 hover:bg-rose-600 hover:text-white transition-all duration-300 uppercase tracking-widest flex items-center justify-center gap-2"
-                                >
-                                  <XCircle className="w-3.5 h-3.5" />
-                                  Deny
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Scheduled'); }}
-                                  className="flex-1 py-3 px-4 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] font-black text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all duration-300 uppercase tracking-widest flex items-center justify-center gap-2"
-                                >
-                                  <Clock className="w-3.5 h-3.5" />
-                                  Approve
-                                </button>
+
+                            {activeTab === 'approvals' && userPermissions.canApprove && (
+                              <div className="flex flex-col gap-2">
+                                {denyingRowId === row.contentCalendarId ? (
+                                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <textarea
+                                      autoFocus
+                                      placeholder="What needs to be fixed?"
+                                      value={denialComment}
+                                      onChange={(e) => setDenialComment(e.target.value)}
+                                      className="w-full p-3 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none resize-none h-20"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setDenyingRowId(null); setDenialComment(''); }}
+                                        className="flex-1 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 rounded-lg transition-all"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleUpdateStatus(row, 'Needs Revision', denialComment);
+                                          setDenyingRowId(null);
+                                          setDenialComment('');
+                                        }}
+                                        className="flex-1 py-2 bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-rose-600 transition-all"
+                                      >
+                                        Send Back
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setDenyingRowId(row.contentCalendarId); setDenialComment(''); }}
+                                      className="flex-1 py-3 px-4 bg-rose-50 border border-rose-100 rounded-xl text-[10px] font-black text-rose-600 hover:bg-rose-600 hover:text-white transition-all duration-300 uppercase tracking-widest flex items-center justify-center gap-2"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                      Deny
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Scheduled'); }}
+                                      className="flex-1 py-3 px-4 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] font-black text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all duration-300 uppercase tracking-widest flex items-center justify-center gap-2"
+                                    >
+                                      <Clock className="w-3.5 h-3.5" />
+                                      Approve
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
 
-                            {activeTab === 'scheduled' && (
+                            {activeTab === 'scheduled' && userPermissions.canApprove && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Approved'); }}
                                 className="w-full py-3 px-4 bg-amber-50 border border-amber-100 rounded-xl text-[10px] font-black text-amber-600 hover:bg-amber-600 hover:text-white transition-all duration-300 uppercase tracking-widest flex items-center justify-center gap-2"
@@ -666,8 +720,16 @@ export function StudioPage({
                                       <p className="text-slate-700 font-medium leading-relaxed line-clamp-2">
                                         {caption || <span className="text-slate-300 italic text-sm">No caption drafting yet.</span>}
                                       </p>
+                                      {row.supervisor_comments && (
+                                        <div className="mt-3 flex items-start gap-2 bg-rose-50/50 border border-rose-100/50 p-2.5 rounded-xl">
+                                          <AlertCircle className="w-3 h-3 text-rose-500 mt-0.5 shrink-0" />
+                                          <p className="text-[11px] font-medium text-rose-800 leading-tight italic">
+                                            "{row.supervisor_comments}"
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 shrink-0">
                                       <button
                                         onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}
                                         className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -683,70 +745,89 @@ export function StudioPage({
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                                    <div className="flex items-center gap-4">
-                                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        {row.scheduled_at ? format(parseISO(row.scheduled_at), 'hh:mm a') : 'Not time-set'}
-                                      </div>
-                                    </div>
-
-                                    <div className="flex gap-4">
-                                      {activeTab === 'drafts' && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (!row.scheduled_at) {
-                                              notify('Please set a schedule date in details before sending for review', 'info');
-                                              activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`);
-                                              return;
-                                            }
-                                            handleUpdateStatus(row, 'For Approval');
-                                          }}
-                                          className="text-[11px] font-black text-emerald-600 uppercase tracking-widest hover:underline flex items-center gap-1"
-                                        >
-                                          <SendHorizontal className="w-3 h-3" />
-                                          Send for Review
-                                        </button>
-                                      )}
-
-                                      {activeTab === 'approvals' && (
-                                        <>
+                                  <div className="flex flex-col gap-4 pt-4 border-t border-slate-50">
+                                    {activeTab === 'approvals' && denyingRowId === row.contentCalendarId && (
+                                      <div className="flex flex-col gap-2 bg-slate-50 p-3 rounded-xl animate-in fade-in slide-in-from-top-2">
+                                        <textarea
+                                          autoFocus
+                                          placeholder="Specific feedback for the creator..."
+                                          value={denialComment}
+                                          onChange={(e) => setDenialComment(e.target.value)}
+                                          className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500/20"
+                                        />
+                                        <div className="flex justify-end gap-2">
                                           <button
-                                            onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Needs Revision'); }}
-                                            className="text-[11px] font-black text-rose-600 uppercase tracking-widest hover:underline flex items-center gap-1"
+                                            onClick={() => { setDenyingRowId(null); setDenialComment(''); }}
+                                            className="px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:bg-white rounded-md transition-colors"
+                                          >
+                                            Cancel
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              handleUpdateStatus(row, 'Needs Revision', denialComment);
+                                              setDenyingRowId(null);
+                                              setDenialComment('');
+                                            }}
+                                            className="px-4 py-1.5 bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest rounded-md hover:bg-rose-600"
+                                          >
+                                            Send Revision Request
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                                          <Clock className="w-3.5 h-3.5" />
+                                          {(activeTab === 'scheduled' || activeTab === 'approvals') && row.scheduled_at
+                                            ? format(parseISO(row.scheduled_at), 'hh:mm a')
+                                            : (row.date || 'Not set')}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex gap-4">
+
+                                        {activeTab === 'approvals' && userPermissions.canApprove && (
+                                          <>
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setDenyingRowId(row.contentCalendarId); setDenialComment(''); }}
+                                              className="text-[11px] font-black text-rose-600 uppercase tracking-widest hover:underline flex items-center gap-1"
+                                            >
+                                              <XCircle className="w-3 h-3" />
+                                              Deny
+                                            </button>
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Scheduled'); }}
+                                              className="text-[11px] font-black text-emerald-600 uppercase tracking-widest hover:underline flex items-center gap-1"
+                                            >
+                                              <Clock className="w-3 h-3" />
+                                              Approve
+                                            </button>
+                                          </>
+                                        )}
+
+                                        {activeTab === 'scheduled' && userPermissions.canApprove && (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Approved'); }}
+                                            className="text-[11px] font-black text-amber-600 uppercase tracking-widest hover:underline flex items-center gap-1"
                                           >
                                             <XCircle className="w-3 h-3" />
-                                            Deny
+                                            Undo Schedule
                                           </button>
+                                        )}
+
+
+
+                                        {userPermissions.canCreate && (
                                           <button
-                                            onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Scheduled'); }}
-                                            className="text-[11px] font-black text-emerald-600 uppercase tracking-widest hover:underline flex items-center gap-1"
+                                            onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
+                                            className="text-[11px] font-black text-slate-400 uppercase tracking-widest hover:underline"
                                           >
-                                            <Clock className="w-3 h-3" />
-                                            Approve
+                                            Edit
                                           </button>
-                                        </>
-                                      )}
-
-                                      {activeTab === 'scheduled' && (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row, 'Approved'); }}
-                                          className="text-[11px] font-black text-amber-600 uppercase tracking-widest hover:underline flex items-center gap-1"
-                                        >
-                                          <XCircle className="w-3 h-3" />
-                                          Undo Schedule
-                                        </button>
-                                      )}
-
-
-
-                                      <button
-                                        onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
-                                        className="text-[11px] font-black text-slate-400 uppercase tracking-widest hover:underline"
-                                      >
-                                        Edit
-                                      </button>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>

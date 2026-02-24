@@ -1,4 +1,5 @@
 import db from '../database/db.js';
+import { logApiUsage } from './apiUsageService.js';
 
 /**
  * Calls Replicate API to generate an image.
@@ -11,7 +12,9 @@ import db from '../database/db.js';
 export const callReplicatePredict = async ({
     prompt,
     model = 'black-forest-labs/flux-dev',
-    aspectRatio = '1:1'
+    aspectRatio = '1:1',
+    companyId,
+    userId
 }) => {
     const apiToken = process.env.REPLICATE_API_TOKEN;
     if (!apiToken) {
@@ -58,6 +61,16 @@ export const callReplicatePredict = async ({
             console.error('[Replicate] No output URL in response:', data);
             return { ok: false, error: 'No image URL returned from Replicate' };
         }
+
+        // Log Usage
+        await logApiUsage({
+            companyId,
+            userId,
+            provider: 'replicate',
+            model: model,
+            type: 'image_generation',
+            metadata: { aspectRatio }
+        });
 
         return { ok: true, url: imageUrl };
     } catch (error) {

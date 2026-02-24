@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
 import {
 
@@ -21,6 +21,8 @@ import {
   Eye,
   Copy,
   Download,
+  ShieldCheck,
+  Megaphone,
 } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LegalPage } from './pages/LegalPage';
@@ -49,6 +51,8 @@ import { MediaLibraryPage } from '@/pages/MediaLibraryPage';
 import { ContentPlannerPage } from '@/pages/ContentPlannerPage';
 import Faq from "@/pages/Faq";
 import { ImageHubPage } from '@/pages/ImageHubPage';
+import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
+import { MaintenancePage } from '@/pages/MaintenancePage';
 
 
 import {
@@ -65,6 +69,7 @@ import {
 } from '@/modals';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
+import { AdminSidebar } from '@/components/AdminSidebar';
 import { ProductTour } from '@/components/ProductTour';
 import './App.css';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -159,8 +164,26 @@ function App() {
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const [csvFieldSelection, setCsvFieldSelection] = useState<Record<string, boolean>>({});
   const [csvScope, setCsvScope] = useState<'selected' | 'all'>('selected');
+  const [publicSettings, setPublicSettings] = useState<{ maintenance_mode?: boolean; system_announcement?: string }>({});
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
-  const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: 'owner' | 'collaborator' }>>([]);
+  useEffect(() => {
+    const fetchPublicSettings = async () => {
+      try {
+        const res = await fetch(`${backendBaseUrl}/api/public/settings`);
+        const data = await res.json();
+        if (data.settings) {
+          setPublicSettings(data.settings);
+        }
+      } catch (e) {
+        console.error('Failed to fetch public settings:', e);
+      }
+    };
+    fetchPublicSettings();
+  }, [backendBaseUrl]);
+
+  const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: string }>>([]);
+  const [customRoles, setCustomRoles] = useState<Array<{ name: string; description?: string; permissions?: { canApprove: boolean; canGenerate: boolean; canCreate: boolean; canDelete: boolean } }>>([]);
   const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
 
@@ -173,6 +196,7 @@ function App() {
         return;
       }
       setCollaborators(data.collaborators || []);
+      setCustomRoles(data.customRoles || []);
     } catch (err) {
       notify('Failed to load collaborators.', 'error');
     }
@@ -216,6 +240,48 @@ function App() {
     }
   };
 
+  const handleUpdateCustomRoles = async (roles: any[]) => {
+    if (!activeCompanyId) return;
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}/roles`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customRoles: roles }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        notify(data.error || 'Failed to update custom roles.', 'error');
+        return;
+      }
+      setCustomRoles(roles);
+      notify('Custom roles updated!', 'success');
+    } catch (err) {
+      console.error('handleUpdateCustomRoles error:', err);
+      notify('Failed to update custom roles. This might be due to missing database columns.', 'error');
+    }
+  };
+
+  const handleAssignRole = async (targetUserId: string, role: string) => {
+    if (!activeCompanyId) return;
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}/${targetUserId}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        notify(data.error || 'Failed to assign role.', 'error');
+        return;
+      }
+      setCollaborators(prev => prev.map(c => c.id === targetUserId ? { ...c, role } : c));
+      notify(`Role updated to ${role}`, 'success');
+    } catch (err) {
+      console.error('handleAssignRole error:', err);
+      notify('Failed to assign role. This might be due to missing database columns.', 'error');
+    }
+  };
+
   const handleRemoveCollaborator = async (id: string) => {
     if (!activeCompanyId) return;
     try {
@@ -236,17 +302,22 @@ function App() {
 
   const authedFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
     const token = session?.access_token;
-
-    // Debug logging
-    if (!token) {
-      console.warn('[authedFetch] No access token available. Session:', session ? 'exists but no token' : 'null');
-    }
+    const impersonateUserId = sessionStorage.getItem('impersonateUserId');
 
     const headers = {
       ...(init.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(impersonateUserId ? { 'X-Impersonate-User': impersonateUserId } : {}),
     };
-    return fetch(input, { ...init, headers });
+    return fetch(input, { ...init, headers }).then(res => {
+      if (res.status === 503) {
+        // Only set maintenance if we are not admin
+        if (userProfile?.role !== 'ADMIN') {
+          setPublicSettings(prev => ({ ...prev, maintenance_mode: true }));
+        }
+      }
+      return res;
+    });
   };
 
   const getAttachedDesignUrls = (row: any): string[] => {
@@ -482,8 +553,8 @@ function App() {
   }, [activeCompanyId, userProfile?.id, isOnboardingOpen]);
 
   useEffect(() => {
-    const isTeamRoute = /^\/company\/[^/]+\/settings\/team\/?$/.test(location.pathname);
-    if (!isTeamRoute) return;
+    const isSettingsRoute = /^\/company\/[^/]+\/settings/.test(location.pathname);
+    if (!isSettingsRoute) return;
     if (!activeCompanyId) return;
     fetchCollaborators(activeCompanyId);
   }, [location.pathname, activeCompanyId]);
@@ -501,6 +572,30 @@ function App() {
       console.error('Failed to load social accounts.', err);
     }
   };
+
+
+  const userPermissions = useMemo(() => {
+    if (!session?.user || !activeCompanyId) return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, isOwner: false };
+    const userId = session.user.id;
+    const activeCompany = companies.find((c: any) => c.companyId === activeCompanyId);
+
+    if (activeCompany?.user_id === userId) {
+      return { canApprove: true, canGenerate: true, canCreate: true, canDelete: true, isOwner: true };
+    }
+
+    const collaboratorEntry = collaborators.find(c => c.id === userId);
+    if (!collaboratorEntry) {
+      return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, isOwner: false };
+    }
+
+    const roleName = collaboratorEntry.role;
+    const roleDef = customRoles.find(r => r.name === roleName);
+
+    return {
+      ...(roleDef?.permissions || { canApprove: false, canGenerate: false, canCreate: false, canDelete: false }),
+      isOwner: false
+    };
+  }, [session, activeCompanyId, companies, collaborators, customRoles]);
 
   const handleConnectLinkedIn = async () => {
     if (!activeCompanyId) return;
@@ -1937,6 +2032,7 @@ function App() {
     const path = location.pathname;
     if (/^\/company\/[^/]+\/dashboard(?:\/|$)/.test(path)) return 'dashboard';
     if (/^\/company\/[^/]+\/generate(?:\/|$)/.test(path)) return 'generate';
+    if (/^\/company\/[^/]+\/plan(?:\/|$)/.test(path)) return 'planner';
     if (/^\/company\/[^/]+\/calendar\/published(?:\/|$)/.test(path)) return 'published';
     if (/^\/company\/[^/]+\/calendar(?:\/|$)/.test(path)) return 'calendar';
     if (/^\/company\/[^/]+\/studio(?:\/|$)/.test(path)) return 'studio';
@@ -2374,6 +2470,9 @@ function App() {
       notify('Company name is required.', 'error');
       return;
     }
+    if (isCreatingCompany) return;
+
+    setIsCreatingCompany(true);
     try {
       const res = await authedFetch(`${backendBaseUrl}/api/company`, {
         method: 'POST',
@@ -2398,6 +2497,8 @@ function App() {
     } catch (err) {
       console.error('Failed to create company', err);
       notify('Failed to create company. Check console for details.', 'error');
+    } finally {
+      setIsCreatingCompany(false);
     }
   };
 
@@ -2625,6 +2726,7 @@ function App() {
   };
 
   const handleLogout = async () => {
+    sessionStorage.removeItem('impersonateUserId');
     setActiveCompanyIdWithPersistence(undefined);
     await supabase?.auth.signOut();
     navigate('/');
@@ -2788,6 +2890,10 @@ function App() {
     );
   }
 
+  if (!authLoading && publicSettings.maintenance_mode && userProfile?.role !== 'ADMIN') {
+    return <MaintenancePage />;
+  }
+
   return (
     <NotificationProvider>
 
@@ -2801,26 +2907,47 @@ function App() {
           session={session}
           supabase={supabase}
           onLogout={handleLogout}
+          userRole={userProfile?.role}
+          authedFetch={authedFetch}
+          backendBaseUrl={backendBaseUrl}
         />
 
-        <div className="flex min-h-[calc(100vh-64px)] relative">
-          <Sidebar
-            isNavDrawerOpen={isNavDrawerOpen}
-            setIsNavDrawerOpen={setIsNavDrawerOpen}
-            activeCompany={activeCompany}
-            activeCompanyId={activeCompanyId}
-            companies={companies}
-            isCompanyDropdownOpen={isCompanyDropdownOpen}
-            setIsCompanyDropdownOpen={setIsCompanyDropdownOpen}
-            navigate={navigate}
-            activeNavKey={activeNavKey}
-            setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-            setIsOnboardingOpen={setIsOnboardingOpen}
-            notify={notify}
-            recentCompanies={companies.filter((c) => recentCompanyIds.includes(c.companyId))}
-          />
+        {publicSettings.system_announcement && (
+          <div className="bg-gradient-to-r from-brand-primary to-indigo-600 text-white px-4 py-2 flex items-center justify-center gap-3 text-xs font-black uppercase tracking-wider shadow-lg animate-in slide-in-from-top duration-500 border-b border-white/10 overflow-hidden relative group">
+            <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 skew-x-12" />
+            <Megaphone className="w-4 h-4 text-brand-primary bg-white rounded-full p-0.5" />
+            <span>{publicSettings.system_announcement}</span>
+          </div>
+        )}
 
-          <div className={`flex-1 ml-0 lg:ml-[264px] transition-all duration-300 ${isAiAssistantOpen ? 'lg:mr-[400px]' : 'mr-0'} overflow-y-auto h-[calc(100vh-64px)] bg-gray-50`}>
+        <div className="flex h-[calc(100vh-64px)] relative">
+          {location.pathname.toLowerCase().startsWith('/admin') ? (
+            <AdminSidebar
+              key="admin-sidebar"
+              isNavDrawerOpen={isNavDrawerOpen}
+              setIsNavDrawerOpen={setIsNavDrawerOpen}
+            />
+          ) : (
+            <Sidebar
+              key="main-sidebar"
+              isNavDrawerOpen={isNavDrawerOpen}
+              setIsNavDrawerOpen={setIsNavDrawerOpen}
+              activeCompany={activeCompany}
+              activeCompanyId={activeCompanyId}
+              companies={companies}
+              isCompanyDropdownOpen={isCompanyDropdownOpen}
+              setIsCompanyDropdownOpen={setIsCompanyDropdownOpen}
+              navigate={navigate}
+              activeNavKey={activeNavKey}
+              setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+              setIsOnboardingOpen={setIsOnboardingOpen}
+              notify={notify}
+              recentCompanies={companies.filter((c) => recentCompanyIds.includes(c.companyId))}
+              userRole={userProfile?.role}
+            />
+          )}
+
+          <div className={`flex-1 ml-0 lg:ml-[280px] transition-all duration-300 ${isAiAssistantOpen ? 'lg:mr-[400px]' : 'mr-0'} overflow-y-auto h-full bg-gray-50`}>
             <div>
               <Routes>
                 <Route
@@ -2882,6 +3009,7 @@ function App() {
                       activeCompanyId={activeCompanyId}
                       authedFetch={authedFetch}
                       notify={notify}
+                      userPermissions={userPermissions}
                       backendBaseUrl={backendBaseUrl}
                       calendarRows={calendarRows}
                       initialItems={preDefinedPlan || undefined}
@@ -2977,6 +3105,7 @@ function App() {
                       authedFetch={authedFetch}
                       backendBaseUrl={backendBaseUrl}
                       notify={notify}
+                      userPermissions={userPermissions}
                     />
                   }
                 />
@@ -3022,6 +3151,7 @@ function App() {
                       authedFetch={authedFetch}
                       backendBaseUrl={backendBaseUrl}
                       notify={notify}
+                      userPermissions={userPermissions}
                     />
                   }
                 />
@@ -3041,6 +3171,7 @@ function App() {
                       connectedAccounts={connectedAccounts}
                       authedFetch={authedFetch}
                       backendBaseUrl={backendBaseUrl}
+                      userPermissions={userPermissions}
                     />
                   }
                 />
@@ -3076,6 +3207,7 @@ function App() {
                       getImageGeneratedSignature={getImageGeneratedSignature}
                       requestConfirm={requestConfirm}
                       setSelectedRow={setSelectedRow}
+                      userPermissions={userPermissions}
                     />
                   }
                 />
@@ -3126,6 +3258,9 @@ function App() {
                       setBrandSetupStep={setBrandSetupStep}
                       setIsEditingBrandSetup={setIsEditingBrandSetup}
                       collaborators={collaborators}
+                      customRoles={customRoles}
+                      onUpdateCustomRoles={handleUpdateCustomRoles}
+                      onAssignRole={handleAssignRole}
                       companyName={companyName}
                       setCompanyName={setCompanyName}
                       companyDescription={companyDescription}
@@ -3228,6 +3363,7 @@ function App() {
                       onConnectLinkedIn={handleConnectLinkedIn}
                       onConnectFacebook={handleConnectFacebook}
                       onDisconnectAccount={handleDisconnectAccount}
+                      userPermissions={userPermissions}
                     />
                   }
                 />
@@ -3264,6 +3400,9 @@ function App() {
                       setBrandSetupStep={setBrandSetupStep}
                       setIsEditingBrandSetup={setIsEditingBrandSetup}
                       collaborators={collaborators}
+                      customRoles={customRoles}
+                      onUpdateCustomRoles={handleUpdateCustomRoles}
+                      onAssignRole={handleAssignRole}
                       companyName={companyName}
                       setCompanyName={setCompanyName}
                       companyDescription={companyDescription}
@@ -3366,7 +3505,7 @@ function App() {
                       onAddCollaborator={handleAddCollaborator}
                       onRemoveCollaborator={handleRemoveCollaborator}
                       onTransferOwnership={handleTransferOwnership}
-                      isOwner={activeCompany?.user_id === session?.user?.id}
+                      userPermissions={userPermissions}
                       onDisconnectAccount={handleDisconnectAccount}
                       backendBaseUrl={backendBaseUrl}
                     />
@@ -3389,6 +3528,9 @@ function App() {
                       setBrandSetupStep={setBrandSetupStep}
                       setIsEditingBrandSetup={setIsEditingBrandSetup}
                       collaborators={collaborators}
+                      customRoles={customRoles}
+                      onUpdateCustomRoles={handleUpdateCustomRoles}
+                      onAssignRole={handleAssignRole}
                       companyName={companyName}
                       setCompanyName={setCompanyName}
                       companyDescription={companyDescription}
@@ -3484,7 +3626,7 @@ function App() {
                       onAddCollaborator={handleAddCollaborator}
                       onRemoveCollaborator={handleRemoveCollaborator}
                       onTransferOwnership={handleTransferOwnership}
-                      isOwner={activeCompany?.user_id === session?.user?.id}
+                      userPermissions={userPermissions}
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       connectedAccounts={connectedAccounts}
                       onConnectLinkedIn={handleConnectLinkedIn}
@@ -3513,6 +3655,9 @@ function App() {
                       setBrandSetupStep={setBrandSetupStep}
                       setIsEditingBrandSetup={setIsEditingBrandSetup}
                       collaborators={collaborators}
+                      customRoles={customRoles}
+                      onUpdateCustomRoles={handleUpdateCustomRoles}
+                      onAssignRole={handleAssignRole}
                       companyName={companyName}
                       setCompanyName={setCompanyName}
                       companyDescription={companyDescription}
@@ -3608,7 +3753,134 @@ function App() {
                       onAddCollaborator={handleAddCollaborator}
                       onRemoveCollaborator={handleRemoveCollaborator}
                       onTransferOwnership={handleTransferOwnership}
-                      isOwner={activeCompany?.user_id === session?.user?.id}
+                      userPermissions={userPermissions}
+                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
+                      connectedAccounts={connectedAccounts}
+                      onConnectLinkedIn={handleConnectLinkedIn}
+                      onConnectFacebook={handleConnectFacebook}
+                      isEditingBrandSetup={isEditingBrandSetup}
+                      brandEditingRef={brandEditingRef}
+                      onDisconnectAccount={handleDisconnectAccount}
+                      formAnswerCache={formAnswerCache}
+                      backendBaseUrl={backendBaseUrl}
+                    />}
+                />
+                <Route
+                  path="/company/:companyId/settings/audit"
+                  element={
+                    <SettingsPage
+                      tab="audit"
+                      notify={notify}
+                      authedFetch={authedFetch}
+                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+                      brandIntelligenceReady={brandIntelligenceReady}
+                      brandSetupMode={brandSetupMode}
+                      setBrandSetupMode={setBrandSetupMode}
+                      brandSetupLevel={brandSetupLevel}
+                      setBrandSetupLevel={setBrandSetupLevel}
+                      brandSetupStep={brandSetupStep}
+                      setBrandSetupStep={setBrandSetupStep}
+                      setIsEditingBrandSetup={setIsEditingBrandSetup}
+                      collaborators={collaborators}
+                      customRoles={customRoles}
+                      onUpdateCustomRoles={handleUpdateCustomRoles}
+                      onAssignRole={handleAssignRole}
+                      companyName={companyName}
+                      setCompanyName={setCompanyName}
+                      companyDescription={companyDescription}
+                      setCompanyDescription={setCompanyDescription}
+                      loadBrandKB={loadBrandKB}
+                      brandKbId={brandKbId}
+                      onSaveCompanyDetails={handleUpdateCompany}
+                      brandPack={brandPack}
+                      setBrandPack={setBrandPack}
+                      brandCapability={brandCapability}
+                      setBrandCapability={setBrandCapability}
+                      emojiRule={emojiRule}
+                      setEmojiRule={setEmojiRule}
+                      systemInstruction={systemInstruction}
+                      setSystemInstruction={setSystemInstruction}
+                      aiWriterSystemPrompt={aiWriterSystemPrompt}
+                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
+                      aiWriterUserPrompt={aiWriterUserPrompt}
+                      setAiWriterUserPrompt={setAiWriterUserPrompt}
+                      activeBrandRuleEdit={activeBrandRuleEdit}
+                      brandRuleDraft={brandRuleDraft}
+                      setBrandRuleDraft={setBrandRuleDraft}
+                      startBrandRuleEdit={startBrandRuleEdit}
+                      cancelBrandRuleEdit={cancelBrandRuleEdit}
+                      saveBrandRuleEdit={saveBrandRuleEdit}
+                      saveBrandSetup={saveBrandSetup}
+                      sendBrandWebhook={sendBrandWebhook}
+                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
+                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
+                      buildFormAnswer={buildFormAnswer}
+                      industryOptions={industryOptions}
+                      audienceRoleOptions={audienceRoleOptions}
+                      painPointOptions={painPointOptions}
+                      noSayOptions={noSayOptions}
+                      brandBasicsName={brandBasicsName}
+                      setBrandBasicsName={setBrandBasicsName}
+                      brandBasicsIndustry={brandBasicsIndustry}
+                      setBrandBasicsIndustry={setBrandBasicsIndustry}
+                      brandBasicsType={brandBasicsType}
+                      setBrandBasicsType={setBrandBasicsType}
+                      brandBasicsOffer={brandBasicsOffer}
+                      setBrandBasicsOffer={setBrandBasicsOffer}
+                      brandBasicsGoal={brandBasicsGoal}
+                      setBrandBasicsGoal={setBrandBasicsGoal}
+                      audienceRole={audienceRole}
+                      setAudienceRole={setAudienceRole}
+                      audienceIndustry={audienceIndustry}
+                      setAudienceIndustry={setAudienceIndustry}
+                      audiencePainPoints={audiencePainPoints}
+                      setAudiencePainPoints={setAudiencePainPoints}
+                      audienceOutcome={audienceOutcome}
+                      setAudienceOutcome={setAudienceOutcome}
+                      toneFormal={toneFormal}
+                      setToneFormal={setToneFormal}
+                      toneEnergy={toneEnergy}
+                      setToneEnergy={setToneEnergy}
+                      toneBold={toneBold}
+                      setToneBold={setToneBold}
+                      emojiUsage={emojiUsage}
+                      setEmojiUsage={setEmojiUsage}
+                      writingLength={writingLength}
+                      setWritingLength={setWritingLength}
+                      ctaStrength={ctaStrength}
+                      setCtaStrength={setCtaStrength}
+                      absoluteTruths={absoluteTruths}
+                      setAbsoluteTruths={setAbsoluteTruths}
+                      noSayRules={noSayRules}
+                      setNoSayRules={setNoSayRules}
+                      regulatedIndustry={regulatedIndustry}
+                      setRegulatedIndustry={setRegulatedIndustry}
+                      legalReview={legalReview}
+                      setLegalReview={setLegalReview}
+                      advancedPositioning={advancedPositioning}
+                      setAdvancedPositioning={setAdvancedPositioning}
+                      advancedDifferentiators={advancedDifferentiators}
+                      setAdvancedDifferentiators={setAdvancedDifferentiators}
+                      advancedPillars={advancedPillars}
+                      setAdvancedPillars={setAdvancedPillars}
+                      advancedCompetitors={advancedCompetitors}
+                      setAdvancedCompetitors={setAdvancedCompetitors}
+                      advancedProofPoints={advancedProofPoints}
+                      setAdvancedProofPoints={setAdvancedProofPoints}
+                      advancedRequiredPhrases={advancedRequiredPhrases}
+                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
+                      advancedForbiddenPhrases={advancedForbiddenPhrases}
+                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
+                      advancedComplianceNotes={advancedComplianceNotes}
+                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
+                      writerRulesUnlocked={writerRulesUnlocked}
+                      reviewerRulesUnlocked={reviewerRulesUnlocked}
+                      newCollaboratorEmail={newCollaboratorEmail}
+                      setNewCollaboratorEmail={setNewCollaboratorEmail}
+                      onAddCollaborator={handleAddCollaborator}
+                      onRemoveCollaborator={handleRemoveCollaborator}
+                      onTransferOwnership={handleTransferOwnership}
+                      userPermissions={userPermissions}
                       onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       connectedAccounts={connectedAccounts}
                       onConnectLinkedIn={handleConnectLinkedIn}
@@ -3621,6 +3893,76 @@ function App() {
                     />}
                 />
 
+                <Route
+                  path="/admin"
+                  element={<Navigate to="/admin/overview" replace />}
+                />
+                <Route
+                  path="/admin/overview"
+                  element={
+                    <AdminDashboardPage
+                      tab="overview"
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
+                    />
+                  }
+                />
+                <Route
+                  path="/admin/users"
+                  element={
+                    <AdminDashboardPage
+                      tab="users"
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
+                    />
+                  }
+                />
+                <Route
+                  path="/admin/companies"
+                  element={
+                    <AdminDashboardPage
+                      tab="companies"
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
+                    />
+                  }
+                />
+                <Route
+                  path="/admin/health"
+                  element={
+                    <AdminDashboardPage
+                      tab="health"
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
+                    />
+                  }
+                />
+                <Route
+                  path="/admin/logs"
+                  element={
+                    <AdminDashboardPage
+                      tab="logs"
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
+                    />
+                  }
+                />
+                <Route
+                  path="/admin/settings"
+                  element={
+                    <AdminDashboardPage
+                      tab="toolbox"
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
+                    />
+                  }
+                />
                 <Route path="/profile" element={<ProfilePage session={session} supabase={supabase} notify={notify} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
@@ -3647,6 +3989,7 @@ function App() {
           onSubmit={handleAddCompany}
           notify={notify}
           isAiAssistantOpen={isAiAssistantOpen}
+          isLoading={isCreatingCompany}
         />
 
         <CsvExportModal

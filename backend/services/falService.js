@@ -1,4 +1,5 @@
 import db from '../database/db.js';
+import { logApiUsage } from './apiUsageService.js';
 
 /**
  * Calls Fal.ai API to generate an image.
@@ -11,7 +12,9 @@ import db from '../database/db.js';
 export const callFalAiPredict = async ({
     prompt,
     model = 'fal-ai/flux-pro/v1.1',
-    aspectRatio = 'square' // Fal often uses "square", "landscape_4_3", "landscape_16_9", "portrait_3_4", "portrait_9_16"
+    aspectRatio = 'square',
+    companyId,
+    userId
 }) => {
     const apiKey = process.env.FAL_KEY;
     if (!apiKey) {
@@ -59,6 +62,15 @@ export const callFalAiPredict = async ({
 
         // Fal.ai Flux Pro returns: { images: [ { url: "...", ... } ], ... }
         if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+            // Log Usage
+            await logApiUsage({
+                companyId,
+                userId,
+                provider: 'fal',
+                model: model,
+                type: 'image_generation',
+                metadata: { aspectRatio: falImageSize }
+            });
             return { ok: true, url: data.images[0].url };
         }
 

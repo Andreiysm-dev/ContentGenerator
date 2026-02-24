@@ -1,5 +1,6 @@
 import express from 'express';
 import db from '../database/db.js';
+import { logAudit } from '../services/auditService.js';
 
 const router = express.Router();
 
@@ -13,29 +14,32 @@ export const getCollaboratorsByCompanyId = async (req, res) => {
     }
 
     // Verify user is owner or collaborator via company.collaborator_ids
-    const { data: company, error: companyError } = await db
+    // Robust select: fallback if custom role columns are missing
+    let { data: companyRow, error: fetchError } = await db
       .from('company')
-      .select('user_id, collaborator_ids')
+      .select('user_id, collaborator_ids, custom_roles, collaborator_roles')
       .eq('companyId', companyId)
       .single();
 
-    if (companyError || !company) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
+    if (fetchError && fetchError.message && fetchError.message.includes('column')) {
+      console.warn('Custom role columns missing, falling back to legacy select');
+      const { data: legacyRow, error: legacyError } = await db
+        .from('company')
+        .select('user_id, collaborator_ids')
+        .eq('companyId', companyId)
+        .single();
 
-    if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
-      return res.status(403).json({ error: 'Forbidden' });
+      companyRow = legacyRow;
+      fetchError = legacyError;
     }
-
-    // Fetch collaborators from company.collaborator_ids and resolve emails via admin API
-    const { data: companyRow, error: fetchError } = await db
-      .from('company')
-      .select('user_id, collaborator_ids')
-      .eq('companyId', companyId)
-      .single();
 
     if (fetchError || !companyRow) {
+      console.error('getCollaboratorsByCompanyId fetch error:', fetchError);
       return res.status(500).json({ error: 'Failed to fetch company' });
+    }
+
+    if (companyRow.user_id !== userId && !(companyRow.collaborator_ids?.includes(userId))) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const { data: { users }, error: adminError } = await db.auth.admin.listUsers();
@@ -44,6 +48,8 @@ export const getCollaboratorsByCompanyId = async (req, res) => {
     }
 
     const result = [];
+    const collaboratorRoles = companyRow.collaborator_roles || {};
+
     // Owner
     const owner = users.find(u => u.id === companyRow.user_id);
     if (owner) {
@@ -53,11 +59,20 @@ export const getCollaboratorsByCompanyId = async (req, res) => {
     if (companyRow.collaborator_ids?.length) {
       companyRow.collaborator_ids.forEach(cid => {
         const u = users.find(user => user.id === cid);
-        if (u) result.push({ id: u.id, email: u.email, role: 'collaborator' });
+        if (u) {
+          result.push({
+            id: u.id,
+            email: u.email,
+            role: collaboratorRoles[u.id] || 'collaborator'
+          });
+        }
       });
     }
 
-    return res.json({ collaborators: result });
+    return res.json({
+      collaborators: result,
+      customRoles: companyRow.custom_roles || []
+    });
   } catch (err) {
     console.error('getCollaboratorsByCompanyId error', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -265,9 +280,99 @@ export const searchUsers = async (req, res) => {
   }
 };
 
+// PUT /api/collaborators/:companyId/roles
+export const updateCustomRoles = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { customRoles } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!Array.isArray(customRoles)) return res.status(400).json({ error: 'Invalid roles format' });
+    if (customRoles.length > 5) return res.status(400).json({ error: 'Maximum 5 custom roles allowed' });
+
+    // Verify owner
+    const { data: company, error: companyError } = await db
+      .from('company')
+      .select('user_id')
+      .eq('companyId', companyId)
+      .single();
+
+    if (companyError || !company) return res.status(404).json({ error: 'Company not found' });
+    if (company.user_id !== userId) return res.status(403).json({ error: 'Only owners can manage roles' });
+
+    const { error: updateError } = await db
+      .from('company')
+      .update({ custom_roles: customRoles })
+      .eq('companyId', companyId);
+
+    if (updateError) return res.status(500).json({ error: 'Failed to update roles' });
+
+    await logAudit(userId, 'ROLES_UPDATE', 'company', companyId, { customRoles });
+
+    return res.json({ message: 'Roles updated successfully' });
+  } catch (err) {
+    console.error('updateCustomRoles error', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// PUT /api/collaborators/:companyId/:targetUserId/role
+export const assignRole = async (req, res) => {
+  try {
+    const { companyId, userId: targetUserId } = req.params;
+    const { role } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Verify owner
+    let { data: company, error: companyError } = await db
+      .from('company')
+      .select('user_id, collaborator_roles')
+      .eq('companyId', companyId)
+      .single();
+
+    if (companyError && companyError.message && companyError.message.includes('column')) {
+      // Fallback to just user_id if collaborator_roles is missing
+      const { data: ownerOnly, error: ownerError } = await db
+        .from('company')
+        .select('user_id')
+        .eq('companyId', companyId)
+        .single();
+      company = ownerOnly;
+      companyError = ownerError;
+    }
+
+    if (companyError || !company) return res.status(404).json({ error: 'Company not found' });
+    if (company.user_id !== userId) return res.status(403).json({ error: 'Only owners can assign roles' });
+
+    if (!company.collaborator_roles && companyError?.message?.includes('column')) {
+      return res.status(500).json({ error: 'Role assignment requires database migration. Please contact support.' });
+    }
+
+    const newRoles = { ...(company.collaborator_roles || {}), [targetUserId]: role };
+    const { error: updateError } = await db
+      .from('company')
+      .update({ collaborator_roles: newRoles })
+      .eq('companyId', companyId);
+
+    if (updateError) return res.status(500).json({ error: 'Failed to assign role' });
+
+    await logAudit(userId, 'ROLE_ASSIGN', 'user', targetUserId, { companyId, role });
+
+    return res.json({ message: 'Role assigned successfully' });
+  } catch (err) {
+    console.error('assignRole error', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 router.get('/collaborators/:companyId', getCollaboratorsByCompanyId);
 router.get('/users/search', searchUsers);
 router.post('/collaborators/:companyId', addCollaborator);
+router.put('/collaborators/:companyId/roles', updateCustomRoles);
+router.put('/collaborators/:companyId/:userId/role', assignRole);
 router.delete('/collaborators/:companyId/:userId', removeCollaborator);
 
 export default router;

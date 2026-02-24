@@ -1,17 +1,46 @@
 import db from '../database/db.js';
 import { generateImageForCalendarRow } from '../services/imageGenerationService.js';
+import { logAudit } from '../services/auditService.js';
 
-// Helper to verify user has access to company
-async function verifyCompanyAccess(userId, companyId) {
+// Helper to verify user has access to company and specific permissions
+async function verifyCompanyAccess(userId, companyId, requiredPermission = null) {
     const { data: company, error } = await db
         .from('company')
-        .select('user_id, collaborator_ids')
+        .select('user_id, collaborator_ids, custom_roles, collaborator_roles')
         .eq('companyId', companyId)
         .single();
+
     if (error || !company) return { ok: false, status: 404 };
-    if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+
+    // Owners have all permissions
+    if (company.user_id === userId) return { ok: true };
+
+    // Check if user is a collaborator
+    if (!(company.collaborator_ids?.includes(userId))) {
         return { ok: false, status: 403 };
     }
+
+    // If no specific permission is required, being a collaborator is enough
+    if (!requiredPermission) return { ok: true };
+
+    // Get user's role
+    const userRoleName = company.collaborator_roles?.[userId];
+    if (!userRoleName) return { ok: true }; // Default collaborator role (legacy or basic)
+
+    // Find role definition
+    const roleDef = company.custom_roles?.find(r => r.name === userRoleName);
+    if (!roleDef) return { ok: true }; // Role not found, fallback to basic access
+
+    // Check if permission is explicitly granted
+    if (roleDef.permissions && roleDef.permissions[requiredPermission] === true) {
+        return { ok: true };
+    }
+
+    // If role has permissions object but this one is missing or false
+    if (roleDef.permissions && roleDef.permissions[requiredPermission] === false) {
+        return { ok: false, status: 403, error: `Member lacks '${requiredPermission}' permission.` };
+    }
+
     return { ok: true };
 }
 
@@ -24,8 +53,8 @@ export const createContentCalendar = async (req, res) => {
         const { companyId, ...rest } = req.body;
         if (!companyId) return res.status(400).json({ error: 'companyId is required' });
 
-        const access = await verifyCompanyAccess(userId, companyId);
-        if (!access.ok) return res.status(access.status).json({ error: 'Forbidden' });
+        const access = await verifyCompanyAccess(userId, companyId, 'canCreate');
+        if (!access.ok) return res.status(access.status).json({ error: access.error || 'Forbidden' });
 
         const payload = { companyId, ...rest, user_id: userId };
         const { data: row, error } = await db
@@ -253,10 +282,19 @@ export const updateContentCalendar = async (req, res) => {
 
         if (fetchError || !existing) return res.status(404).json({ error: 'Content calendar not found' });
 
-        const access = await verifyCompanyAccess(userId, existing.companyId);
-        if (!access.ok) return res.status(access.status).json({ error: 'Forbidden' });
+        const isStatusChange = updateData.status && (updateData.status.toUpperCase() === 'SCHEDULED' || updateData.status.toUpperCase() === 'PUBLISHED');
+        const requiredPerm = isStatusChange ? 'canApprove' : 'canCreate';
+
+        const access = await verifyCompanyAccess(userId, existing.companyId, requiredPerm);
+        if (!access.ok) return res.status(access.status).json({ error: access.error || 'Forbidden' });
 
         const { contentCalendarId, companyId, created_at, provider, model, ...updateData } = req.body;
+
+        // Clear supervisor comments on approval/publish
+        if (updateData.status && (updateData.status.toUpperCase() === 'SCHEDULED' || updateData.status.toUpperCase() === 'PUBLISHED')) {
+            updateData.supervisor_comments = null;
+        }
+
         if (Object.keys(updateData).length === 0) return res.status(400).json({ error: 'No fields to update' });
 
         const { data: row, error } = await db
@@ -324,14 +362,27 @@ export const deleteContentCalendar = async (req, res) => {
 
         const { data: existing, error: fetchError } = await db
             .from('contentCalendar')
-            .select('companyId')
+            .select('companyId, imageGenerated')
             .eq('contentCalendarId', id)
             .single();
 
         if (fetchError || !existing) return res.status(404).json({ error: 'Content calendar not found' });
 
-        const access = await verifyCompanyAccess(userId, existing.companyId);
-        if (!access.ok) return res.status(access.status).json({ error: 'Forbidden' });
+        const access = await verifyCompanyAccess(userId, existing.companyId, 'canDelete');
+        if (!access.ok) return res.status(access.status).json({ error: access.error || 'Forbidden' });
+
+        // Storage Cleanup: Remove image from bucket if it exists
+        if (existing.imageGenerated) {
+            try {
+                // imageGenerated usually stores the path like "companyId/contentId/filename.png"
+                await db.storage
+                    .from('generated-images')
+                    .remove([existing.imageGenerated]);
+            } catch (storageErr) {
+                console.error('Failed to cleanup storage for deleted contentCalendar:', storageErr);
+                // We continue with the DB deletion even if storage cleanup fails
+            }
+        }
 
         const { data: row, error } = await db
             .from('contentCalendar')
@@ -344,6 +395,10 @@ export const deleteContentCalendar = async (req, res) => {
             console.error('Error deleting contentCalendar:', error);
             return res.status(500).json({ error: 'Failed to delete content calendar' });
         }
+        await logAudit(userId, 'CONTENT_DELETE', 'contentCalendar', id, {
+            companyId: existing.companyId
+        });
+
         return res.status(200).json({ message: 'Deleted', contentCalendar: row });
     } catch (err) {
         console.error('deleteContentCalendar error:', err);
@@ -358,20 +413,41 @@ export const deleteContentCalendarsByCompanyId = async (req, res) => {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-        const access = await verifyCompanyAccess(userId, companyId);
-        if (!access.ok) return res.status(access.status).json({ error: 'Forbidden' });
+        const access = await verifyCompanyAccess(userId, companyId, 'canDelete');
+        if (!access.ok) return res.status(access.status).json({ error: access.error || 'Forbidden' });
 
+        // Delete from DB and get back all the paths to delete from storage
         const { data: rows, error } = await db
             .from('contentCalendar')
             .delete()
             .eq('companyId', companyId)
-            .select();
+            .select('imageGenerated');
 
         if (error) {
             console.error('Error deleting contentCalendars:', error);
             return res.status(500).json({ error: 'Failed to delete content calendars' });
         }
-        return res.status(200).json({ message: `Deleted ${(rows || []).length} entries`, count: (rows || []).length });
+
+        // Storage Cleanup: Remove all images linked to these rows
+        const filePaths = (rows || [])
+            .map(r => r.imageGenerated)
+            .filter(Boolean);
+
+        if (filePaths.length > 0) {
+            try {
+                await db.storage
+                    .from('generated-images')
+                    .remove(filePaths);
+            } catch (storageErr) {
+                console.error('Failed to cleanup batch storage for company:', companyId, storageErr);
+            }
+        }
+
+        await logAudit(userId, 'CONTENT_BULK_DELETE', 'company', companyId, {
+            count: (rows || []).length
+        });
+
+        return res.status(200).json({ message: `Deleted ${(rows || []).length} entries and cleaned up storage`, count: (rows || []).length });
     } catch (err) {
         console.error('deleteContentCalendarsByCompanyId error:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -420,11 +496,16 @@ export const batchGenerateImages = async (req, res) => {
             return res.status(500).json({ error: 'Failed to authorize image generation.' });
         }
 
-        const allowedCompanyIds = new Set(
-            (companies || [])
-                .filter((company) => company.user_id === userId || company.collaborator_ids?.includes(userId))
-                .map((company) => company.companyId),
-        );
+        const allowedCompanyIds = new Set();
+        for (const company of companies || []) {
+            const hasAccess = company.user_id === userId || (company.collaborator_ids?.includes(userId));
+            if (!hasAccess) continue;
+
+            const access = await verifyCompanyAccess(userId, company.companyId, 'canGenerate');
+            if (access.ok) {
+                allowedCompanyIds.add(company.companyId);
+            }
+        }
         const allowedRows = rows.filter((row) => allowedCompanyIds.has(row.companyId));
 
         if (allowedRows.length === 0) {

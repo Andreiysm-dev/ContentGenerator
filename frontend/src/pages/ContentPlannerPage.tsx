@@ -16,14 +16,36 @@ interface PlannedItem {
     promoType: string;
 }
 
-export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFetch, initialItems, notify, backendBaseUrl, calendarRows }: {
+export function ContentPlannerPage({
+    activeCompanyId,
+    onAddToCalendar,
+    authedFetch,
+    initialItems,
+    notify,
+    backendBaseUrl,
+    calendarRows,
+    userPermissions = {
+        canApprove: false,
+        canGenerate: false,
+        canCreate: false,
+        canDelete: false,
+        isOwner: false
+    }
+}: {
     activeCompanyId?: string,
     onAddToCalendar?: (items: any[]) => Promise<void>,
     authedFetch?: (url: string, options?: RequestInit) => Promise<Response>,
     initialItems?: any[],
     notify: (message: string, tone: "success" | "error" | "info") => void,
     backendBaseUrl?: string,
-    calendarRows?: any[]
+    calendarRows?: any[],
+    userPermissions?: {
+        canApprove: boolean;
+        canGenerate: boolean;
+        canCreate: boolean;
+        canDelete: boolean;
+        isOwner: boolean;
+    }
 }) {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'planner' | 'ideas'>('planner');
@@ -35,6 +57,7 @@ export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFet
     const [isSaving, setIsSaving] = useState(false);
     const [newIdea, setNewIdea] = useState('');
     const [isCreatingIdea, setIsCreatingIdea] = useState(false);
+    const [isRefining, setIsRefining] = useState(false);
 
     React.useEffect(() => {
         if (initialItems && initialItems.length > 0) {
@@ -151,6 +174,36 @@ export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFet
         }
     };
 
+    const handleRefineIdea = async () => {
+        if (!newIdea.trim() || !authedFetch || !backendBaseUrl) return;
+        setIsRefining(true);
+        try {
+            const prompt = `
+                Act as a creative content director. I have a rough content idea: "${newIdea}".
+                Refine this into a more structured and professional content theme. 
+                Keep it concise but much more impactful and clear.
+                Return ONLY the refined text. No formatting, no chat.
+            `;
+
+            const res = await authedFetch(`${backendBaseUrl}/api/generate-content`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, noStream: true })
+            });
+
+            const data = await res.json();
+            const refined = (data.content || data.result || "").replace(/```/g, '').trim();
+            if (refined) {
+                setNewIdea(refined);
+                notify('Idea refined by AI!', 'success');
+            }
+        } catch (err) {
+            notify('Failed to refine idea', 'error');
+        } finally {
+            setIsRefining(false);
+        }
+    };
+
     return (
         <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6 relative">
             {/* Background Ambience */}
@@ -172,7 +225,7 @@ export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFet
                         <p className="mt-1 text-sm font-medium text-slate-400">Define your goal, choose your timeline, and let AI structure your campaign strategy.</p>
                     </div>
 
-                    {(items.length > 0) && (
+                    {items.length > 0 && userPermissions?.canCreate && (
                         <button
                             onClick={handleSaveToCalendar}
                             disabled={isSaving}
@@ -236,10 +289,20 @@ export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFet
                                             className="w-full bg-white/60 border border-amber-200/50 rounded-2xl p-4 text-sm font-medium text-slate-700 placeholder:text-amber-900/30 focus:outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/30 transition-all resize-none h-24 backdrop-blur-sm shadow-inner"
                                         />
                                     </div>
-                                    <div className="flex flex-col justify-end">
+                                    <div className="flex flex-col justify-end gap-2">
+                                        <button
+                                            onClick={handleRefineIdea}
+                                            disabled={isRefining || !newIdea.trim() || !userPermissions?.canGenerate}
+                                            title={!userPermissions?.canGenerate ? "You don't have permission to use AI refinement" : ""}
+                                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white border border-amber-200 text-amber-700 rounded-2xl text-xs font-bold hover:bg-amber-50 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                        >
+                                            <Wand2 className={`w-3.5 h-3.5 ${isRefining ? 'animate-spin' : ''}`} />
+                                            {isRefining ? 'Magic...' : 'Magic Refine'}
+                                        </button>
                                         <button
                                             onClick={handleCreateIdea}
-                                            disabled={isCreatingIdea || !newIdea.trim()}
+                                            disabled={isCreatingIdea || !newIdea.trim() || !userPermissions?.canCreate}
+                                            title={!userPermissions?.canCreate ? "You don't have permission to create content" : ""}
                                             className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-900 text-white rounded-2xl text-sm font-black hover:bg-black transition-all shadow-xl shadow-slate-900/20 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
                                         >
                                             {isCreatingIdea ? (
@@ -346,7 +409,8 @@ export function ContentPlannerPage({ activeCompanyId, onAddToCalendar, authedFet
                                     <div className="md:col-span-2">
                                         <button
                                             onClick={handleGenerate}
-                                            disabled={isGenerating || !goal.trim()}
+                                            disabled={isGenerating || !goal.trim() || !userPermissions?.canGenerate}
+                                            title={!userPermissions?.canGenerate ? "You don't have permission to generate content" : ""}
                                             className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white h-[60px] rounded-2xl font-bold shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition disabled:opacity-50 disabled:hover:scale-100"
                                         >
                                             {isGenerating ? (

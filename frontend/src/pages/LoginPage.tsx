@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Target } from "lucide-react";
 
 interface LoginPageProps {
   supabase: any;
@@ -30,7 +30,7 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAuthError(null); // Clear previous errors
+    setAuthError(null);
     if (!supabase) {
       setAuthError("System configuration error: Supabase not found.");
       return;
@@ -50,8 +50,6 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
       if (error) {
         console.error("Login error:", error);
         setAuthError(error.message || "Invalid login credentials.");
-      } else {
-        // App.tsx auth listener will handle redirection
       }
     } catch (err) {
       console.error("Unexpected login error:", err);
@@ -104,60 +102,85 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-cover bg-center px-4 sm:px-6" style={{ backgroundImage: "url('https://i.pinimg.com/1200x/a5/c7/e6/a5c7e61c0ea7ee0cfa03a220c6de9272.jpg')" }}>
-      <div className="bg-white p-6 sm:p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-[400px] text-center my-4">
+    <div className="flex justify-center items-center min-h-screen bg-[#F5F8FB] px-4 font-ribo">
+      {/* Background decoration matching Ribo palette */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] right-[-7%] w-[40%] h-[40%] bg-[#3FA9F5]/5 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-[38%] h-[38%] bg-[#0B2641]/5 rounded-full blur-[100px]" />
+      </div>
+
+      <div className="bg-white p-8 md:p-12 rounded-xl shadow-[0_10px_40px_rgba(11,38,65,0.08)] w-full max-w-[440px] relative z-10 border border-slate-100">
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-12 h-12 bg-[#3FA9F5] rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-4 transition-transform hover:scale-110">
+            <Target className="text-white w-7 h-7" />
+          </div>
+          <h1 className="h3 text-[#0B2641]">
+            Startup<span className="text-[#3FA9F5]">Lab</span>
+          </h1>
+          <p className="caption-1 text-slate-400 mt-2 uppercase tracking-widest font-bold">Content Intelligence Platform</p>
+        </div>
+
         {!isSignUp ? (
           <>
-            <div className="text-3xl sm:text-md font-bold text-brand-dark uppercase pb-5 mb-2 font-body">Welcome Back</div>
+            <h2 className="h5 text-[#0B2641] text-center mb-6">Welcome Back</h2>
 
             {authError && (
-              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm text-left flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+              <div className="mb-6 p-4 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 text-xs font-medium flex items-start gap-3 animate-in fade-in slide-in-from-top-1">
+                <div className="mt-0.5">⚠️</div>
                 <span>{authError}</span>
               </div>
             )}
 
-            <form className="flex flex-col gap-3 mb-4" onSubmit={handleLogin}>
-              <input
-                type="email"
-                placeholder="Email"
-                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${authError ? 'border-red-300 focus:ring-red-200' : 'border-gray-300 focus:ring-brand-primary'}`}
-                value={loginEmail}
-                onChange={(e) => {
-                  setLoginEmail(e.target.value);
-                  clearError();
-                }}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${authError ? 'border-red-300 focus:ring-red-200' : 'border-gray-300 focus:ring-brand-primary'}`}
-                value={loginPassword}
-                onChange={(e) => {
-                  setLoginPassword(e.target.value);
-                  clearError();
-                }}
-                required
-              />
+            <form className="flex flex-col gap-4" onSubmit={handleLogin}>
+              <div className="space-y-1.5 text-left">
+                <label className="label-ribo text-slate-500">Email Address</label>
+                <input
+                  type="email"
+                  placeholder="e.g. alex@company.com"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3FA9F5]/20 focus:border-[#3FA9F5] transition-all text-sm"
+                  value={loginEmail}
+                  onChange={(e) => {
+                    setLoginEmail(e.target.value);
+                    clearError();
+                  }}
+                  required
+                />
+              </div>
 
-              <button type="submit" className="w-full text-md btn btn-primary flex justify-center mt-2" disabled={loading}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "LOGIN"}
+              <div className="space-y-1.5 text-left">
+                <label className="label-ribo text-slate-500">Password</label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3FA9F5]/20 focus:border-[#3FA9F5] transition-all text-sm"
+                  value={loginPassword}
+                  onChange={(e) => {
+                    setLoginPassword(e.target.value);
+                    clearError();
+                  }}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-[#0B2641] text-white rounded-md font-bold text-sm hover:bg-[#1D3D5E] transition-all shadow-lg shadow-blue-900/10 mt-2 flex justify-center items-center"
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "SIGN IN"}
               </button>
             </form>
 
-            <div className="relative text-center my-6 font-medium">
-              <span className="relative z-10 bg-white px-4">OR</span>
+            <div className="relative text-center my-8">
+              <span className="relative z-10 bg-white px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest">or continue with</span>
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
+                <div className="w-full border-t border-slate-100"></div>
               </div>
             </div>
 
             <button
               type="button"
-              className="w-full flex items-center justify-center gap-2 btn btn-primary text-black bg-white border border-gray-300 hover:bg-gray-50"
+              className="w-full flex items-center justify-center gap-3 py-3 border border-slate-200 rounded-md text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-[0.98]"
               onClick={async () => {
                 if (!supabase) {
                   notify("Supabase is not configured.", "error");
@@ -169,72 +192,103 @@ export function LoginPage({ supabase, notify }: LoginPageProps) {
                 });
               }}
             >
-              <img src="https://cdn.freebiesupply.com/logos/large/2x/google-g-2015-logo-png-transparent.png" alt="Google" className="w-6 h-6" />
-              Sign in with Google
+              <img src="https://cdn.freebiesupply.com/logos/large/2x/google-g-2015-logo-png-transparent.png" alt="Google" className="w-5 h-5" />
+              Google Workspace
             </button>
 
-            <p className="mt-6 text-sm text-gray-500">
-              Don't have an account?{" "}
-              <button type="button" className="text-brand-primary underline font-medium transition-colors cursor-pointer bg-transparent border-none p-0" onClick={() => setIsSignUp(true)}>
-                Sign Up
+            <p className="mt-8 text-xs text-slate-500 text-center">
+              New to StartupLab?{" "}
+              <button
+                type="button"
+                className="text-[#3FA9F5] font-bold hover:underline transition-colors"
+                onClick={() => setIsSignUp(true)}
+              >
+                Create Account
               </button>
             </p>
           </>
         ) : (
           <>
-            {/* Sign Up */}
-            <div className="text-2xl sm:text-md font-bold uppercase mb-2">Create an account</div>
-            <p className="text-gray-600 mb-8">Sign up to get started.</p>
+            <h2 className="h5 text-[#0B2641] text-center mb-2">Create Account</h2>
+            <p className="body-3 text-slate-400 text-center mb-8">Join the intelligence fast-lane.</p>
 
-            <form className="flex flex-col gap-3 mb-4" onSubmit={handleSignUp}>
-              <input
-                type="text"
-                placeholder="First Name"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Last Name"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                value={signUpEmail}
-                onChange={(e) => setSignUpEmail(e.target.value)}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                value={signUpPassword}
-                onChange={(e) => setSignUpPassword(e.target.value)}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Confirm Password"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
+            <form className="flex flex-col gap-4" onSubmit={handleSignUp}>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 text-left">
+                  <label className="label-ribo text-slate-500">First Name</label>
+                  <input
+                    type="text"
+                    placeholder="Alex"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3FA9F5]/20 focus:border-[#3FA9F5] text-sm"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5 text-left">
+                  <label className="label-ribo text-slate-500">Last Name</label>
+                  <input
+                    type="text"
+                    placeholder="Smith"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3FA9F5]/20 focus:border-[#3FA9F5] text-sm"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
+              </div>
 
-              <button type="submit" className="w-full flex justify-center btn btn-primary mt-2" disabled={loading}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "SIGN UP"}
+              <div className="space-y-1.5 text-left">
+                <label className="label-ribo text-slate-500">Corporate Email</label>
+                <input
+                  type="email"
+                  placeholder="alex@company.com"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3FA9F5]/20 focus:border-[#3FA9F5] text-sm"
+                  value={signUpEmail}
+                  onChange={(e) => setSignUpEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="label-ribo text-slate-500">Password</label>
+                <input
+                  type="password"
+                  placeholder="Min. 8 characters"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3FA9F5]/20 focus:border-[#3FA9F5] text-sm"
+                  value={signUpPassword}
+                  onChange={(e) => setSignUpPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="label-ribo text-slate-500">Confirm Password</label>
+                <input
+                  type="password"
+                  placeholder="Repeat password"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3FA9F5]/20 focus:border-[#3FA9F5] text-sm"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-[#0B2641] text-white rounded-md font-bold text-sm hover:bg-[#1D3D5E] transition-all shadow-lg flex justify-center items-center mt-2"
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "JOIN NOW"}
               </button>
             </form>
 
-            <p className="mt-6 text-sm text-gray-500">
-              Already have an account?{" "}
-              <button type="button" className="text-brand-primary underline font-medium transition-colors cursor-pointer bg-transparent border-none p-0" onClick={() => setIsSignUp(false)}>
-                Log In
+            <p className="mt-8 text-xs text-slate-500 text-center">
+              Already a member?{" "}
+              <button
+                type="button"
+                className="text-[#3FA9F5] font-bold hover:underline transition-colors"
+                onClick={() => setIsSignUp(false)}
+              >
+                Sign In
               </button>
             </p>
           </>

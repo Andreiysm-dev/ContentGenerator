@@ -1,16 +1,39 @@
 @import "tailwindcss";
 
-
-/* Ribo brand: body = Poppins, headers = Helvetica Now. Colors: #0b2641, #1d3d5e, #3fa9f5 */
 :root {
-  font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* FONT FAMILY - Ribo standard */
+  --font-ribo: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: var(--font-ribo);
   line-height: 1.5;
   font-weight: 400;
 
+  /* BRAND PALETTE (VIBE) */
+  --ribo-black: #000000;
+  --ribo-navy-900: #0B2641;
+  --ribo-navy-800: #1D3D5E;
+  --ribo-navy-700: #385980;
+  --ribo-blue-primary: #3FA9F5;
+  --ribo-blue-medium: #6FB6E8;
+  --ribo-blue-light: #81BAD1;
+  --ribo-violet: #A78BFA;
+  --ribo-pink: #E5A4E6;
+  --ribo-white: #FFFFFF;
+
+  /* SEMANTIC SHORTCUTS */
+  --brand-primary: var(--ribo-navy-900);
+  --brand-accent: var(--ribo-blue-primary);
+  --text-main: var(--ribo-navy-900);
+  --bg-app: #F5F8FB;
+
+  /* FUNCTIONAL PALETTE (Approximated from PDF scales) */
+  --success: #3FA915;
+  --warning: #F5A623;
+  --danger: #FF4D4D;
+  --info: var(--ribo-blue-primary);
+
   color-scheme: light;
-  color: #0b2641;
-  /* brand-dark */
-  background-color: #f5f8fb;
+  color: var(--text-main);
+  background-color: var(--bg-app);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -18,24 +41,144 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* TYPOGRAPHY SCALE - Page 6 of Design System */
+.h1 {
+  font-size: 60px;
+  line-height: 64px;
+  font-weight: 600;
+}
+
+.h2 {
+  font-size: 48px;
+  line-height: 48px;
+  font-weight: 600;
+}
+
+.h3 {
+  font-size: 36px;
+  line-height: 38px;
+  font-weight: 600;
+}
+
+.h4 {
+  font-size: 30px;
+  line-height: 34px;
+  font-weight: 600;
+}
+
+.h5 {
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.subtitle-1 {
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.subtitle-2 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.body-1 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.body-2 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+.body-3 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.body-4 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.caption-1 {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.caption-2 {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.caption-3 {
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 500;
+}
+
+.label-ribo {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 a {
   font-weight: 500;
-  color: #3fa9f5;
+  color: var(--ribo-blue-primary);
   text-decoration: inherit;
+  transition: color 0.2s ease;
 }
 
 a:hover {
-  color: #1d3d5e;
+  color: var(--ribo-navy-800);
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f5f8fb;
+  background: var(--bg-app);
+  font-family: var(--font-ribo);
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* RE-TYPED HEADINGS FOR GLOBAL COMPLIANCE */
+h1,
+.h1 {
+  font-family: var(--font-ribo);
+}
+
+h2,
+.h2 {
+  font-family: var(--font-ribo);
+}
+
+h3,
+.h3 {
+  font-family: var(--font-ribo);
+}
+
+/* BUTTONS - PREVIEW OF PAGE 7 MAPPINGS */
+.btn-ribo-primary {
+  background-color: var(--ribo-navy-900);
+  color: white;
+  border-radius: 4px;
+  /* Ribo uses sharp/minimal radius */
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-ribo-primary:hover {
+  background-color: var(--ribo-navy-800);
 }

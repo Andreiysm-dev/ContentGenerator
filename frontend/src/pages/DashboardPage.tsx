@@ -21,28 +21,28 @@ export function DashboardPage({ activeCompany, activeCompanyId, dashboardStats, 
   const navigate = useNavigate();
 
   return (
-    <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6 min-w-0 relative">
-      {/* Background Ambience */}
+    <main className="flex-1 overflow-y-auto bg-[#F5F8FB] p-2.5 md:p-6 min-w-0 relative font-ribo">
+      {/* Background Ambience - Updated with Ribo Tones */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-gradient-to-br from-[#3fa9f5]/20 to-[#6fb6e8]/15 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-gradient-to-tr from-[#a78bfa]/15 to-[#e5a4e6]/12 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '700ms' }} />
-        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-gradient-to-bl from-[#81bad1]/12 to-transparent rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '1400ms' }} />
+        <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-gradient-to-br from-[#3FA9F5]/20 to-[#6FB6E8]/15 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-gradient-to-tr from-[#A78BFA]/15 to-[#E5A4E6]/12 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '700ms' }} />
+        <div className="absolute top-[30%] right-[10%] w-[30%] h-[30%] bg-gradient-to-bl from-[#81BAD1]/12 to-transparent rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '1400ms' }} />
       </div>
-      <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full relative z-10">
-        <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden">
-          <LayoutDashboard className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
+      <section className="w-full bg-white border border-slate-200/60 rounded-xl shadow-[0_2px_15px_-3px_rgba(11,38,65,0.07)] overflow-hidden flex flex-col h-full relative z-10">
+        <div className="px-8 py-8 bg-gradient-to-br from-[#0B2641] to-[#1D3D5E] border-b border-white/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden">
+          <LayoutDashboard className="absolute top-4 right-8 text-blue-400/5 w-32 h-32 rotate-12 pointer-events-none" />
 
           <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#3FA9F5]/20 text-[#3FA9F5] rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-[#3FA9F5]/20 mb-3">
               Workspace Overview
             </div>
-            <h2 className="text-2xl font-black text-white">{activeCompany?.companyName ?? "Company"} Dashboard</h2>
-            <p className="mt-1 text-sm font-medium text-slate-400">Monitor content performance and workflow status.</p>
+            <h2 className="h2 text-white">{activeCompany?.companyName ?? "Company"} Dashboard</h2>
+            <p className="body-3 mt-1 text-slate-300">Monitor content performance and workflow status.</p>
           </div>
 
           <button
             type="button"
-            className="relative z-10 inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-600 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/35"
+            className="relative z-10 inline-flex items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-bold bg-[#3FA9F5] text-white shadow-lg shadow-blue-500/20 transition hover:bg-[#1D3D5E] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3FA9F5]/35"
             onClick={() => {
               if (!activeCompanyId) return;
               navigate(`/company/${encodeURIComponent(activeCompanyId)}/generate`);

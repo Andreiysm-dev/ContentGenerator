@@ -1,4 +1,5 @@
 import db from '../database/db.js';
+import { logAudit } from '../services/auditService.js';
 
 // CREATE - Add a new company
 export const createCompany = async (req, res) => {
@@ -8,8 +9,8 @@ export const createCompany = async (req, res) => {
 
         // Validate required fields
         if (!companyName) {
-            return res.status(400).json({ 
-                error: 'Company name is required' 
+            return res.status(400).json({
+                error: 'Company name is required'
             });
         }
         if (!userId) {
@@ -19,8 +20,8 @@ export const createCompany = async (req, res) => {
         const { data: company, error: companyError } = await db
             .from('company')
             .insert([
-                { 
-                    companyName, 
+                {
+                    companyName,
                     companyDescription,
                     user_id: userId,
                     created_at: new Date().toISOString()
@@ -30,20 +31,24 @@ export const createCompany = async (req, res) => {
 
         if (companyError) {
             console.error('Error creating company:', companyError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to create company',
-                details: companyError.message 
+                details: companyError.message
             });
         }
 
-        return res.status(201).json({ 
+        await logAudit(userId, 'COMPANY_CREATE', 'company', company[0].companyId, {
+            name: companyName
+        });
+
+        return res.status(201).json({
             message: 'Company created successfully',
-            company: company[0] 
+            company: company[0]
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -63,20 +68,20 @@ export const getCompany = async (req, res) => {
 
         if (companyError) {
             console.error('Error fetching companies:', companyError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to fetch companies',
-                details: companyError.message 
+                details: companyError.message
             });
         }
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             companies,
-            count: companies.length 
+            count: companies.length
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -99,22 +104,22 @@ export const getCompanyById = async (req, res) => {
 
         if (companyError) {
             if (companyError.code === 'PGRST116') {
-                return res.status(404).json({ 
-                    error: 'Company not found' 
+                return res.status(404).json({
+                    error: 'Company not found'
                 });
             }
             console.error('Error fetching company:', companyError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to fetch company',
-                details: companyError.message 
+                details: companyError.message
             });
         }
 
         return res.status(200).json({ company });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -135,8 +140,8 @@ export const updateCompany = async (req, res) => {
         if (companyDescription !== undefined) updateData.companyDescription = companyDescription;
 
         if (Object.keys(updateData).length === 0) {
-            return res.status(400).json({ 
-                error: 'No fields to update' 
+            return res.status(400).json({
+                error: 'No fields to update'
             });
         }
 
@@ -149,26 +154,26 @@ export const updateCompany = async (req, res) => {
 
         if (companyError) {
             console.error('Error updating company:', companyError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to update company',
-                details: companyError.message 
+                details: companyError.message
             });
         }
 
         if (!company || company.length === 0) {
-            return res.status(404).json({ 
-                error: 'Company not found' 
+            return res.status(404).json({
+                error: 'Company not found'
             });
         }
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             message: 'Company updated successfully',
-            company: company[0] 
+            company: company[0]
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };
@@ -191,26 +196,30 @@ export const deleteCompany = async (req, res) => {
 
         if (companyError) {
             console.error('Error deleting company:', companyError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Failed to delete company',
-                details: companyError.message 
+                details: companyError.message
             });
         }
 
         if (!company || company.length === 0) {
-            return res.status(404).json({ 
-                error: 'Company not found' 
+            return res.status(404).json({
+                error: 'Company not found'
             });
         }
 
-        return res.status(200).json({ 
+        await logAudit(userId, 'COMPANY_DELETE', 'company', id, {
+            name: company[0].companyName
+        });
+
+        return res.status(200).json({
             message: 'Company deleted successfully',
-            company: company[0] 
+            company: company[0]
         });
     } catch (error) {
         console.error('Unexpected error:', error);
-        return res.status(500).json({ 
-            error: 'Internal server error' 
+        return res.status(500).json({
+            error: 'Internal server error'
         });
     }
 };

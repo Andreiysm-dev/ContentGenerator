@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
-import { Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon, Trash2, Plus, Pencil, Save, X, ShieldCheck, Zap, UserPlus, Users, Check, Info, Activity } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { BrandCoreTab } from "./settings/BrandCoreTab";
 
-export type CompanySettingsTab = "overview" | "brand-intelligence" | "team" | "integrations";
+export type CompanySettingsTab = "overview" | "brand-intelligence" | "team" | "integrations" | "audit";
 
 export type CompanySettingsShellProps = {
   tab: CompanySettingsTab;
@@ -114,7 +115,16 @@ export type CompanySettingsShellProps = {
   onAddCollaborator: () => void;
   onRemoveCollaborator: (id: string) => void;
   onTransferOwnership?: (newOwnerId: string) => void;
-  isOwner?: boolean;
+  userPermissions?: {
+    canApprove: boolean;
+    canGenerate: boolean;
+    canCreate: boolean;
+    canDelete: boolean;
+    isOwner: boolean;
+  };
+  customRoles: any[];
+  onUpdateCustomRoles: (roles: any[]) => void;
+  onAssignRole: (userId: string, role: string) => void;
   isBrandWebhookCoolingDown: boolean;
   brandWebhookCooldownSecondsLeft: number;
   isEditingBrandSetup: boolean;
@@ -200,7 +210,7 @@ export const StatusPill = ({ tone, children }: { tone: "positive" | "warning" | 
   return <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cls}`}>{children}</span>;
 };
 
-import { BrandCoreTab } from "./settings/BrandCoreTab";
+
 
 export function SettingsPage(props: CompanySettingsShellProps) {
   const {
@@ -314,7 +324,20 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     onDisconnectAccount,
     notify,
     authedFetch,
+    customRoles,
+    onUpdateCustomRoles,
+    onAssignRole,
+    onTransferOwnership,
+    userPermissions = {
+      canApprove: false,
+      canGenerate: false,
+      canCreate: false,
+      canDelete: false,
+      isOwner: false
+    },
   } = props;
+
+  const isOwner = userPermissions.isOwner;
 
   const { companyId } = useParams<{ companyId: string }>();
   const [localAccounts, setLocalAccounts] = useState<any[]>([]);
@@ -322,6 +345,19 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   const [userSearchResults, setUserSearchResults] = useState<any[]>([]);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDesc, setNewRoleDesc] = useState("");
+  const [newRolePermissions, setNewRolePermissions] = useState({
+    canApprove: true,
+    canGenerate: true,
+    canCreate: true,
+    canDelete: false
+  });
+  const [showRolesGuide, setShowRolesGuide] = useState(false);
+  const [editingRoleIdx, setEditingRoleIdx] = useState<number | null>(null);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [showAuditLogs, setShowAuditLogs] = useState(true);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   const fetchAccounts = async () => {
     if (!companyId || !supabase) return;
@@ -430,6 +466,28 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     return () => clearTimeout(timer);
   }, [newCollaboratorEmail, props.backendBaseUrl, authedFetch]);
 
+  const fetchAuditLogs = async () => {
+    if (!companyId || !authedFetch) return;
+    setLoadingAudit(true);
+    try {
+      const res = await authedFetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/audit/${companyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogs(data.logs || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch audit logs:', e);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showAuditLogs) {
+      fetchAuditLogs();
+    }
+  }, [showAuditLogs]);
+
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
       <main className="flex-1 flex flex-col overflow-hidden p-2.5 md:p-6">
@@ -461,6 +519,9 @@ export function SettingsPage(props: CompanySettingsShellProps) {
               </TabLink>
               <TabLink to={`${companyUrlBase}/integrations`} id="integrations" pressedTab={pressedTab} onClick={() => setPressedTab("integrations")}>
                 Integrations
+              </TabLink>
+              <TabLink to={`${companyUrlBase}/audit`} id="audit" pressedTab={pressedTab} onClick={() => setPressedTab("audit")}>
+                Audit
               </TabLink>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-slate-900/5" />
             </div>
@@ -588,107 +649,380 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                     <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Manage collaborators with access to this company.</p>
                   </div>
 
-                  <Card className="bg-white" title="Collaborators" subtitle="Add teammates who can access and approve content.">
+                  {/* Invite Teammates Card */}
+                  <Card className="bg-white border-slate-200/60 shadow-sm" title="Invite Teammates" subtitle="Add coworkers to collaborate on content and branding.">
                     <div className="space-y-4">
-                      <div className="space-y-1.5 relative">
-                        <label className="text-xs font-bold text-slate-700">Add collaborator (email)</label>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center relative z-[100]">
-                          <div className="relative flex-1">
-                            <Input
-                              type="email"
-                              placeholder="user@example.com"
-                              value={newCollaboratorEmail}
-                              onChange={(e) => {
-                                setNewCollaboratorEmail(e.target.value);
-                                if (e.target.value.length >= 2) {
-                                  setShowUserDropdown(true);
-                                }
-                              }}
-                              onFocus={() => {
-                                if (newCollaboratorEmail.length >= 2 && userSearchResults.length > 0) {
-                                  setShowUserDropdown(true);
-                                }
-                              }}
-                            />
-                            {isSearchingUsers && (
-                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                              </div>
-                            )}
-
-                            {/* Dropdown Results */}
-                            {showUserDropdown && userSearchResults.length > 0 && (
-                              <div className="absolute z-[100] left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                                <div className="p-2 border-b border-slate-50 bg-slate-50/50">
-                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Suggestions</span>
-                                </div>
-                                <div className="max-h-[240px] overflow-y-auto">
-                                  {userSearchResults.map((user) => (
-                                    <button
-                                      key={user.id}
-                                      type="button"
-                                      className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center justify-between group"
-                                      onClick={() => {
-                                        setNewCollaboratorEmail(user.email);
-                                        setShowUserDropdown(false);
-                                      }}
-                                    >
-                                      <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-slate-900 group-hover:text-blue-700">{user.email}</span>
-                                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Existing User</span>
-                                      </div>
-                                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <div className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded-md uppercase">Select</div>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            className="btn btn-primary btn-sm h-[38px] px-6"
-                            type="button"
-                            onClick={onAddCollaborator}
-                            disabled={!newCollaboratorEmail}
-                          >
-                            Add Teammate
+                      <div className="space-y-2 relative">
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider ml-1">New Teammate Email</label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="colleague@company.com"
+                            value={newCollaboratorEmail}
+                            onChange={(e) => {
+                              setNewCollaboratorEmail(e.target.value);
+                              if (e.target.value.length >= 2) setShowUserDropdown(true);
+                            }}
+                            onKeyPress={(e) => e.key === "Enter" && onAddCollaborator()}
+                            className="h-10 rounded-xl border-slate-200 focus:ring-[#3fa9f5]/20"
+                          />
+                          <button className="h-10 px-6 bg-[#3fa9f5] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2f97e6] transition-all flex items-center gap-2 shadow-sm" type="button" onClick={onAddCollaborator}>
+                            <UserPlus size={14} />
+                            Invite
                           </button>
                         </div>
-                        {showUserDropdown && (
-                          <div className="fixed inset-0 z-[90]" onClick={() => setShowUserDropdown(false)} />
-                        )}
-                      </div>
 
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700">Current collaborators</label>
-                        <div className="rounded-2xl border border-slate-200 bg-white">
-                          {collaborators.length === 0 ? (
-                            <div className="p-4 text-sm text-slate-600">No collaborators added yet.</div>
-                          ) : (
-                            <div className="divide-y divide-slate-200">
-                              {collaborators.map((c: any) => (
-                                <div key={c.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-                                  <div className="min-w-0">
-                                    <div className="truncate text-sm font-semibold text-slate-900">{c.email}</div>
-                                    <div className="mt-1 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-700">{c.role}</div>
+                        {showUserDropdown && userSearchResults.length > 0 && (
+                          <div className="absolute z-50 left-0 right-0 top-[calc(100%+8px)] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                            {userSearchResults.map((user) => (
+                              <button
+                                key={user.id}
+                                className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center justify-between group transition-colors"
+                                onClick={() => {
+                                  setNewCollaboratorEmail(user.email);
+                                  setShowUserDropdown(false);
+                                  onAddCollaborator();
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
+                                    <Users size={14} />
                                   </div>
-                                  {props.isOwner && c.role !== "owner" && (
-                                    <button className="btn btn-danger btn-sm self-start sm:self-auto" type="button" onClick={() => onRemoveCollaborator(c.id)}>
-                                      Remove
-                                    </button>
-                                  )}
+                                  <span className="text-sm font-semibold text-slate-700">{user.email}</span>
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                                <Plus size={14} className="text-[#3fa9f5] opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Card>
 
+                  {/* Teammates List Card */}
+                  <Card className="bg-white border-slate-200/60 shadow-sm" title="Teammates" subtitle="Users who have access to this company workspace.">
+                    <div className="space-y-4">
+                      {collaborators.length === 0 ? (
+                        <div className="text-center py-12 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                          <Users className="mx-auto text-slate-300 mb-3" size={32} />
+                          <p className="text-sm font-medium text-slate-500">No collaborators added yet.</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-3">
+                          {collaborators.map((c: any) => (
+                            <div key={c.id} className="group flex flex-col gap-3 p-4 rounded-2xl border border-slate-200/60 bg-white hover:border-[#3fa9f5]/30 hover:shadow-md transition-all duration-300">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-600 font-bold border border-slate-200/50">
+                                    {c.email?.[0].toUpperCase()}
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <div className="text-sm font-bold text-slate-900 truncate">{c.email}</div>
+                                    <div className="mt-0.5 flex flex-wrap gap-2 items-center">
+                                      <div className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${c.role === 'owner' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                                        }`}>
+                                        {c.role}
+                                      </div>
+                                      {/* Simplified Permission Icons */}
+                                      {c.role !== 'owner' && (() => {
+                                        const roleDef = customRoles.find(r => r.name === c.role);
+                                        if (!roleDef) return null;
+                                        return (
+                                          <div className="flex gap-1.5 ml-1 opacity-70">
+                                            {roleDef.permissions?.canApprove && (<span title="Approve"><Check size={10} className="text-green-600" /></span>)}
+                                            {roleDef.permissions?.canGenerate && (<span title="Generate"><Zap size={10} className="text-purple-600" /></span>)}
+                                            {roleDef.permissions?.canCreate && (<span title="Create"><Plus size={10} className="text-blue-600" /></span>)}
+                                            {roleDef.permissions?.canDelete && (<span title="Delete"><Trash2 size={10} className="text-red-600" /></span>)}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {isOwner && c.role !== "owner" && (
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-[#3fa9f5]/20 focus:border-[#3fa9f5]/40 transition-all outline-none cursor-pointer"
+                                        value={c.role}
+                                        onChange={(e) => onAssignRole(c.id, e.target.value)}
+                                      >
+                                        <option value="collaborator">Collaborator</option>
+                                        {customRoles.map((r: any) => (
+                                          <option key={r.name} value={r.name}>{r.name}</option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                        type="button"
+                                        onClick={() => onRemoveCollaborator(c.id)}
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* Custom Roles Management */}
+                  {isOwner && (
+                    <Card className="bg-white border-slate-200/60 shadow-sm" title="Custom Roles" subtitle="Define up to 5 granular roles for specialized team members.">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between px-1">
+                          <button
+                            onClick={() => setShowRolesGuide(!showRolesGuide)}
+                            className="flex items-center gap-2 text-[10px] font-bold text-[#3fa9f5] hover:text-[#3fa9f5]/80 transition-all uppercase tracking-wider"
+                          >
+                            <Info size={12} />
+                            {showRolesGuide ? 'Hide' : 'Show'} Permissions Guide
+                          </button>
+                        </div>
+
+                        {showRolesGuide && (
+                          <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="space-y-3">
+                              <div className="flex gap-3">
+                                <div className="h-6 w-6 rounded-lg bg-green-500/10 flex items-center justify-center text-green-600 shrink-0">
+                                  <Check size={12} />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] font-black uppercase text-slate-900">Approve</div>
+                                  <p className="text-[9px] text-slate-500 font-medium leading-normal">Allows members to validate content and move posts to final Scheduled or Published status.</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-3">
+                                <div className="h-6 w-6 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-600 shrink-0">
+                                  <Zap size={12} />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] font-black uppercase text-slate-900">Generate</div>
+                                  <p className="text-[9px] text-slate-500 font-medium leading-normal">Grants access to AI generation for captions, images, and design prompts (DMPs).</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="flex gap-3">
+                                <div className="h-6 w-6 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
+                                  <Plus size={12} />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] font-black uppercase text-slate-900">Create</div>
+                                  <p className="text-[9px] text-slate-500 font-medium leading-normal">Allows members to add new entries to the content calendar and draft campaign ideas.</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-3">
+                                <div className="h-6 w-6 rounded-lg bg-red-500/10 flex items-center justify-center text-red-600 shrink-0">
+                                  <Trash2 size={12} />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] font-black uppercase text-slate-900">Delete</div>
+                                  <p className="text-[9px] text-slate-500 font-medium leading-normal">Permits the removal of content entries and their associated media from the system.</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {customRoles.map((role, idx) => (
+                            <div key={idx} className="group relative flex flex-col gap-2 p-4 rounded-xl border border-slate-200/60 bg-gradient-to-br from-white to-slate-50/50 hover:border-[#3fa9f5]/30 transition-all duration-300">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                                    <ShieldCheck size={14} />
+                                  </div>
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <div className="text-[10px] font-black text-slate-900 uppercase tracking-wider truncate">{role.name}</div>
+                                    <button
+                                      onClick={() => setShowRolesGuide(true)}
+                                      className="text-slate-300 hover:text-blue-400 transition-colors"
+                                      title="View Permission Details"
+                                    >
+                                      <Info size={10} />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => {
+                                      setEditingRoleIdx(idx);
+                                      setNewRoleName(role.name);
+                                      setNewRoleDesc(role.description || "");
+                                      setNewRolePermissions(role.permissions || { canApprove: false, canGenerate: false, canCreate: false, canDelete: false });
+                                    }}
+                                    className="p-1 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => onUpdateCustomRoles(customRoles.filter((_, i) => i !== idx))}
+                                    className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-slate-500 font-medium leading-relaxed line-clamp-2">{role.description || "No description provided."}</p>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {role.permissions?.canApprove && (
+                                  <div className="px-1.5 py-0.5 rounded-md bg-green-50 text-[8px] font-black uppercase text-green-700 flex items-center gap-1 border border-green-100/50">
+                                    <Check size={8} /> Appr
+                                  </div>
+                                )}
+                                {role.permissions?.canGenerate && (
+                                  <div className="px-1.5 py-0.5 rounded-md bg-purple-50 text-[8px] font-black uppercase text-purple-700 flex items-center gap-1 border border-purple-100/50">
+                                    <Zap size={8} /> Gen
+                                  </div>
+                                )}
+                                {role.permissions?.canCreate && (
+                                  <div className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[8px] font-black uppercase text-blue-700 flex items-center gap-1 border border-blue-100/50">
+                                    <Check size={8} /> Cre
+                                  </div>
+                                )}
+                                {role.permissions?.canDelete && (
+                                  <div className="px-1.5 py-0.5 rounded-md bg-red-50 text-[8px] font-black uppercase text-red-700 flex items-center gap-1 border border-red-100/50">
+                                    <Trash2 size={8} /> Del
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+
+                          {(customRoles.length < 5 || editingRoleIdx !== null) && (
+                            <div className={`p-4 rounded-xl border-2 border-dashed ${editingRoleIdx !== null ? 'border-blue-400 bg-blue-50/10' : 'border-slate-200 bg-slate-50/30'} flex flex-col gap-3 group hover:bg-white transition-all duration-300`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className={`h-6 w-6 rounded-full ${editingRoleIdx !== null ? 'bg-blue-500 text-white' : 'bg-[#3fa9f5]/10 text-[#3fa9f5]'} flex items-center justify-center`}>
+                                    {editingRoleIdx !== null ? <Pencil size={10} /> : <Plus size={12} />}
+                                  </div>
+                                  <div className="text-[11px] font-bold text-slate-900">{editingRoleIdx !== null ? `Editing: ${customRoles[editingRoleIdx].name}` : 'New Role'}</div>
+                                </div>
+                                {editingRoleIdx !== null && (
+                                  <button onClick={() => {
+                                    setEditingRoleIdx(null);
+                                    setNewRoleName("");
+                                    setNewRoleDesc("");
+                                    setNewRolePermissions({ canApprove: true, canGenerate: true, canCreate: true, canDelete: false });
+                                  }} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">
+                                    Cancel
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="w-full space-y-3">
+                                <div className="space-y-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider ml-0.5">Title</label>
+                                      <Input
+                                        value={newRoleName}
+                                        onChange={(e) => setNewRoleName(e.target.value)}
+                                        placeholder="Editor"
+                                        className="h-8 text-xs border-slate-200 rounded-lg focus:ring-[#3fa9f5]/20"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider ml-0.5">Purpose</label>
+                                      <Input
+                                        value={newRoleDesc}
+                                        onChange={(e) => setNewRoleDesc(e.target.value)}
+                                        placeholder="Goal?"
+                                        className="h-8 text-xs border-slate-200 rounded-lg focus:ring-[#3fa9f5]/20"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewRolePermissions(p => ({ ...p, canApprove: !p.canApprove }))}
+                                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[9px] font-black uppercase transition-all ${newRolePermissions.canApprove ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-100 text-slate-400'}`}
+                                    >
+                                      <div className={`h-2.5 w-2.5 rounded-full border flex items-center justify-center ${newRolePermissions.canApprove ? 'bg-green-500 border-green-600' : 'bg-white border-slate-200'}`}>
+                                        {newRolePermissions.canApprove && <Check size={6} className="text-white" />}
+                                      </div>
+                                      Approve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewRolePermissions(p => ({ ...p, canGenerate: !p.canGenerate }))}
+                                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[9px] font-black uppercase transition-all ${newRolePermissions.canGenerate ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-white border-slate-100 text-slate-400'}`}
+                                    >
+                                      <div className={`h-2.5 w-2.5 rounded-full border flex items-center justify-center ${newRolePermissions.canGenerate ? 'bg-purple-500 border-purple-600' : 'bg-white border-slate-200'}`}>
+                                        {newRolePermissions.canGenerate && <Check size={6} className="text-white" />}
+                                      </div>
+                                      Generate
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewRolePermissions(p => ({ ...p, canCreate: !p.canCreate }))}
+                                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[9px] font-black uppercase transition-all ${newRolePermissions.canCreate ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-100 text-slate-400'}`}
+                                    >
+                                      <div className={`h-2.5 w-2.5 rounded-full border flex items-center justify-center ${newRolePermissions.canCreate ? 'bg-blue-500 border-blue-600' : 'bg-white border-slate-200'}`}>
+                                        {newRolePermissions.canCreate && <Check size={6} className="text-white" />}
+                                      </div>
+                                      Create
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewRolePermissions(p => ({ ...p, canDelete: !p.canDelete }))}
+                                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[9px] font-black uppercase transition-all ${newRolePermissions.canDelete ? 'bg-red-50 border-red-200 text-red-700' : 'bg-white border-slate-100 text-slate-400'}`}
+                                    >
+                                      <div className={`h-2.5 w-2.5 rounded-full border flex items-center justify-center ${newRolePermissions.canDelete ? 'bg-red-500 border-red-600' : 'bg-white border-slate-200'}`}>
+                                        {newRolePermissions.canDelete && <Check size={6} className="text-white" />}
+                                      </div>
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={!newRoleName}
+                                  onClick={() => {
+                                    if (newRoleName) {
+                                      if (editingRoleIdx !== null) {
+                                        const updated = [...customRoles];
+                                        updated[editingRoleIdx] = { name: newRoleName, description: newRoleDesc, permissions: newRolePermissions };
+                                        onUpdateCustomRoles(updated);
+                                        setEditingRoleIdx(null);
+                                      } else {
+                                        onUpdateCustomRoles([...customRoles, { name: newRoleName, description: newRoleDesc, permissions: newRolePermissions }]);
+                                      }
+                                      setNewRoleName("");
+                                      setNewRoleDesc("");
+                                      setNewRolePermissions({ canApprove: true, canGenerate: true, canCreate: true, canDelete: false });
+                                    }
+                                  }}
+                                  className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-black uppercase tracking-widest text-slate-900 border border-slate-200 bg-slate-50 rounded-xl hover:bg-slate-900 hover:text-white transition-all duration-300 disabled:opacity-50"
+                                >
+                                  {editingRoleIdx !== null ? <Save size={14} /> : <Plus size={14} />}
+                                  {editingRoleIdx !== null ? 'Update Role' : 'Create Role'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {customRoles.length === 0 && (
+                            <div className="md:col-span-2 text-center py-8 px-4 bg-[#3fa9f5]/5 rounded-2xl border border-[#3fa9f5]/10">
+                              <Zap className="mx-auto text-[#3fa9f5] mb-2" size={24} />
+                              <p className="text-xs font-bold text-slate-600">Go beyond 'Collaborator'. Create custom roles tailored to your workflow.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
                   {/* Transfer Ownership Section */}
-                  {props.isOwner && (
+                  {isOwner && (
                     <Card className="bg-white border-amber-200" title="Transfer Ownership" subtitle="Transfer this company to another team member.">
                       <div className="space-y-4">
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -703,8 +1037,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                             <Select
                               value=""
                               onChange={(e) => {
-                                if (e.target.value && props.onTransferOwnership) {
-                                  props.onTransferOwnership(e.target.value);
+                                if (e.target.value && onTransferOwnership) {
+                                  onTransferOwnership(e.target.value);
                                 }
                               }}
                               className="w-full"
@@ -724,6 +1058,73 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                             Add collaborators first before you can transfer ownership.
                           </p>
                         )}
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {tab === "audit" && (
+                <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)]">
+                  <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div>
+                      <div className="text-md md:text-xl font-bold">Audit</div>
+                      <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Track permission changes and team modifications.</p>
+                    </div>
+                  </div>
+                  {isOwner && (
+                    <Card className="bg-white border-slate-200/60 shadow-sm overflow-hidden p-0" title="" subtitle="">
+                      <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-extrabold text-slate-900">Security & Audit Logs</div>
+                          <div className="mt-1 text-sm text-slate-600">View chronological activity within this company.</div>
+                        </div>
+                        {loadingAudit && (
+                          <Activity size={16} className="text-blue-500 animate-spin" />
+                        )}
+                      </div>
+
+                      <div className="w-full overflow-x-auto">
+                        <table className="w-full text-left text-sm text-slate-600">
+                          <thead className="bg-[#f8fafc] text-xs uppercase font-bold text-slate-500 border-b border-slate-200">
+                            <tr>
+                              <th className="px-5 py-4 w-40">Date</th>
+                              <th className="px-5 py-4 w-48">Actor</th>
+                              <th className="px-5 py-4 w-48">Action</th>
+                              <th className="px-5 py-4">Details</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {auditLogs.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="px-5 py-12 text-center text-slate-400 font-medium">
+                                  {loadingAudit ? 'Loading logs...' : 'No activity recorded yet.'}
+                                </td>
+                              </tr>
+                            ) : (
+                              auditLogs.map((log, i) => (
+                                <tr key={log.id || i} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="px-5 py-4 whitespace-nowrap text-[11px] font-medium text-slate-500">
+                                    {new Date(log.created_at).toLocaleString()}
+                                  </td>
+                                  <td className="px-5 py-4 font-medium text-slate-700">
+                                    {log.actorEmail || 'Unknown'}
+                                  </td>
+                                  <td className="px-5 py-4">
+                                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-slate-800 uppercase">
+                                      {log.action?.replace(/_/g, ' ')}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-4 text-xs font-medium text-slate-600 w-full min-w-[200px]">
+                                    {log.action === 'ROLE_ASSIGN' && `Assigned role "${log.details?.role}" to teammate.`}
+                                    {log.action === 'ROLES_UPDATE' && `Updated custom role definitions.`}
+                                    {!['ROLE_ASSIGN', 'ROLES_UPDATE'].includes(log.action) && `Performed security action: ${log.action}`}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </Card>
                   )}

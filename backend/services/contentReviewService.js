@@ -33,10 +33,10 @@ const writeStatus = (state, extra = {}) => ({
   ...extra,
 });
 
-const assertUserCanAccessCompany = async ({ userId, companyId }) => {
+const assertUserCanAccessCompany = async ({ userId, companyId, requiredPermission = null }) => {
   const { data: company, error } = await db
     .from('company')
-    .select('user_id, collaborator_ids')
+    .select('user_id, collaborator_ids, custom_roles, collaborator_roles')
     .eq('companyId', companyId)
     .single();
 
@@ -44,8 +44,20 @@ const assertUserCanAccessCompany = async ({ userId, companyId }) => {
     return { ok: false, status: 404, error: 'Company not found' };
   }
 
-  if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+  // Owner check
+  if (company.user_id === userId) {
+    // Proceed
+  } else if (!(company.collaborator_ids?.includes(userId))) {
     return { ok: false, status: 403, error: 'Forbidden' };
+  } else if (requiredPermission) {
+    // Permission check for collaborator
+    const userRoleName = company.collaborator_roles?.[userId];
+    if (userRoleName) {
+      const roleDef = company.custom_roles?.find(r => r.name === userRoleName);
+      if (roleDef && roleDef.permissions && roleDef.permissions[requiredPermission] === false) {
+        return { ok: false, status: 403, error: `Member lacks '${requiredPermission}' permission.` };
+      }
+    }
   }
 
   return { ok: true };
@@ -258,7 +270,7 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
     return { ok: false, status: 400, error: 'Content calendar row missing companyId' };
   }
 
-  const auth = await assertUserCanAccessCompany({ userId, companyId });
+  const auth = await assertUserCanAccessCompany({ userId, companyId, requiredPermission: 'canGenerate' });
   if (!auth.ok) return auth;
 
   const state = String(normalizeStatusState(contentCalendar.status).state || 'Draft');

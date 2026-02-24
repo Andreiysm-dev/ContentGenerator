@@ -2,6 +2,7 @@ import db from '../database/db.js';
 
 import { CAPTION_USER_PROMPT_TEMPLATE } from './prompts.js';
 import { sendNotification, sendTeamNotification } from './notificationService.js';
+import { logApiUsage } from './apiUsageService.js';
 
 const ALLOWED_FRAMEWORKS = new Set([
   'EDUCATIONAL',
@@ -155,7 +156,7 @@ const safeParseModelText = (text) => {
   };
 };
 
-const callOpenAIForCaption = async ({ systemPrompt, userPrompt }) => {
+const callOpenAIForCaption = async ({ systemPrompt, userPrompt, companyId, userId }) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return { ok: false, error: 'Missing OPENAI_API_KEY' };
@@ -208,13 +209,27 @@ const callOpenAIForCaption = async ({ systemPrompt, userPrompt }) => {
   }
 
   const content = data?.choices?.[0]?.message?.content;
+
+  // Log Usage
+  if (data?.usage) {
+    await logApiUsage({
+      companyId,
+      userId,
+      provider: 'openai',
+      model: model,
+      type: 'completion',
+      inputTokens: data.usage.prompt_tokens,
+      outputTokens: data.usage.completion_tokens
+    });
+  }
+
   return { ok: true, content: typeof content === 'string' ? content : '', rawEnvelope: data };
 };
 
-const assertUserCanAccessCompany = async ({ userId, companyId }) => {
+const assertUserCanAccessCompany = async ({ userId, companyId, requiredPermission = null }) => {
   const { data: company, error } = await db
     .from('company')
-    .select('user_id, collaborator_ids, companyName')
+    .select('user_id, collaborator_ids, companyName, custom_roles, collaborator_roles')
     .eq('companyId', companyId)
     .single();
 
@@ -222,8 +237,20 @@ const assertUserCanAccessCompany = async ({ userId, companyId }) => {
     return { ok: false, status: 404, error: 'Company not found' };
   }
 
-  if (company.user_id !== userId && !(company.collaborator_ids?.includes(userId))) {
+  // Owner check
+  if (company.user_id === userId) {
+    // Proceed
+  } else if (!(company.collaborator_ids?.includes(userId))) {
     return { ok: false, status: 403, error: 'Forbidden' };
+  } else if (requiredPermission) {
+    // Permission check for collaborator
+    const userRoleName = company.collaborator_roles?.[userId];
+    if (userRoleName) {
+      const roleDef = company.custom_roles?.find(r => r.name === userRoleName);
+      if (roleDef && roleDef.permissions && roleDef.permissions[requiredPermission] === false) {
+        return { ok: false, status: 403, error: `Member lacks '${requiredPermission}' permission.` };
+      }
+    }
   }
 
   // Fetch user metadata for triggeredByName
@@ -257,7 +284,7 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
     return { ok: false, status: 400, error: 'Content calendar row missing companyId' };
   }
 
-  const auth = await assertUserCanAccessCompany({ userId, companyId });
+  const auth = await assertUserCanAccessCompany({ userId, companyId, requiredPermission: 'canGenerate' });
   if (!auth.ok) return auth;
 
   const companyName = auth.companyName;
@@ -306,6 +333,8 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
   const openAiRes = await callOpenAIForCaption({
     systemPrompt: brandKB?.writerAgent ?? '',
     userPrompt,
+    companyId,
+    userId,
   });
 
   if (!openAiRes.ok) {
@@ -476,6 +505,7 @@ export async function generateCaptionForContentSystem(payload = {}) {
   const openAiRes = await callOpenAIForCaption({
     systemPrompt: brandKB?.writerAgent ?? '',
     userPrompt,
+    companyId,
   });
 
   if (!openAiRes.ok) {

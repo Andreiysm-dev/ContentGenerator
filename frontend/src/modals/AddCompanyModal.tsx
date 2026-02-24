@@ -10,6 +10,7 @@ interface AddCompanyModalProps {
   onSubmit: () => Promise<void>;
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
   isAiAssistantOpen?: boolean;
+  isLoading?: boolean;
 }
 
 export function AddCompanyModal({
@@ -21,7 +22,8 @@ export function AddCompanyModal({
   setNewCompanyDescription,
   onSubmit,
   notify,
-  isAiAssistantOpen
+  isAiAssistantOpen,
+  isLoading
 }: AddCompanyModalProps) {
   if (!isOpen) return null;
 
@@ -91,8 +93,10 @@ export function AddCompanyModal({
           </button>
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-xl px-5 py-2 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px]"
+            disabled={isLoading}
+            className={`inline-flex items-center justify-center rounded-xl px-5 py-2 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
             onClick={async () => {
+              if (isLoading) return;
               if (!newCompanyName.trim()) {
                 notify('Company name is required.', 'error');
                 return;
@@ -100,7 +104,7 @@ export function AddCompanyModal({
               await onSubmit();
             }}
           >
-            Create Company
+            {isLoading ? 'Creating...' : 'Create Company'}
           </button>
         </div>
       </div>

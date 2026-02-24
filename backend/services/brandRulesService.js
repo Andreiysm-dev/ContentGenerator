@@ -1,4 +1,5 @@
 import db from '../database/db.js';
+import { logApiUsage } from './apiUsageService.js';
 import {
   BRAND_PACK_SYSTEM_PROMPT,
   BRAND_PACK_USER_PROMPT,
@@ -12,7 +13,7 @@ import {
   VISUAL_IDENTITY_USER_PROMPT
 } from './prompts.js';
 
-const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => {
+const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1, companyId, userId }) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return { ok: false, error: 'Missing OPENAI_API_KEY' };
@@ -50,6 +51,21 @@ const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1 }) => 
   }
 
   const content = data?.choices?.[0]?.message?.content;
+
+  // Log Usage
+  if (data?.usage) {
+    await logApiUsage({
+      companyId,
+      userId,
+      provider: 'openai',
+      model: model,
+      type: 'completion',
+      inputTokens: data.usage.prompt_tokens,
+      outputTokens: data.usage.completion_tokens,
+      metadata: { type: 'brand_rules_generation' }
+    });
+  }
+
   return { ok: true, content: typeof content === 'string' ? content : '', rawEnvelope: data };
 };
 
@@ -76,6 +92,8 @@ export async function generateBrandRulesSystem(payload = {}) {
     systemPrompt: brandPackSystem.replaceAll('{{FORM_ANSWER}}', formAnswerText),
     userPrompt: brandPackUser.replaceAll('{{FORM_ANSWER}}', formAnswerText),
     temperature: 1,
+    companyId,
+    // Note: User ID might not be in payload here, but usually it's triggered by user
   });
 
   if (!packRes.ok) {
@@ -95,6 +113,7 @@ export async function generateBrandRulesSystem(payload = {}) {
       .replaceAll('{{FORM_ANSWER}}', formAnswerText)
       .replaceAll('{{BRAND_PACK}}', brandPack),
     temperature: 1,
+    companyId
   });
 
   if (!capRes.ok) {
@@ -112,6 +131,7 @@ export async function generateBrandRulesSystem(payload = {}) {
       .replaceAll('{{BRAND_PACK}}', brandPack)
       .replaceAll('{{BRAND_CAP}}', brandCapability),
     temperature: 1,
+    companyId
   });
 
   const reviewerPromise = callOpenAIText({
@@ -120,6 +140,7 @@ export async function generateBrandRulesSystem(payload = {}) {
       .replaceAll('{{BRAND_PACK}}', brandPack)
       .replaceAll('{{BRAND_CAP}}', brandCapability),
     temperature: 1,
+    companyId
   });
 
   const [writerRes, reviewerRes] = await Promise.all([
@@ -214,6 +235,7 @@ export async function generateVisualIdentitySystem(payload = {}) {
       .replaceAll('{{BRAND_CAP}}', brandCapability || '')
       .replaceAll('{{FORM_ANSWER}}', `${formAnswerText}\n\nUSER VISUAL PREFERENCES: ${visualStateText}`),
     temperature: 1,
+    companyId
   });
 
   if (!visualRes.ok) {
