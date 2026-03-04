@@ -135,7 +135,7 @@ export function StudioPage({
   // Filtering Logic
   const allRows = calendarRows.map(row => ({
     ...row,
-    normalizedStatus: (row.status || '').toLowerCase(),
+    normalizedStatus: getStatusValue(row.status).toLowerCase(),
     displayStatus: getStatusValue(row.status)
   }));
 
