@@ -24,6 +24,7 @@ export const createCompany = async (req, res) => {
                     companyName,
                     companyDescription,
                     user_id: userId,
+                    kanban_settings: req.body.kanban_settings || null,
                     created_at: new Date().toISOString()
                 }
             ])
@@ -128,6 +129,7 @@ export const getCompanyById = async (req, res) => {
 export const updateCompany = async (req, res) => {
     try {
         const { id } = req.params;
+        console.log("UPDATE_COMPANY BODY:", req.body);
         const { companyName, companyDescription } = req.body;
         const userId = req.user?.id;
         if (!userId) {
@@ -138,6 +140,7 @@ export const updateCompany = async (req, res) => {
         const updateData = {};
         if (companyName !== undefined) updateData.companyName = companyName;
         if (companyDescription !== undefined) updateData.companyDescription = companyDescription;
+        if (req.body.kanban_settings !== undefined) updateData.kanban_settings = req.body.kanban_settings;
 
         if (Object.keys(updateData).length === 0) {
             return res.status(400).json({

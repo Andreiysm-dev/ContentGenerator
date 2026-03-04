@@ -39,7 +39,7 @@ export const sendTeamNotification = async ({ companyId, title, message, type = '
         // Fetch owner and collaborators
         const { data: company, error: companyError } = await db
             .from('company')
-            .select('user_id, collaborator_ids')
+            .select('user_id, collaborator_ids, companyName')
             .eq('companyId', companyId)
             .single();
 
@@ -47,6 +47,8 @@ export const sendTeamNotification = async ({ companyId, title, message, type = '
             console.error('[Notification] Error fetching company team:', companyError);
             return;
         }
+
+        const finalCompanyName = companyName || company.companyName || 'Company';
 
         const potentialTeamIds = new Set([company.user_id, ...(company.collaborator_ids || [])]);
 
@@ -72,7 +74,7 @@ export const sendTeamNotification = async ({ companyId, title, message, type = '
                 type,
                 link,
                 triggered_by_name: triggeredByName,
-                company_name: companyName,
+                company_name: finalCompanyName,
                 read: false,
             }));
 
@@ -90,5 +92,100 @@ export const sendTeamNotification = async ({ companyId, title, message, type = '
         }
     } catch (error) {
         console.error('[Notification] Unexpected error in sendTeamNotification:', error);
+    }
+};
+
+export const sendRoleNotification = async ({ companyId, roleName, title, message, type = 'info', link = null, triggeredByName = null, companyName = null }) => {
+    if (!companyId) return;
+
+    try {
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids, collaborator_roles, companyName')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) return;
+
+        const finalCompanyName = companyName || company.companyName || 'Company';
+
+        const teamIds = new Set();
+        // Add owner
+        if (company.user_id) teamIds.add(company.user_id);
+
+        // Add collaborators with specific role
+        if (roleName && company.collaborator_roles) {
+            const collaborators = Object.entries(company.collaborator_roles)
+                .filter(([_, role]) => role === roleName)
+                .map(([userId, _]) => userId);
+
+            collaborators.forEach(id => teamIds.add(id));
+        }
+
+        if (teamIds.size === 0) return;
+
+        const notifications = Array.from(teamIds).map(userId => ({
+            user_id: userId,
+            title,
+            message,
+            type,
+            link,
+            triggered_by_name: triggeredByName,
+            company_name: finalCompanyName,
+            read: false,
+        }));
+
+        const { error } = await db
+            .from('notifications')
+            .insert(notifications);
+
+        if (error) console.error('[Notification] Error inserting role notifications:', error);
+    } catch (error) {
+        console.error('[Notification] Error in sendRoleNotification:', error);
+    }
+};
+
+/**
+ * Checks if a status belongs to a locked column and notifies the designated role + owner if it does.
+ */
+export const checkAndNotifyApproval = async ({ companyId, status, contentTheme, triggeredByName, userId }) => {
+    if (!companyId || !status) return;
+
+    try {
+        const { data: company, error } = await db
+            .from('company')
+            .select('companyName, kanban_settings')
+            .eq('companyId', companyId)
+            .single();
+
+        if (error || !company) return;
+
+        const automations = company.kanban_settings?.automations;
+        if (!automations) return;
+
+        const stateSrt = (typeof status === 'object' ? status.state : status) || '';
+        const lockRule = automations.find(a => a.type === 'access_rule' && a.columnId === stateSrt);
+
+        if (lockRule) {
+            // If triggeredByName is not provided, fetch it
+            let finalTriggerName = triggeredByName;
+            if (!finalTriggerName && userId) {
+                const { data: profile } = await db.from('profiles').select('full_name, email').eq('id', userId).single();
+                finalTriggerName = profile?.full_name || profile?.email || 'A team member';
+            }
+
+            await sendRoleNotification({
+                companyId,
+                roleName: lockRule.roleName,
+                title: 'Approval Needed',
+                message: `Content "${contentTheme || 'Untitled'}" moved to ${stateSrt}. Your approval is required.`,
+                type: 'warning',
+                link: `/company/${companyId}/calendar`,
+                triggeredByName: finalTriggerName || 'System',
+                companyName: company.companyName || 'Company'
+            });
+        }
+    } catch (err) {
+        console.error('[Notification] Error in checkAndNotifyApproval:', err);
     }
 };

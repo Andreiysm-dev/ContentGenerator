@@ -54,7 +54,6 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
     });
     const [activePlatformTab, setActivePlatformTab] = useState('master');
     const [showPostConfirmation, setShowPostConfirmation] = useState(false);
-    const [supervisorComments, setSupervisorComments] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -81,7 +80,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                 setCaption(row.finalCaption || row.captionOutput || '');
                 setHashtags(row.finalHashtags || row.hastagsOutput || '');
                 setMediaUrl(row.imageGenerated || row.imageGeneratedUrl || null);
-                setSupervisorComments(row.supervisor_comments || null);
+                setMediaUrl(row.imageGenerated || row.imageGeneratedUrl || null);
                 let fallbackDate = '';
                 if (row.scheduled_at) {
                     fallbackDate = new Date(row.scheduled_at).toISOString().slice(0, 16);
@@ -196,7 +195,6 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                     (newStatus === 'For Approval' && !isScheduleEnabled) ? new Date().toISOString() : null,
                 channels: selectedAccountIds, // Save selected accounts
                 draft_caption: JSON.stringify(remixes), // Persist remixes here
-                supervisor_comments: newStatus === 'For Approval' ? null : supervisorComments
             };
 
             let url = `${backendBaseUrl}/api/content-calendar`;
@@ -576,7 +574,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
 
                         <div className="relative">
                             <button
-                                onClick={() => setShowPostConfirmation(!showPostConfirmation)}
+                                onClick={() => isScheduleEnabled ? handleSave('SCHEDULED') : handlePublish()}
                                 disabled={isSaving || selectedAccountIds.length === 0}
                                 className={`
                                     px-6 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-2 shadow-lg
@@ -591,51 +589,6 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                                 {isScheduleEnabled ? 'Schedule' : 'Post'}
                             </button>
 
-                            {/* Post Confirmation Dropdown */}
-                            {showPostConfirmation && (
-                                <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setShowPostConfirmation(false)} />
-                                    <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 p-4 transform origin-top-right animate-in fade-in zoom-in-95 duration-200">
-                                        <div className="text-center space-y-3">
-                                            <div className={`mx-auto h-10 w-10 rounded-full flex items-center justify-center ${isScheduleEnabled ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                                {isScheduleEnabled ? <Calendar className="h-5 w-5" /> : <Send className="h-5 w-5" />}
-                                            </div>
-                                            <div>
-                                                <h4 className="text-slate-900 font-bold text-sm">
-                                                    {isScheduleEnabled ? 'Send for Approval?' : 'Send for Approval?'}
-                                                </h4>
-                                                <p className="text-xs text-slate-500 mt-1 px-2">
-                                                    {isScheduleEnabled
-                                                        ? `This post will be reviewed and once approved, go live on ${new Date(scheduleDate).toLocaleString()}.`
-                                                        : `This post will be sent for review and once approved, will be published immediately.`
-                                                    }
-                                                </p>
-                                            </div>
-
-                                            <div className="pt-2 flex gap-2">
-                                                <button
-                                                    onClick={() => setShowPostConfirmation(false)}
-                                                    className="flex-1 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 rounded-lg transition-colors"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        handleSave('For Approval');
-                                                        setShowPostConfirmation(false);
-                                                    }}
-                                                    className={`
-                                                        flex-1 py-2 text-xs font-bold text-white rounded-lg transition-colors shadow-sm
-                                                        ${isScheduleEnabled ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-500 hover:bg-emerald-600'}
-                                                    `}
-                                                >
-                                                    Confirm
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -647,20 +600,6 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                 {/* Left: Editor (60%) */}
                 <div className="flex-[3] min-w-[500px] overflow-y-auto bg-white border-r border-slate-200 p-8 pt-6">
                     <div className="max-w-3xl mx-auto space-y-10">
-                        {supervisorComments && (
-                            <div className="bg-rose-50 border border-rose-100 p-5 rounded-[2rem] animate-in fade-in slide-in-from-top-4 duration-700">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="p-2 bg-rose-100 rounded-xl">
-                                        <AlertCircle className="w-4 h-4 text-rose-600" />
-                                    </div>
-                                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-rose-600">Supervisor Feedback</h4>
-                                </div>
-                                <p className="text-sm font-medium text-rose-900 leading-relaxed italic ml-1">
-                                    "{supervisorComments}"
-                                </p>
-                            </div>
-                        )}
-
                         {/* 1. Account Selection */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">

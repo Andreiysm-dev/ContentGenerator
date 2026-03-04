@@ -150,6 +150,7 @@ export function Sidebar({
                 <div className="text-[10px] tracking-[0.2em] uppercase text-white/20 font-black px-3 mb-1">Main Workspace</div>
                 {[
                   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "dashboard" },
+                  { key: "calendar", label: "Content Board", icon: CalendarDays, path: "calendar" },
                   { key: "settings", tourKey: "company-settings", label: "Company Settings", icon: Settings, path: "settings/overview" },
                 ].map((item: any) => {
                   const Icon = item.icon;
@@ -179,7 +180,6 @@ export function Sidebar({
                 {[
                   { key: "planner", label: "Content Planner", icon: Target, path: "plan" },
                   { key: "generate", label: "AI Creator", tourKey: "create", icon: Wand2, path: "generate" },
-                  { key: "calendar", label: "Editorial Calendar", icon: CalendarDays, path: "calendar" },
                   { key: "image-hub", label: "Visual Assets", icon: Image, path: "image-hub" },
                   { key: "studio", label: "Studio Explorer", icon: FileText, path: "studio" },
                 ].map((item) => {

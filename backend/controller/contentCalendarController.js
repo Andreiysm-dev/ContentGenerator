@@ -1,47 +1,51 @@
 import db from '../database/db.js';
+import { getTargetStatusFromAutomation } from '../services/kanbanAutomationService.js';
 import { generateImageForCalendarRow } from '../services/imageGenerationService.js';
 import { logAudit } from '../services/auditService.js';
+import * as notificationService from '../services/notificationService.js';
 
 // Helper to verify user has access to company and specific permissions
 async function verifyCompanyAccess(userId, companyId, requiredPermission = null) {
     const { data: company, error } = await db
         .from('company')
-        .select('user_id, collaborator_ids, custom_roles, collaborator_roles')
+        .select('user_id, collaborator_ids, custom_roles, collaborator_roles, kanban_settings')
         .eq('companyId', companyId)
         .single();
 
     if (error || !company) return { ok: false, status: 404 };
 
     // Owners have all permissions
-    if (company.user_id === userId) return { ok: true };
+    if (company.user_id === userId) return { ok: true, isOwner: true, role: 'owner', company };
 
     // Check if user is a collaborator
     if (!(company.collaborator_ids?.includes(userId))) {
-        return { ok: false, status: 403 };
+        return { ok: false, status: 403, error: 'You do not have access to this company.' };
     }
-
-    // If no specific permission is required, being a collaborator is enough
-    if (!requiredPermission) return { ok: true };
 
     // Get user's role
     const userRoleName = company.collaborator_roles?.[userId];
-    if (!userRoleName) return { ok: true }; // Default collaborator role (legacy or basic)
+
+    // If no specific permission is required, being a collaborator is enough
+    if (!requiredPermission) return { ok: true, isOwner: false, role: userRoleName, company };
+
+    if (!userRoleName) return { ok: true, isOwner: false, role: null, company }; // Default collaborator role
 
     // Find role definition
     const roleDef = company.custom_roles?.find(r => r.name === userRoleName);
-    if (!roleDef) return { ok: true }; // Role not found, fallback to basic access
+    if (!roleDef) return { ok: true, isOwner: false, role: userRoleName, company }; // Role not found, fallback to basic access
 
     // Check if permission is explicitly granted
     if (roleDef.permissions && roleDef.permissions[requiredPermission] === true) {
-        return { ok: true };
+        return { ok: true, isOwner: false, role: userRoleName, company };
     }
 
     // If role has permissions object but this one is missing or false
     if (roleDef.permissions && roleDef.permissions[requiredPermission] === false) {
-        return { ok: false, status: 403, error: `Member lacks '${requiredPermission}' permission.` };
+        const readablePerm = requiredPermission.replace('can', '').toLowerCase();
+        return { ok: false, status: 403, error: `Your role (${userRoleName}) lacks ${readablePerm} permissions.` };
     }
 
-    return { ok: true };
+    return { ok: true, isOwner: false, role: userRoleName, company };
 }
 
 // CREATE - Add a new content calendar entry
@@ -276,22 +280,95 @@ export const updateContentCalendar = async (req, res) => {
 
         const { data: existing, error: fetchError } = await db
             .from('contentCalendar')
-            .select('companyId')
+            .select('*')
             .eq('contentCalendarId', id)
             .single();
 
         if (fetchError || !existing) return res.status(404).json({ error: 'Content calendar not found' });
 
-        const isStatusChange = updateData.status && (updateData.status.toUpperCase() === 'SCHEDULED' || updateData.status.toUpperCase() === 'PUBLISHED');
-        const requiredPerm = isStatusChange ? 'canApprove' : 'canCreate';
+        const { contentCalendarId, companyId, created_at, provider, model, ...updateData } = req.body;
+
+        // Safely extract status string (can be either a plain string or { state, updatedAt, by } object)
+        const statusStr = updateData.status
+            ? (typeof updateData.status === 'object' ? (updateData.status.state || '') : String(updateData.status))
+            : '';
+        const requiredPerm = 'canCreate';
 
         const access = await verifyCompanyAccess(userId, existing.companyId, requiredPerm);
         if (!access.ok) return res.status(access.status).json({ error: access.error || 'Forbidden' });
 
-        const { contentCalendarId, companyId, created_at, provider, model, ...updateData } = req.body;
+        // Enforcement of Access Rules / Locking
+        const kanbanSettings = access.company?.kanban_settings;
+        if (kanbanSettings?.automations) {
+            const currentStatus = (typeof existing.status === 'object' ? existing.status.state : existing.status) || '';
+            const lockRule = kanbanSettings.automations.find(a => a.type === 'access_rule' && a.columnId === currentStatus);
+            if (lockRule) {
+                if (!access.isOwner && access.role !== lockRule.roleName) {
+                    return res.status(403).json({ error: `This content is locked to the ${lockRule.roleName} role. Dragging or editing is restricted.` });
+                }
+            }
+        }
+
+        // Kanban Automation Triggering Logic
+        // Only auto-move if the user hasn't explicitly set a different status in this same request
+        // AND the current status is an intermediate/working state
+        const isUserExplicitlySettingStatus = !!updateData.status;
+        const intermediateStatuses = ['Draft', 'Drafts', 'Generating', 'To Do', 'Planning'];
+        const currentStatusStr = existing.status && typeof existing.status === 'object'
+            ? (existing.status.state || '')
+            : (existing.status || '');
+        const isCurrentlyIntermediate = intermediateStatuses.some(s =>
+            s.toLowerCase() === currentStatusStr.toLowerCase()
+        );
+
+        // Only run event-based automation when NOT explicitly setting status, and existing is intermediate
+        if (!isUserExplicitlySettingStatus && (updateData.captionOutput || updateData.imageGenerated || updateData.supervisor_comments)) {
+            try {
+                let targetStatus = null;
+
+                // Determine the event trigger
+                if (updateData.captionOutput && !existing.captionOutput) {
+                    targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'caption_generated', null);
+                }
+
+                if (!targetStatus && updateData.imageGenerated && !existing.imageGenerated) {
+                    targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'image_generated', null);
+                }
+
+                if (!targetStatus && updateData.supervisor_comments && !existing.supervisor_comments) {
+                    targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'comment_added', null);
+                }
+
+                if (targetStatus) {
+                    updateData.status = targetStatus;
+                }
+            } catch (err) {
+                console.error('Failed to process kanban automations:', err);
+                // Non-blocking for the main update
+            }
+        } else if (isUserExplicitlySettingStatus && (updateData.captionOutput || updateData.imageGenerated || updateData.supervisor_comments)) {
+            // User is setting status AND data is changing — run status-driven automation
+            try {
+                let targetStatus = null;
+
+                if (updateData.supervisor_comments && !existing.supervisor_comments) {
+                    targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'comment_added', null);
+                }
+
+                if (!targetStatus && updateData.status && (updateData.status === 'Revision' || (updateData.status?.state && updateData.status.state === 'Revision'))) {
+                    targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'revision_requested', null);
+                }
+
+                if (targetStatus) {
+                    updateData.status = targetStatus;
+                }
+            } catch (err) {
+                console.error('Failed to process kanban automations:', err);
+            }
+        }
 
         // Clear supervisor comments on approval/publish
-        if (updateData.status && (updateData.status.toUpperCase() === 'SCHEDULED' || updateData.status.toUpperCase() === 'PUBLISHED')) {
+        if (statusStr && (statusStr.toUpperCase() === 'SCHEDULED' || statusStr.toUpperCase() === 'PUBLISHED')) {
             updateData.supervisor_comments = null;
         }
 
@@ -344,6 +421,22 @@ export const updateContentCalendar = async (req, res) => {
                 console.error('Failed to auto-queue post:', queueErr);
                 // We don't fail the main request, but log the error
             }
+        }
+
+        if (updateData.status && updateData.status !== existing.status) {
+            await logAudit(userId, 'STATUS_CHANGE', 'contentCalendar', id, {
+                oldStatus: existing.status,
+                newStatus: updateData.status,
+                companyId: existing.companyId
+            });
+
+            // Notification for Locked Columns (Approvals)
+            await notificationService.checkAndNotifyApproval({
+                companyId: existing.companyId,
+                status: updateData.status,
+                contentTheme: row.theme,
+                userId: userId
+            });
         }
 
         return res.status(200).json({ contentCalendar: row });

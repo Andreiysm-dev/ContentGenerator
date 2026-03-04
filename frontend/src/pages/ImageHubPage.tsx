@@ -36,7 +36,8 @@ import {
     FileText,
     Zap,
     MessageSquare,
-    Info
+    Info,
+    XCircle
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -67,6 +68,7 @@ interface ImageHubPageProps {
         canDelete: boolean;
         isOwner: boolean;
     };
+    activeCompany?: any;
 }
 
 export function ImageHubPage({
@@ -90,7 +92,8 @@ export function ImageHubPage({
         canCreate: false,
         canDelete: false,
         isOwner: false
-    }
+    },
+    activeCompany
 }: ImageHubPageProps) {
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
     const [dmpDraft, setDmpDraft] = useState('');
@@ -109,7 +112,9 @@ export function ImageHubPage({
     const [isRefining, setIsRefining] = useState(false);
     const [isRefinerOpen, setIsRefinerOpen] = useState(false);
     const [showTechnicalPrompt, setShowTechnicalPrompt] = useState(false);
+    const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
     const [searchParams] = useSearchParams();
+    const columns = (activeCompany?.kanban_settings?.columns || []) as any[];
 
     // Visual Onboarding States
     const [isVisualOnboardingOpen, setIsVisualOnboardingOpen] = useState(false);
@@ -163,10 +168,33 @@ export function ImageHubPage({
 
     const approvedRows = useMemo(() => {
         return calendarRows.filter(row => {
-            const status = getStatusValue(row.status).toLowerCase();
-            return status === 'approved' || status === 'design completed' || status === 'design-completed' || status === 'design-complete' || status === 'ready';
+            if (selectedStatusFilter === 'all') return true;
+
+            const rawStatus = getStatusValue(row.status).trim();
+
+            // Try to find the title of the current row's status
+            const rowColumn = columns.find(c =>
+                c.id === rawStatus ||
+                c.title.toLowerCase() === rawStatus.toLowerCase()
+            );
+
+            const rowStatusTitle = rowColumn ? rowColumn.title : rawStatus;
+            const rowStatusId = rowColumn ? rowColumn.id : rawStatus;
+
+            // Try to find the column for the selected filter (which could be an ID or Title)
+            const filterColumn = columns.find(c =>
+                c.id === selectedStatusFilter ||
+                c.title.toLowerCase() === selectedStatusFilter.toLowerCase()
+            );
+
+            const filterTitle = filterColumn ? filterColumn.title : selectedStatusFilter;
+            const filterId = filterColumn ? filterColumn.id : selectedStatusFilter;
+
+            // Match by ID or Title
+            return rowStatusId === filterId ||
+                rowStatusTitle.toLowerCase() === filterTitle.toLowerCase();
         }).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-    }, [calendarRows, getStatusValue]);
+    }, [calendarRows, getStatusValue, selectedStatusFilter, columns]);
 
     const activeQueueRows = useMemo(() => {
         // Filter out dismissed items, but ALWAYS show the explicitly selected one from URL/Editor
@@ -311,12 +339,12 @@ export function ImageHubPage({
             return;
         }
 
-        // Priority 2: Auto-select first item if none selected
-        if (!selectedRowId && activeQueueRows.length > 0) {
-            const firstId = activeQueueRows[0].contentCalendarId;
-            setSelectedRowId(firstId);
-            setLastId(firstId);
-        }
+        // Priority 2: Auto-select first item removed per user request
+        // if (!selectedRowId && activeQueueRows.length > 0) {
+        //     const firstId = activeQueueRows[0].contentCalendarId;
+        //     setSelectedRowId(firstId);
+        //     setLastId(firstId);
+        // }
     }, [activeQueueRows, selectedRowId, searchParams, dismissedIds, lastUrlId]);
 
     // Handle row selection change - Only reset when switching DIFFERENT items
@@ -673,16 +701,33 @@ export function ImageHubPage({
                             </button>
                         </div>
 
-                        <div className="p-4 border-b border-slate-50">
-                            <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Search queue..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/10 transition-all font-medium"
-                                />
+                        <div className="p-4 border-b border-slate-50 space-y-4">
+                            <div className="space-y-2">
+                                <div className="relative">
+                                    <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <select
+                                        value={selectedStatusFilter}
+                                        onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                                        className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-wider outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/50 transition-all appearance-none cursor-pointer shadow-sm"
+                                    >
+                                        <option value="all">View All Statuses</option>
+                                        {columns.map((c: any) => (
+                                            <option key={c.id} value={c.id}>{c.title}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                </div>
+
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search queue..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-4 focus:ring-blue-500/5 transition-all font-bold placeholder:text-slate-400"
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -806,9 +851,9 @@ export function ImageHubPage({
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => handleGenerateStyleGuide()}
-                                                        disabled={isGeneratingImage}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
-                                                        title="Regenerate Style Guide"
+                                                        disabled={isGeneratingImage || !selectedRow?.finalCaption}
+                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        title={!selectedRow?.finalCaption ? "Final caption is required" : "Regenerate Style Guide"}
                                                     >
                                                         <RefreshCw size={16} className={isGeneratingImage ? 'animate-spin' : ''} />
                                                     </button>
@@ -1001,10 +1046,20 @@ export function ImageHubPage({
                                                             <div className="flex flex-col items-center gap-3 w-full max-w-md">
                                                                 <button
                                                                     onClick={() => handleGenerateStyleGuide()}
-                                                                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                                    disabled={isGeneratingImage || !selectedRow?.finalCaption}
+                                                                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 >
-                                                                    <RefreshCw size={16} />
-                                                                    Generate Style Guide
+                                                                    {!selectedRow?.finalCaption ? (
+                                                                        <>
+                                                                            <XCircle size={16} />
+                                                                            Caption Required
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <RefreshCw size={16} className={isGeneratingImage ? 'animate-spin' : ''} />
+                                                                            Generate Style Guide
+                                                                        </>
+                                                                    )}
                                                                 </button>
 
                                                                 <button

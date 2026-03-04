@@ -11,6 +11,7 @@ interface FormState {
   targetAudience: string;
   primaryGoal: string;
   cta: string;
+  cardName: string;
   promoType: string;
 }
 
@@ -79,6 +80,17 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
                     type="date"
                     name="date"
                     value={form.date}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider ml-1">Card Name (Optional)</label>
+                  <input
+                    type="text"
+                    name="cardName"
+                    placeholder="e.g., Campaign Intro #1"
+                    value={form.cardName}
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl"
                   />

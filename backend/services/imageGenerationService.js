@@ -1,4 +1,6 @@
 import db from '../database/db.js';
+import { logAudit } from './auditService.js';
+import { getTargetStatusFromAutomation } from './kanbanAutomationService.js';
 import { IMAGE_GENERATION_SYSTEM_PROMPT, IMAGE_GENERATION_USER_PROMPT } from './prompts.js';
 import { sendNotification, sendTeamNotification } from './notificationService.js';
 import { callReplicatePredict } from './replicateService.js';
@@ -422,16 +424,24 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     return { ok: false, status: 500, error: uploadRes.error };
   }
 
+  const finalStatus = await getTargetStatusFromAutomation(row.companyId, 'image_generated', 'Design Completed');
+
   const { data: updatedRows, error: saveError } = await db
     .from('contentCalendar')
     .update({
-      status: 'Design Completed',
+      status: finalStatus,
       imageGenerated: uploadRes.path,
     })
     .eq('contentCalendarId', contentCalendarId)
     .select();
 
   if (!saveError) {
+    await logAudit(userId, 'IMAGE_GENERATED', 'contentCalendar', contentCalendarId, {
+      companyId: row.companyId,
+      provider,
+      model
+    });
+
     await sendTeamNotification({
       companyId: row.companyId,
       title: 'Image Generated',
@@ -440,6 +450,16 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
       link: '/calendar',
       triggeredByName,
       companyName,
+    });
+
+    // Notification for Locked Columns (Approvals)
+    const { checkAndNotifyApproval } = await import('./notificationService.js');
+    await checkAndNotifyApproval({
+      companyId: row.companyId,
+      status: finalStatus,
+      contentTheme: row.theme,
+      triggeredByName,
+      userId
     });
   }
 
@@ -555,10 +575,12 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     return { ok: false, status: 500, error: uploadRes.error };
   }
 
+  const finalStatus = await getTargetStatusFromAutomation(row.companyId, 'image_generated', 'Design Completed');
+
   const { data: updatedRows, error: saveError } = await db
     .from('contentCalendar')
     .update({
-      status: 'Design Completed',
+      status: finalStatus,
       imageGenerated: uploadRes.path,
     })
     .eq('contentCalendarId', contentCalendarId)
@@ -567,6 +589,13 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
   if (saveError) {
     return { ok: false, status: 500, error: 'Failed to save image output' };
   }
+
+  await logAudit(userId, 'IMAGE_GENERATED', 'contentCalendar', contentCalendarId, {
+    companyId: row.companyId,
+    provider,
+    model,
+    customDmp: true
+  });
 
   await sendTeamNotification({
     companyId: row.companyId,

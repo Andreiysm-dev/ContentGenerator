@@ -1,4 +1,6 @@
 import db from '../database/db.js';
+import { logAudit } from './auditService.js';
+import { getTargetStatusFromAutomation } from './kanbanAutomationService.js';
 
 import { CAPTION_USER_PROMPT_TEMPLATE } from './prompts.js';
 import { sendNotification, sendTeamNotification } from './notificationService.js';
@@ -260,6 +262,9 @@ const assertUserCanAccessCompany = async ({ userId, companyId, requiredPermissio
   return { ok: true, companyName: company.companyName, triggeredByName };
 };
 
+// In-memory lock to prevent concurrent generation on the same row
+const activeGenerations = new Set();
+
 export async function generateCaptionForContent(contentCalendarId, opts = {}) {
   const userId = opts.userId;
   if (!contentCalendarId) {
@@ -293,23 +298,13 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
   const normalized = normalizeStatusState(contentCalendar.status);
   const state = String(normalized.state || 'Draft');
 
-  if (state === 'Generating') {
+  // Use in-memory lock to prevent concurrent generation (avoids writing 'Generating' status to DB)
+  if (activeGenerations.has(contentCalendarId)) {
     return { ok: false, status: 409, error: 'Generation already running', code: 'ALREADY_GENERATING' };
   }
-  const generationAllowed = ['Draft', 'Error', 'Generate', 'Review', 'Approved', 'Needs Revision'].includes(state);
-  if (!generationAllowed) {
-    return { ok: false, status: 409, error: `Generation blocked for status: ${state}`, code: 'STATUS_BLOCKED' };
-  }
+  activeGenerations.add(contentCalendarId);
 
-  const { error: setGeneratingError } = await db
-    .from('contentCalendar')
-    .update({ status: writeStatus('Generating') })
-    .eq('contentCalendarId', contentCalendarId);
-
-  if (setGeneratingError) {
-    return { ok: false, status: 500, error: 'Failed to set Generating status' };
-  }
-
+  // Fetch brand knowledge (no status changes during processing — card stays in its current column)
   const { data: brandKB, error: brandError } = await db
     .from('brandKB')
     .select('brandPack, brandCapability, writerAgent, emojiRule, companyId')
@@ -326,6 +321,7 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
       })
       .eq('contentCalendarId', contentCalendarId);
 
+    activeGenerations.delete(contentCalendarId);
     return { ok: false, status: 500, error: 'Failed to load brandKB' };
   }
 
@@ -346,6 +342,7 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
       })
       .eq('contentCalendarId', contentCalendarId);
 
+    activeGenerations.delete(contentCalendarId);
     return { ok: false, status: 500, error: openAiRes.error };
   }
 
@@ -360,11 +357,15 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
       })
       .eq('contentCalendarId', contentCalendarId);
 
+    activeGenerations.delete(contentCalendarId);
     return { ok: false, status: 500, error: parsedAny.error };
   }
 
   const { framework, caption, cta, hashtags } = parsedAny.value;
   const hashtagsJoined = hashtags.join(' ');
+
+  const targetStatus = await getTargetStatusFromAutomation(companyId, 'caption_generated', 'Review');
+  console.log(`[CaptionService] companyId=${companyId}, targetStatus from automation="${targetStatus}"`);
 
   const { data: updatedRows, error: saveError } = await db
     .from('contentCalendar')
@@ -373,7 +374,7 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
       captionOutput: caption,
       ctaOuput: cta,
       hastagsOutput: hashtagsJoined,
-      status: writeStatus('Review'),
+      status: writeStatus(targetStatus),
       reviewNotes: null,
     })
     .eq('contentCalendarId', contentCalendarId)
@@ -388,12 +389,18 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
       })
       .eq('contentCalendarId', contentCalendarId);
 
+    activeGenerations.delete(contentCalendarId);
     return { ok: false, status: 500, error: 'Failed to save caption outputs' };
   }
 
   const updated = Array.isArray(updatedRows) ? updatedRows[0] : null;
 
   if (updated) {
+    await logAudit(userId, 'CAPTION_GENERATED', 'contentCalendar', contentCalendarId, {
+      companyId,
+      framework
+    });
+
     await sendTeamNotification({
       companyId,
       title: 'Caption Generated',
@@ -404,12 +411,26 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
       companyName,
     });
 
-    // Auto-trigger review if caption was generated successfully
+    // Notification for Locked Columns (Approvals)
+    const { checkAndNotifyApproval } = await import('./notificationService.js');
+    await checkAndNotifyApproval({
+      companyId,
+      status: targetStatus,
+      contentTheme: updated.theme,
+      triggeredByName,
+      userId
+    });
+
+    // Auto-trigger review after caption generation.
+    // skipStatusUpdate=true — caption_generated automation already set the final column.
+    // Review runs as part of this unified process; it saves its AI decision/notes only.
     try {
       const { reviewContentForCalendarRow } = await import('./contentReviewService.js');
-      await reviewContentForCalendarRow(contentCalendarId, { userId });
+      await reviewContentForCalendarRow(contentCalendarId, { userId, skipStatusUpdate: true });
     } catch (reviewErr) {
       console.error('Failed to auto-trigger review after generation:', reviewErr);
+    } finally {
+      activeGenerations.delete(contentCalendarId);
     }
   }
 
@@ -460,17 +481,9 @@ export async function generateCaptionForContentSystem(payload = {}) {
   const stateFromWebhook = statusFromWebhook != null ? String(normalizeStatusState(statusFromWebhook).state || '') : '';
   const effectiveState = stateFromWebhook || stateFromRow;
 
+  // Only prevent if a generation is already actively running on this row
   if (effectiveState === 'Generating') {
     return { ok: false, status: 409, error: 'Generation already running', code: 'ALREADY_GENERATING' };
-  }
-  const generationAllowed = ['Draft', 'Error', 'Generate', 'Review', 'Approved', 'Needs Revision'].includes(effectiveState);
-  if (!generationAllowed) {
-    return {
-      ok: false,
-      status: 409,
-      error: `Generation blocked for status: ${effectiveState}`,
-      code: 'STATUS_BLOCKED',
-    };
   }
 
   const { error: setGeneratingError } = await db
@@ -544,7 +557,7 @@ export async function generateCaptionForContentSystem(payload = {}) {
       captionOutput: caption,
       ctaOuput: cta,
       hastagsOutput: hashtagsJoined,
-      status: writeStatus('Review'),
+      status: writeStatus(await getTargetStatusFromAutomation(companyId, 'caption_generated', 'Review')),
       reviewNotes: null,
     })
     .eq('contentCalendarId', contentCalendarId)

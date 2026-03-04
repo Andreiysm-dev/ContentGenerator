@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ExternalLink, Wand2, Check, Copy, BarChart3, Clock, Target, Layout, MessageSquare, Calendar, ChevronDown, Zap, ClipboardList, PenLine, X, Info, ShieldCheck, Eye, FileText, MousePointer2, Tag, Share2, ChevronUp } from 'lucide-react';
+import { ExternalLink, Wand2, Check, Copy, Clock, Target, Layout, MessageSquare, Calendar, Zap, ClipboardList, PenLine, X, Eye, FileText, MousePointer2, Tag as TagIcon, Share2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Info, ShieldCheck, BarChart3, ArrowRight, Send, Trash2, MessageCircle, Plus, X as XIcon, Hash, Loader2, Edit3 } from 'lucide-react';
+import type { Tag } from '../pages/Workboard/types';
 import { useNavigate } from 'react-router-dom';
 
 
@@ -29,9 +30,13 @@ interface ViewContentModalProps {
     setIsImageModalOpen: (open: boolean) => void;
     setIsViewModalOpen: (open: boolean) => void;
     activeCompanyId?: string;
+    activeCompany?: any;
     setBrandKbId: (id: string | null) => void;
     setSystemInstruction: (instruction: string) => void;
     isAiAssistantOpen?: boolean;
+    collaborators?: any[];
+    automations?: any[];
+    userPermissions?: any;
 }
 
 export function ViewContentModal({
@@ -55,9 +60,13 @@ export function ViewContentModal({
     setIsImageModalOpen,
     setIsViewModalOpen,
     activeCompanyId,
+    activeCompany,
     setBrandKbId,
     setSystemInstruction,
-    isAiAssistantOpen
+    isAiAssistantOpen,
+    collaborators = [],
+    automations = [],
+    userPermissions = {},
 }: ViewContentModalProps) {
     const navigate = useNavigate();
     const [isManualApproving, setIsManualApproving] = useState(false);
@@ -68,16 +77,267 @@ export function ViewContentModal({
     const [editedValues, setEditedValues] = useState<any>({});
     const [isSavingInputs, setIsSavingInputs] = useState(false);
     const [showAllStrategy, setShowAllStrategy] = useState(false);
+    const [logs, setLogs] = useState<any[]>([]);
+    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+    const [logPage, setLogPage] = useState(1);
+    const [totalLogs, setTotalLogs] = useState(0);
+    const [comments, setComments] = useState<any[]>([]);
+    const [isLoadingComments, setIsLoadingComments] = useState(false);
+    const [newCommentText, setNewCommentText] = useState('');
+    const [isPostingComment, setIsPostingComment] = useState(false);
+    const [commentPage, setCommentPage] = useState(1);
+    const [totalComments, setTotalComments] = useState(0);
+    const [tagPool, setTagPool] = useState<Tag[]>([]);
+    const [isAddingTag, setIsAddingTag] = useState(false);
+    const [newTagName, setNewTagName] = useState('');
+    const [isUpdatingTags, setIsUpdatingTags] = useState(false);
+    const [isAddingCollaborator, setIsAddingCollaborator] = useState(false);
+    const [isUpdatingCollaborators, setIsUpdatingCollaborators] = useState(false);
+    const [toggledCollaboratorId, setToggledCollaboratorId] = useState<string | null>(null);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [tempName, setTempName] = useState('');
+    const [isSavingName, setIsSavingName] = useState(false);
+
+    const currentStatusInModal = getStatusValue(selectedRow?.status);
+    const lockRuleInModal = automations?.find(a => a.type === 'access_rule' && a.columnId === currentStatusInModal);
+    const isLockedInModal = !!(lockRuleInModal && !userPermissions?.isOwner && userPermissions?.roleName !== lockRuleInModal.roleName);
 
     React.useEffect(() => {
-        if (isOpen && selectedRow && selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook') {
-            fetchAnalytics();
+        if (isOpen && selectedRow) {
+            fetchLogs();
+            fetchComments();
+            fetchTagPool();
+            if (selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook') {
+                fetchAnalytics();
+            }
         } else {
             setAnalytics(null);
+            setLogs([]);
+            setComments([]);
+            setLogPage(1);
+            setTotalLogs(0);
+            setCommentPage(1);
+            setTotalComments(0);
+            setNewCommentText('');
+            setNewTagName('');
+            setIsAddingTag(false);
+            setIsAddingCollaborator(false);
         }
     }, [isOpen, selectedRow?.contentCalendarId]);
 
+    const fetchLogs = async (page = 1) => {
+        if (!activeCompanyId || !selectedRow?.contentCalendarId) return;
+        setIsLoadingLogs(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/audit/${activeCompanyId}?entityId=${selectedRow.contentCalendarId}&page=${page}&pageSize=5`);
+            if (res.ok) {
+                const data = await res.json();
+                setLogs(data.logs || []);
+                setTotalLogs(data.count || 0);
+                setLogPage(data.page || 1);
+            }
+        } catch (err) {
+            console.error('Error fetching logs:', err);
+        } finally {
+            setIsLoadingLogs(false);
+        }
+    };
+
+    const fetchComments = async (page = 1) => {
+        if (!selectedRow?.contentCalendarId) return;
+        setIsLoadingComments(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/comments?page=${page}&pageSize=5`);
+            if (res.ok) {
+                const data = await res.json();
+                setComments(data.comments || []);
+                setTotalComments(data.count || 0);
+                setCommentPage(data.page || 1);
+            }
+        } catch (err) {
+            console.error('Error fetching comments:', err);
+        } finally {
+            setIsLoadingComments(false);
+        }
+    };
+
+    const handleAddComment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const text = newCommentText.trim();
+        if (!text || !selectedRow?.contentCalendarId || isPostingComment) return;
+
+        setIsPostingComment(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+
+            if (res.ok) {
+                setNewCommentText('');
+                await fetchComments();
+            } else {
+                notify('Failed to post comment', 'error');
+            }
+        } catch (err) {
+            console.error('Add comment error:', err);
+            notify('Error posting comment', 'error');
+        } finally {
+            setIsPostingComment(false);
+        }
+    };
+
+    const handleDeleteComment = async (commentId: string) => {
+        const proceed = await requestConfirm({
+            title: 'Delete Comment?',
+            description: 'Are you sure you want to delete this comment? This action cannot be undone.',
+            confirmLabel: 'Delete',
+            cancelLabel: 'Cancel'
+        });
+        if (!proceed) return;
+
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/comments/${commentId}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                await fetchComments();
+            } else {
+                notify('Failed to delete comment', 'error');
+            }
+        } catch (err) {
+            console.error('Delete comment error:', err);
+            notify('Error deleting comment', 'error');
+        }
+    };
+
+    const fetchTagPool = async () => {
+        if (!activeCompanyId) return;
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setTagPool(data.company?.kanban_settings?.tags || []);
+            }
+        } catch (err) {
+            console.error('Error fetching tag pool:', err);
+        }
+    };
+
+    const handleToggleTag = async (tag: Tag) => {
+        if (!selectedRow || isUpdatingTags) return;
+
+        setIsUpdatingTags(true);
+        const currentTags = Array.isArray(selectedRow.tags) ? selectedRow.tags : [];
+        const isAssigned = currentTags.some((t: any) => t.id === tag.id);
+
+        let nextTags;
+        if (isAssigned) {
+            nextTags = currentTags.filter((t: any) => t.id !== tag.id);
+        } else {
+            nextTags = [...currentTags, tag];
+        }
+
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tags: nextTags })
+            });
+
+            if (res.ok) {
+                await refreshCalendarRow(selectedRow.contentCalendarId);
+            } else {
+                notify('Failed to update tags', 'error');
+            }
+        } catch (err) {
+            console.error('Tag update error:', err);
+            notify('Error updating tags', 'error');
+        } finally {
+            setIsUpdatingTags(false);
+        }
+    };
+
+    const handleToggleCollaborator = async (collaborator: any) => {
+        if (!selectedRow?.contentCalendarId || isUpdatingCollaborators) return;
+
+        const currentCollaborators = selectedRow.collaborators || [];
+        const isAssigned = currentCollaborators.some((c: any) => c.id === collaborator.id);
+
+        let nextCollaborators;
+        if (isAssigned) {
+            nextCollaborators = currentCollaborators.filter((c: any) => c.id !== collaborator.id);
+        } else {
+            nextCollaborators = [...currentCollaborators, { id: collaborator.id, email: collaborator.email, role: collaborator.role }];
+        }
+
+        setIsUpdatingCollaborators(true);
+        setToggledCollaboratorId(collaborator.id);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ collaborators: nextCollaborators })
+            });
+
+            if (res.ok) {
+                await refreshCalendarRow(selectedRow.contentCalendarId);
+            } else {
+                notify('Failed to update collaborators', 'error');
+            }
+        } catch (err) {
+            console.error('Error updating collaborators:', err);
+            notify('Error updating collaborators', 'error');
+        } finally {
+            setIsUpdatingCollaborators(false);
+            setToggledCollaboratorId(null);
+        }
+    };
+
+    const handleCreateTag = async () => {
+        const name = newTagName.trim();
+        if (!name || !activeCompanyId) return;
+
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const newTag: Tag = { id: `tag-${Date.now()}`, name, color: randomColor };
+
+        const nextPool = [...tagPool, newTag];
+
+        try {
+            // Fetch current company settings first to ensure we don't overwrite other fields
+            const cRes = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`);
+            const cData = await cRes.json();
+            const currentSettings = cData.company?.kanban_settings || {};
+
+            const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    kanban_settings: {
+                        ...currentSettings,
+                        tags: nextPool
+                    }
+                })
+            });
+
+            if (res.ok) {
+                setTagPool(nextPool);
+                setNewTagName('');
+                setIsAddingTag(false);
+                notify(`Tag "${name}" created!`, 'success');
+                // Automatically assign it to the current card
+                handleToggleTag(newTag);
+            }
+        } catch (err) {
+            console.error('Create tag error:', err);
+            notify('Failed to create tag', 'error');
+        }
+    };
     const fetchAnalytics = async () => {
+        if (!selectedRow?.contentCalendarId) return;
         setIsLoadingAnalytics(true);
         try {
             const res = await authedFetch(`${backendBaseUrl}/api/social/facebook/insights/${selectedRow.contentCalendarId}`);
@@ -104,6 +364,7 @@ export function ViewContentModal({
             primaryGoal: selectedRow.primaryGoal,
             cta: selectedRow.cta,
             promoType: selectedRow.promoType,
+            card_name: selectedRow.card_name || '',
             frameworkUsed: selectedRow.frameworkUsed,
         });
         setIsEditingInputs(true);
@@ -111,26 +372,58 @@ export function ViewContentModal({
 
     const handleSaveInputs = async () => {
         setIsSavingInputs(true);
+        const payload = { ...editedValues };
+
+        // Auto-status mapping for scheduling
+        const studioSettings = activeCompany?.kanban_settings?.studio_settings;
+        if (studioSettings?.schedulingStatus && editedValues.date && !selectedRow.date) {
+            payload.status = studioSettings.schedulingStatus;
+        }
+
         try {
             const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editedValues)
+                body: JSON.stringify(payload)
             });
 
             if (res.ok) {
-                notify('Inputs updated successfully', 'success');
+                notify('Details updated successfully', 'success');
                 setIsEditingInputs(false);
                 await refreshCalendarRow(selectedRow.contentCalendarId);
             } else {
                 const data = await res.json().catch(() => ({}));
-                notify(data.error || 'Failed to update inputs', 'error');
+                notify(data.error || 'Failed to update details', 'error');
             }
         } catch (err) {
             console.error('Save inputs error:', err);
-            notify('Error saving inputs', 'error');
+            notify('Error saving details', 'error');
         } finally {
             setIsSavingInputs(false);
+        }
+    };
+
+    const handleSaveName = async () => {
+        if (!tempName.trim()) return setIsEditingName(false);
+        setIsSavingName(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ card_name: tempName })
+            });
+
+            if (res.ok) {
+                notify('Name updated', 'success');
+                setIsEditingName(false);
+                await refreshCalendarRow(selectedRow.contentCalendarId);
+            } else {
+                notify('Failed to update name', 'error');
+            }
+        } catch (err) {
+            notify('Error saving name', 'error');
+        } finally {
+            setIsSavingName(false);
         }
     };
 
@@ -155,13 +448,62 @@ export function ViewContentModal({
                                 <ClipboardList size={24} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                                    {selectedRow.theme || "Content Details"}
-                                    <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm ${statusBadgeClasses(statusKey(getStatusValue(selectedRow.status)))
-                                        }`}>
-                                        {getStatusValue(selectedRow.status)}
-                                    </div>
-                                </h2>
+                                <div className="flex items-center gap-3">
+                                    {isEditingName ? (
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                value={tempName}
+                                                onChange={e => setTempName(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+                                                onBlur={() => !isSavingName && handleSaveName()}
+                                                className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-lg font-black outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-300 shadow-sm min-w-[200px]"
+                                                placeholder="Enter post name..."
+                                            />
+                                            {isSavingName && <Loader2 size={16} className="animate-spin text-blue-500" />}
+                                        </div>
+                                    ) : (
+                                        <h2
+                                            className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3 cursor-pointer hover:text-blue-600 transition-colors group"
+                                            onClick={() => { setTempName(selectedRow.card_name || ''); setIsEditingName(true); }}
+                                        >
+                                            {selectedRow.card_name || selectedRow.theme || "Content Details"}
+                                            <PenLine size={16} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-all" />
+                                        </h2>
+                                    )}
+                                    {(() => {
+                                        const rawStatus = getStatusValue(selectedRow.status).trim();
+                                        const columns = activeCompany?.kanban_settings?.columns || [];
+                                        const match = columns.find(
+                                            (c: any) => c.id === rawStatus || c.title === rawStatus ||
+                                                c.id.toLowerCase() === rawStatus.toLowerCase() ||
+                                                c.title.toLowerCase() === rawStatus.toLowerCase()
+                                        );
+
+                                        if (match) {
+                                            const colColor = match.color;
+                                            const badgeStyle = colColor
+                                                ? { borderColor: colColor + '40', color: colColor, backgroundColor: colColor + '15' }
+                                                : undefined;
+                                            return (
+                                                <div
+                                                    className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm"
+                                                    style={badgeStyle}
+                                                >
+                                                    {match.title}
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm ${statusBadgeClasses(statusKey(rawStatus))
+                                                }`}>
+                                                {rawStatus}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
                                 <div className="flex items-center gap-3 mt-0.5">
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
                                         <Calendar size={12} />
@@ -184,292 +526,624 @@ export function ViewContentModal({
                         </button>
                     </div>
 
-                    {/* Body: Two-Column Workspace */}
+                    {/* Body: Focused two-column layout */}
                     <div className="flex flex-col lg:flex-row h-full max-h-[70vh] min-h-[500px]">
-                        {/* Main Feed Column */}
-                        <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-12 bg-slate-50/30">
+                        {/* Main: Caption + CTA + Hashtags */}
+                        <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-6 bg-slate-50/30">
 
-                            {/* Section: AI-Generated Core */}
-                            <section className="space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-blue-600 flex items-center gap-2">
-                                        <Zap size={14} className="fill-blue-600" />
-                                        AI-Generated Outputs
-                                    </h3>
-                                    <span className="text-[11px] font-bold text-slate-400">Draft suggestions for your review</span>
+                            {/* Final Caption */}
+                            <section className="space-y-3">
+                                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-2">
+                                    <PenLine size={14} className="text-emerald-600" />
+                                    Final Caption
+                                </h3>
+                                <div className="bg-white border border-emerald-500/20 rounded-[1.5rem] p-6 shadow-sm relative group min-h-[160px]">
+                                    <button
+                                        onClick={() => handleCopy('finalDescription', [selectedRow.finalCaption || selectedRow.captionOutput, selectedRow.finalHashtags || selectedRow.hastagsOutput].filter(Boolean).join('\n\n'))}
+                                        className="absolute top-4 right-4 px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-[9px] font-black shadow-lg shadow-emerald-500/20"
+                                    >
+                                        {copiedField === 'finalDescription' ? 'COPIED' : 'COPY ALL'}
+                                    </button>
+                                    <div className="text-sm font-medium text-slate-800 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto pr-2">
+                                        {selectedRow.finalCaption || selectedRow.captionOutput || <span className="text-slate-300 italic">Not generated yet</span>}
+                                    </div>
                                 </div>
+                            </section>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                    {/* Caption Output Card */}
-                                    <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => handleCopy('captionOutput', selectedRow.captionOutput)}
-                                                className="p-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-lg"
-                                            >
-                                                {copiedField === 'captionOutput' ? <Check size={14} /> : <Copy size={14} />}
-                                            </button>
+                            {/* Visual Asset — inline in left column */}
+                            <div className="space-y-3">
+                                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+                                    <Layout size={13} />
+                                    Visual Asset
+                                </h3>
+                                <div className="w-full bg-slate-100 rounded-[1.5rem] border border-slate-200 relative overflow-hidden transition-all hover:border-blue-200 group" style={{ minHeight: '280px' }}>
+                                    {getImageGeneratedUrl(selectedRow) ? (
+                                        <img
+                                            src={`${getImageGeneratedUrl(selectedRow)}${getImageGeneratedUrl(selectedRow)?.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
+                                            alt="Generated visual"
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            style={{ minHeight: '280px' }}
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-16 px-4 h-full" style={{ minHeight: '280px' }}>
+                                            <Layout size={36} className="text-slate-300 mb-3" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">No visual yet</span>
                                         </div>
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
-                                            <MessageSquare size={12} />
-                                            Caption draft
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* CTA + Hashtags */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <section className="space-y-3">
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-blue-600 flex items-center gap-2">
+                                        <Target size={14} />
+                                        Final CTA
+                                    </h3>
+                                    <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm relative group">
+                                        <button
+                                            onClick={() => handleCopy('finalCTA', selectedRow.finalCTA || selectedRow.ctaOuput)}
+                                            className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 transition-colors"
+                                        >
+                                            {copiedField === 'finalCTA' ? <Check size={12} /> : <Copy size={12} />}
+                                        </button>
+                                        <div className="text-sm font-bold text-slate-900 leading-snug">
+                                            {selectedRow.finalCTA || selectedRow.ctaOuput || <span className="text-slate-300 font-normal">—</span>}
                                         </div>
-                                        <div className="text-sm font-medium text-slate-700 leading-relaxed min-h-[100px] whitespace-pre-wrap max-h-[250px] overflow-y-auto pr-2">
+                                    </div>
+                                </section>
+
+                                <section className="space-y-3">
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-blue-600 flex items-center gap-2">
+                                        <TagIcon size={14} />
+                                        Final Hashtags
+                                    </h3>
+                                    <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm relative group">
+                                        <button
+                                            onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags || selectedRow.hastagsOutput)}
+                                            className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 transition-colors"
+                                        >
+                                            {copiedField === 'finalHashtags' ? <Check size={12} /> : <Copy size={12} />}
+                                        </button>
+                                        <div className="text-sm font-bold text-blue-600/80 leading-relaxed">
+                                            {selectedRow.finalHashtags || selectedRow.hastagsOutput || <span className="text-slate-300 font-normal">—</span>}
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* Collapsible: AI Draft Outputs */}
+                            <details className="group">
+                                <summary className="flex items-center justify-between cursor-pointer select-none py-2 px-1 rounded-xl hover:bg-slate-100/70 transition-colors">
+                                    <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                                        <Zap size={13} />
+                                        AI Draft Outputs
+                                    </span>
+                                    <ChevronDown size={14} className="text-slate-400 group-open:rotate-180 transition-transform duration-200" />
+                                </summary>
+
+                                <div className="mt-4 space-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    {/* Caption Draft */}
+                                    <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm relative group/card">
+                                        <button
+                                            onClick={() => handleCopy('captionOutput', selectedRow.captionOutput)}
+                                            className="absolute top-3 right-3 p-1.5 bg-slate-100 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-colors opacity-0 group-hover/card:opacity-100"
+                                        >
+                                            {copiedField === 'captionOutput' ? <Check size={12} /> : <Copy size={12} />}
+                                        </button>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-2">
+                                            <MessageSquare size={11} /> Caption Draft
+                                        </div>
+                                        <div className="text-sm font-medium text-slate-600 leading-relaxed whitespace-pre-wrap max-h-[180px] overflow-y-auto pr-2">
                                             {selectedRow.captionOutput ?? <span className="text-slate-300 italic">Not generated yet</span>}
                                         </div>
                                     </div>
 
-                                    {/* CTA & Hashtags Stack */}
-                                    <div className="space-y-5">
-                                        <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm relative group">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
-                                                <Target size={12} />
-                                                Suggested CTA
-                                            </div>
-                                            <div className="text-sm font-bold text-slate-900">
-                                                {selectedRow.ctaOuput ?? <span className="text-slate-300 italic font-normal">—</span>}
-                                            </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* CTA Draft */}
+                                        <div className="bg-white border border-slate-200 rounded-[1.5rem] p-4 shadow-sm relative group/card">
                                             <button
                                                 onClick={() => handleCopy('ctaOuput', selectedRow.ctaOuput)}
-                                                className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 transition-colors"
+                                                className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-blue-500 transition-colors opacity-0 group-hover/card:opacity-100"
                                             >
-                                                {copiedField === 'ctaOuput' ? <Check size={12} /> : <Copy size={12} />}
+                                                {copiedField === 'ctaOuput' ? <Check size={11} /> : <Copy size={11} />}
                                             </button>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                                                <Target size={11} /> Suggested CTA
+                                            </div>
+                                            <div className="text-sm font-bold text-slate-700">
+                                                {selectedRow.ctaOuput ?? <span className="text-slate-300 italic font-normal">—</span>}
+                                            </div>
                                         </div>
-                                        <div className="bg-white border border-slate-200 rounded-[1.5rem] p-5 shadow-sm relative group">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
-                                                <PenLine size={12} />
-                                                Suggested Hashtags
-                                            </div>
-                                            <div className="text-sm font-medium text-slate-600 line-clamp-3">
-                                                {selectedRow.hastagsOutput ?? <span className="text-slate-300 italic font-normal">—</span>}
-                                            </div>
+                                        {/* Hashtags Draft */}
+                                        <div className="bg-white border border-slate-200 rounded-[1.5rem] p-4 shadow-sm relative group/card">
                                             <button
                                                 onClick={() => handleCopy('hastagsOutput', selectedRow.hastagsOutput)}
-                                                className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 transition-colors"
+                                                className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-blue-500 transition-colors opacity-0 group-hover/card:opacity-100"
                                             >
-                                                {copiedField === 'hastagsOutput' ? <Check size={12} /> : <Copy size={12} />}
+                                                {copiedField === 'hastagsOutput' ? <Check size={11} /> : <Copy size={11} />}
+                                            </button>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                                                <TagIcon size={11} /> Hashtag Draft
+                                            </div>
+                                            <div className="text-sm font-medium text-slate-600 line-clamp-4">
+                                                {selectedRow.hastagsOutput ?? <span className="text-slate-300 italic font-normal">—</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+                            {/* Comments Section */}
+                            <div className="pt-8 border-t border-slate-200 mt-8">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                                        <MessageCircle size={13} />
+                                        Team Discussions
+                                    </div>
+                                    {totalComments > 5 && (
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => fetchComments(commentPage - 1)}
+                                                disabled={commentPage === 1 || isLoadingComments}
+                                                className="p-1 px-2 border border-slate-200 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                                            >
+                                                <ChevronLeft size={14} />
+                                            </button>
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                Page {commentPage} / {Math.ceil(totalComments / 5)}
+                                            </span>
+                                            <button
+                                                onClick={() => fetchComments(commentPage + 1)}
+                                                disabled={commentPage >= Math.ceil(totalComments / 5) || isLoadingComments}
+                                                className="p-1 px-2 border border-slate-200 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                                            >
+                                                <ChevronRight size={14} />
                                             </button>
                                         </div>
-                                    </div>
-                                </div>
-                            </section>
-
-                            {/* Section: Final Deliverable */}
-                            <section className="space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-2">
-                                        <ShieldCheck size={14} className="fill-emerald-600" />
-                                        Review & Final Deliverable
-                                    </h3>
-                                    <span className="text-[11px] font-bold text-slate-400">Approved version ready for deployment</span>
-                                </div>
-
-                                <div className="bg-emerald-500/[0.03] border-2 border-emerald-500/10 rounded-[2rem] p-6 lg:p-8 relative">
-                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                                        <div className="flex flex-col gap-6">
-                                            <div>
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
-                                                    <Info size={12} />
-                                                    Approval status & Notes
-                                                </div>
-                                                <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm min-h-[100px]">
-                                                    <div className="text-sm font-black text-slate-900 mb-2">Decision: {selectedRow.reviewDecision || "PENDING"}</div>
-                                                    <p className="text-xs font-semibold text-slate-500 italic leading-relaxed">
-                                                        "{selectedRow.reviewNotes || "No review notes provided yet."}"
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm group">
-                                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 flex justify-between">
-                                                        Final CTA
-                                                        <button onClick={() => handleCopy('finalCTA', selectedRow.finalCTA)} className="text-slate-300 hover:text-blue-600 transition-colors">
-                                                            {copiedField === 'finalCTA' ? <Check size={12} /> : <Copy size={12} />}
-                                                        </button>
-                                                    </div>
-                                                    <div className="text-sm font-black text-slate-900 leading-snug">
-                                                        {selectedRow.finalCTA || <span className="text-slate-300 font-normal">—</span>}
-                                                    </div>
-                                                </div>
-                                                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm group">
-                                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-2 flex justify-between">
-                                                        Final Hashtags
-                                                        <button onClick={() => handleCopy('finalHashtags', selectedRow.finalHashtags)} className="text-slate-300 hover:text-blue-600 transition-colors">
-                                                            {copiedField === 'finalHashtags' ? <Check size={12} /> : <Copy size={12} />}
-                                                        </button>
-                                                    </div>
-                                                    <div className="text-sm font-bold text-blue-600/80 leading-relaxed">
-                                                        {selectedRow.finalHashtags || <span className="text-slate-300 font-normal">—</span>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="relative">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex justify-between items-center">
-                                                <div className="flex items-center gap-2"><PenLine size={12} /> Final Caption</div>
-                                                <button
-                                                    onClick={() => handleCopy('finalDescription', [selectedRow.finalCaption, selectedRow.finalHashtags].filter(Boolean).join('\n\n'))}
-                                                    className="px-3 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-[9px] font-black shadow-lg shadow-emerald-500/20"
-                                                >
-                                                    {copiedField === 'finalDescription' ? "COPIED" : "COPY READY DESCRIPTION"}
-                                                </button>
-                                            </div>
-                                            <div className="bg-white border border-emerald-500/20 rounded-2xl p-5 shadow-inner min-h-[180px] text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
-                                                {[selectedRow.finalCaption, selectedRow.finalHashtags].filter(Boolean).join('\n\n') || "Drafting finalized version..."}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </section>
-
-                            {/* Section: Analytics */}
-                            {selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook' && (
-                                <section className="pt-6 border-t border-slate-200 space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-900 flex items-center gap-2">
-                                            <BarChart3 size={14} className="text-slate-900" />
-                                            Live Insights
-                                        </h3>
-                                        {selectedRow.social_post_id && (
-                                            <a href={`https://facebook.com/${selectedRow.social_post_id}`} target="_blank" className="text-[10px] font-black text-blue-600 flex items-center gap-1.5 hover:underline decoration-2">
-                                                LIVE AT FACEBOOK <ExternalLink size={10} />
-                                            </a>
-                                        )}
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-6">
-                                        {[
-                                            { label: 'Reach', val: analytics?.reach, icon: Eye },
-                                            { label: 'Engagement', val: analytics?.likes, icon: Target },
-                                            { label: 'Conversations', val: analytics?.comments, icon: MessageSquare }
-                                        ].map((stat, i) => (
-                                            <div key={i} className="bg-white border border-slate-200 rounded-[1.5rem] p-4 text-center group hover:border-blue-200 transition-all">
-                                                <div className="w-8 h-8 mx-auto mb-2 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-all">
-                                                    <stat.icon size={16} />
-                                                </div>
-                                                <div className="text-xl font-black text-slate-900">{isLoadingAnalytics ? '...' : (stat.val ?? '0')}</div>
-                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
-                        </div>
-
-                        {/* Sidebar: Strategy & Metadata */}
-                        <div className="w-full lg:w-[400px] border-l border-slate-200 bg-white overflow-y-auto p-8 space-y-10 flex-shrink-0">
-
-                            {/* Strategy Section */}
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="text-xs font-black uppercase tracking-widest text-slate-900">Campaign Strategy</div>
-                                    {isEditingInputs ? (
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setIsEditingInputs(false)} className="p-1 text-slate-400 hover:text-slate-600 transition-all"><X size={14} /></button>
-                                            <button onClick={handleSaveInputs} disabled={isSavingInputs} className="p-1 text-blue-600 hover:text-blue-700 disabled:opacity-50"><Check size={14} /></button>
-                                        </div>
-                                    ) : (
-                                        <button onClick={handleStartEditing} className="p-1.5 bg-slate-50 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
-                                            <PenLine size={14} />
-                                        </button>
                                     )}
                                 </div>
 
-                                <div className="bg-slate-50/50 border border-slate-200/60 rounded-[1.5rem] p-4 space-y-5">
-                                    {[
-                                        { label: 'Theme', key: 'theme', icon: Layout },
-                                        { label: 'Type', key: 'contentType', icon: FileText },
-                                        { label: 'Date', key: 'date', icon: Calendar },
-                                        { label: 'Brand Focus', key: 'brandHighlight', icon: Target },
-                                        { label: 'Primary Goal', key: 'primaryGoal', icon: Zap },
-                                        { label: 'Audience', key: 'targetAudience', icon: Eye },
-                                        { label: 'Channels', key: 'channels', icon: ExternalLink },
-                                        { label: 'CTA', key: 'cta', icon: MousePointer2 },
-                                        { label: 'Promo Type', key: 'promoType', icon: Tag },
-                                        { label: 'Cross Promo', key: 'crossPromo', icon: Share2 },
-                                        { label: 'Framework', key: 'frameworkUsed', icon: ClipboardList },
-                                    ].slice(0, showAllStrategy ? undefined : 5).map((item, idx) => (
-                                        <div key={idx} className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                                <item.icon size={10} />
-                                                {item.label}
+                                <div className="space-y-6">
+                                    {/* Comment Input */}
+                                    <form onSubmit={handleAddComment} className="relative">
+                                        <textarea
+                                            value={newCommentText}
+                                            onChange={(e) => setNewCommentText(e.target.value)}
+                                            placeholder="Write a comment..."
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-14 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none min-h-[100px]"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleAddComment(e);
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={!newCommentText.trim() || isPostingComment}
+                                            className="absolute bottom-4 right-4 p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-30 disabled:hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20"
+                                        >
+                                            {isPostingComment ? (
+                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <Send size={16} />
+                                            )}
+                                        </button>
+                                    </form>
+
+                                    {/* comments List */}
+                                    <div className="space-y-4">
+                                        {isLoadingComments ? (
+                                            <div className="space-y-4">
+                                                {[...Array(2)].map((_, i) => (
+                                                    <div key={i} className="animate-pulse flex gap-3">
+                                                        <div className="w-8 h-8 bg-slate-100 rounded-full" />
+                                                        <div className="flex-1 space-y-2">
+                                                            <div className="h-2 bg-slate-50 rounded w-1/4" />
+                                                            <div className="h-10 bg-slate-50 rounded" />
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                            {isEditingInputs ? (
+                                        ) : comments.length > 0 ? (
+                                            comments.map((comment) => (
+                                                <div key={comment.id} className="flex gap-4 group/comment">
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[10px] font-black text-white shrink-0 uppercase shadow-sm">
+                                                        {comment.actorName?.charAt(0) || 'U'}
+                                                    </div>
+                                                    <div className="flex-1 space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs font-bold text-slate-900">{comment.actorName}</span>
+                                                                <span className="text-[10px] text-slate-400 font-medium">
+                                                                    {new Date(comment.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                            </div>
+                                                            {/* Delete button — only if user matches (handled by backend too) */}
+                                                            <button
+                                                                onClick={() => handleDeleteComment(comment.id)}
+                                                                className="opacity-0 group-hover/comment:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        </div>
+                                                        <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-none p-3 shadow-sm">
+                                                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                                                {comment.text}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-8 text-slate-300">
+                                                <MessageSquare size={24} className="mb-2 opacity-20" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">No comments yet</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Activity Stream — Moved from sidebar */}
+                            <div className="pt-8 border-t border-slate-200 mt-8">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                                        <Clock size={13} />
+                                        Activity Stream
+                                    </div>
+                                    {totalLogs > 5 && (
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => fetchLogs(logPage - 1)}
+                                                disabled={logPage === 1 || isLoadingLogs}
+                                                className="p-1 px-2 border border-slate-200 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                                            >
+                                                <ChevronLeft size={14} />
+                                            </button>
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                Page {logPage} / {Math.ceil(totalLogs / 5)}
+                                            </span>
+                                            <button
+                                                onClick={() => fetchLogs(logPage + 1)}
+                                                disabled={logPage >= Math.ceil(totalLogs / 5) || isLoadingLogs}
+                                                className="p-1 px-2 border border-slate-200 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                                            >
+                                                <ChevronRight size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="space-y-4 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
+                                    {isLoadingLogs ? (
+                                        <div className="flex flex-col gap-4">
+                                            {[...Array(3)].map((_, i) => (
+                                                <div key={i} className="flex items-center gap-3 pl-8 py-2 animate-pulse">
+                                                    <div className="w-2 h-2 bg-slate-200 rounded-full" />
+                                                    <div className="space-y-2 flex-1">
+                                                        <div className="h-2 bg-slate-50 rounded w-1/4" />
+                                                        <div className="h-2 bg-slate-50 rounded w-1/2" />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : logs.length > 0 ? (
+                                        logs.map((log, idx) => (
+                                            <div key={idx} className="relative pl-8 group">
+                                                <div className="absolute left-0 top-1.5 w-[24px] h-[24px] bg-white border-2 border-slate-100 rounded-full flex items-center justify-center z-10 group-hover:border-blue-200 transition-colors">
+                                                    <div className="w-1.5 h-1.5 bg-slate-300 rounded-full group-hover:bg-blue-500 transition-colors" />
+                                                </div>
+                                                <div className="space-y-0.5">
+                                                    <div className="text-[11px] font-bold text-slate-700 leading-tight">
+                                                        {log.action === 'STATUS_CHANGE' ? (
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-slate-500">Status updated</span>
+                                                                {log.metadata?.oldStatus && log.metadata?.newStatus && (
+                                                                    <div className="flex items-center gap-1.5 py-0.5">
+                                                                        <span className="text-[9px] font-black uppercase bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded leading-none line-through opacity-70">
+                                                                            {getStatusValue(log.metadata.oldStatus)}
+                                                                        </span>
+                                                                        <ArrowRight size={10} className="text-slate-300" />
+                                                                        <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded leading-none">
+                                                                            {getStatusValue(log.metadata.newStatus)}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            log.action?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400 font-medium flex items-center gap-2">
+                                                        {new Date(log.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        {log.actorEmail && (
+                                                            <>
+                                                                <div className="w-0.5 h-0.5 bg-slate-200 rounded-full" />
+                                                                <span className="text-[9px] text-slate-500 font-black uppercase tracking-tighter">
+                                                                    {log.actorEmail.split('@')[0]}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="pl-8 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest italic" id="empty-activity-stream">
+                                            No activity recorded
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="w-full lg:w-[320px] border-l border-slate-200 bg-white overflow-y-auto p-6 space-y-6 flex-shrink-0">
+
+
+                            {/* Tags */}
+                            <div className="space-y-3 pt-2">
+                                <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <TagIcon size={13} />
+                                        Tags
+                                    </div>
+                                    <button
+                                        onClick={() => setIsAddingTag(!isAddingTag)}
+                                        className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
+                                    >
+                                        {isAddingTag ? <X size={14} /> : <Plus size={14} />}
+                                    </button>
+                                </div>
+
+                                {isAddingTag && (
+                                    <div className="bg-white border border-blue-100 rounded-xl p-3 shadow-sm animate-in fade-in zoom-in-95 duration-200 mb-4">
+                                        <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Create New Tag</div>
+                                        <div className="flex gap-2 mb-3">
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                placeholder="Tag name..."
+                                                value={newTagName}
+                                                onChange={e => setNewTagName(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleCreateTag()}
+                                                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/10"
+                                            />
+                                            <button
+                                                onClick={handleCreateTag}
+                                                className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                            >
+                                                <Check size={14} />
+                                            </button>
+                                        </div>
+
+                                        {tagPool.some(t => !selectedRow.tags?.some((st: any) => st.id === t.id)) && (
+                                            <>
+                                                <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2 pt-2 border-t border-slate-100 text-center">Assign Existing</div>
+                                                <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1">
+                                                    {tagPool.filter(t => !selectedRow.tags?.some((st: any) => st.id === t.id)).map(tag => (
+                                                        <button
+                                                            key={tag.id}
+                                                            onClick={() => handleToggleTag(tag)}
+                                                            className="px-2 py-1 rounded-lg text-[9px] font-black uppercase border border-slate-200 hover:border-blue-200 hover:text-blue-600 transition-all"
+                                                            style={{ color: tag.color, borderColor: `${tag.color}40`, backgroundColor: `${tag.color}10` }}
+                                                        >
+                                                            {tag.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-1.5">
+                                    {selectedRow.tags?.map((tag: any) => (
+                                        <div
+                                            key={tag.id}
+                                            className="group flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border shadow-sm animate-in zoom-in-95 duration-200"
+                                            style={{
+                                                color: tag.color,
+                                                borderColor: `${tag.color}40`,
+                                                backgroundColor: `${tag.color}15`
+                                            }}
+                                        >
+                                            <Hash size={10} className="opacity-50" />
+                                            {tag.name}
+                                            <button
+                                                onClick={() => handleToggleTag(tag)}
+                                                className="ml-0.5 p-0.5 hover:bg-black/5 rounded-md transition-colors"
+                                            >
+                                                <XIcon size={10} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(!selectedRow.tags || selectedRow.tags.length === 0) && !isAddingTag && (
+                                        <button
+                                            onClick={() => setIsAddingTag(true)}
+                                            className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-200 rounded-2xl text-[10px] font-bold text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-blue-50/50 transition-all w-full justify-center"
+                                        >
+                                            <TagIcon size={12} />
+                                            Add Tags
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Collaborators section */}
+                            <div className="space-y-4 pt-4 border-t border-slate-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                                        <ClipboardList size={13} />
+                                        Collaborators
+                                    </div>
+                                    <button
+                                        onClick={() => setIsAddingCollaborator(!isAddingCollaborator)}
+                                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-all active:scale-95"
+                                        title="Manage collaborators"
+                                    >
+                                        <Plus size={14} />
+                                    </button>
+                                </div>
+
+                                {isAddingCollaborator && (
+                                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 px-1 text-center">Assign Team Members</div>
+                                        <div className="grid grid-cols-1 gap-1 max-h-60 overflow-y-auto pr-2 custom-scrollbar overscroll-behavior-contain">
+                                            {collaborators.map(c => {
+                                                const isAssigned = (selectedRow.collaborators || []).some((ac: any) => ac.id === c.id);
+                                                return (
+                                                    <button
+                                                        key={c.id}
+                                                        type="button"
+                                                        onClick={() => handleToggleCollaborator(c)}
+                                                        disabled={isUpdatingCollaborators}
+                                                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 ${isAssigned
+                                                            ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-700/50'
+                                                            : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50/10'
+                                                            }`}
+                                                    >
+                                                        <span className="truncate pr-2">{c.email}</span>
+                                                        {toggledCollaboratorId === c.id ? (
+                                                            <Loader2 size={12} className="animate-spin flex-shrink-0" />
+                                                        ) : isAssigned ? (
+                                                            <Check size={12} className="flex-shrink-0" />
+                                                        ) : (
+                                                            <Plus size={12} className="flex-shrink-0 opacity-40 group-hover:opacity-100" />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                            {collaborators.length === 0 && (
+                                                <div className="text-[10px] text-slate-400 text-center py-6 font-medium italic">
+                                                    No team members found.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedRow.collaborators?.map((c: any) => (
+                                        <div
+                                            key={c.id}
+                                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 shadow-sm transition-all hover:border-slate-300 group"
+                                        >
+                                            <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-black text-white uppercase border border-white/20">
+                                                {c.email?.substring(0, 1) || '?'}
+                                            </div>
+                                            <span className="text-[10px] font-bold truncate max-w-[80px]">{c.email}</span>
+                                            <button
+                                                onClick={() => handleToggleCollaborator(c)}
+                                                className="p-0.5 hover:bg-slate-200 rounded-md transition-colors text-slate-400 hover:text-rose-500"
+                                            >
+                                                <XIcon size={10} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(!selectedRow.collaborators || selectedRow.collaborators.length === 0) && !isAddingCollaborator && (
+                                        <button
+                                            onClick={() => setIsAddingCollaborator(true)}
+                                            className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-200 rounded-2xl text-[10px] font-bold text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-blue-50/50 transition-all w-full justify-center"
+                                        >
+                                            <ClipboardList size={12} />
+                                            Assign Collaborators
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Content Strategy Metadata */}
+                            <div className="space-y-4 pt-4 border-t border-slate-100">
+                                <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-500 flex items-center gap-2">
+                                    <Target size={13} />
+                                    Post Information
+                                </div>
+                                <div className="bg-indigo-50/30 rounded-2xl p-4 space-y-4 border border-indigo-100/50 shadow-sm shadow-indigo-100/10">
+                                    {[
+                                        { label: 'Primary Goal', value: selectedRow.primaryGoal, key: 'primaryGoal', description: 'The core objective of this content piece' },
+                                        { label: 'Target Audience', value: selectedRow.targetAudience, key: 'targetAudience', description: 'Who this post is specifically for' },
+                                        { label: 'CTA', value: selectedRow.cta, key: 'cta', description: 'The primary action we want users to take' },
+                                        { label: 'Framework', value: selectedRow.frameworkUsed, key: 'frameworkUsed', description: 'The structural approach (e.g., AIDA, PAS)' },
+                                        { label: 'Content Type', value: selectedRow.contentType, key: 'contentType', description: 'Format of the final delivery' },
+                                    ].map((item, i) => (
+                                        <div key={i} className="group">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">{item.label}</div>
+                                                <div className="text-[8px] font-medium text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap hidden sm:block pl-2">{item.description}</div>
+                                            </div>
+                                            {isEditingInputs && item.key ? (
                                                 <input
                                                     type="text"
                                                     value={editedValues[item.key] || ''}
-                                                    onChange={(e) => setEditedValues({ ...editedValues, [item.key]: e.target.value })}
-                                                    className="w-full bg-white border border-blue-200 rounded-lg p-2 text-xs font-bold text-blue-600 outline-none shadow-sm"
-                                                    autoFocus={idx === 0}
+                                                    onChange={e => setEditedValues({ ...editedValues, [item.key!]: e.target.value })}
+                                                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-300 shadow-sm"
                                                 />
                                             ) : (
-                                                <div className="text-xs font-bold text-slate-900 leading-tight">
-                                                    {selectedRow[item.key] || '—'}
+                                                <div className="text-xs font-bold text-slate-800 break-words leading-relaxed pl-1 border-l-2 border-indigo-200/50 ml-1">
+                                                    {item.value || (
+                                                        <span className="text-slate-300 font-medium italic">Not defined</span>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
                                     ))}
 
-                                    <button
-                                        onClick={() => setShowAllStrategy(!showAllStrategy)}
-                                        className="w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-blue-100"
-                                    >
-                                        {showAllStrategy ? (
-                                            <>Show Less <ChevronUp size={12} /></>
-                                        ) : (
-                                            <>Show More +6 Items <ChevronDown size={12} /></>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
+                                    <div className="pt-2 border-t border-slate-100/50 mt-4">
+                                        <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Other Execution Details</div>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                                            {[
+                                                { label: 'Theme', value: selectedRow.theme, key: 'theme' },
+                                                { label: 'Date', value: selectedRow.date, key: 'date' },
+                                                { label: 'Brand Highlight', value: selectedRow.brandHighlight, key: 'brandHighlight' },
+                                                { label: 'Promo Type', value: selectedRow.promoType, key: 'promoType' },
+                                            ].map((item, i) => (
+                                                <div key={i}>
+                                                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-0.5">{item.label}</div>
+                                                    {isEditingInputs && item.key ? (
+                                                        <input
+                                                            type={item.key === 'date' ? 'date' : 'text'}
+                                                            value={editedValues[item.key] || ''}
+                                                            onChange={e => setEditedValues({ ...editedValues, [item.key!]: e.target.value })}
+                                                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10"
+                                                        />
+                                                    ) : (
+                                                        <div className="text-[10px] font-bold text-slate-700 truncate">{item.value || '—'}</div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                            {/* Visual Preview */}
-                            <div className="space-y-4">
-                                <div className="text-xs font-black uppercase tracking-widest text-slate-900">Visual Asset</div>
-                                <div className="aspect-square bg-slate-100 rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-4 relative overflow-hidden transition-all hover:border-blue-200 group">
-                                    {getImageGeneratedUrl(selectedRow) ? (
-                                        <img
-                                            src={`${getImageGeneratedUrl(selectedRow)}${getImageGeneratedUrl(selectedRow)?.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
-                                            alt="Generated"
-                                            className="w-full h-full object-cover rounded-2xl transition-transform duration-500 group-hover:scale-110"
-                                        />
+                                    {isEditingInputs ? (
+                                        <div className="flex gap-2 pt-4">
+                                            <button
+                                                onClick={handleSaveInputs}
+                                                disabled={isSavingInputs}
+                                                className="flex-1 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-indigo-700 disabled:opacity-40 transition-all shadow-md shadow-indigo-100"
+                                            >
+                                                {isSavingInputs ? 'Saving...' : 'Save Details'}
+                                            </button>
+                                            <button
+                                                onClick={() => setIsEditingInputs(false)}
+                                                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-[10px] font-black uppercase rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
                                     ) : (
-                                        <>
-                                            <Layout size={32} className="text-slate-300 mb-3" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Empty visual slate</span>
-                                        </>
+                                        <button
+                                            onClick={handleStartEditing}
+                                            disabled={isLockedInModal}
+                                            className={`w-full py-2 border border-dashed rounded-xl text-[10px] font-black uppercase transition-all mt-4 ${isLockedInModal
+                                                ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
+                                                : 'border-indigo-200 text-indigo-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50/50 shadow-sm shadow-indigo-50/30'
+                                                }`}
+                                        >
+                                            {isLockedInModal ? 'Locked (Needs Access)' : 'Update Metadata'}
+                                        </button>
                                     )}
                                 </div>
                             </div>
-
-                            {/* System Metadata Details */}
-                            <details className="group border border-slate-200 rounded-2xl bg-white overflow-hidden transition-all">
-                                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 text-xs font-black uppercase tracking-widest text-slate-400">
-                                    System Metadata
-                                    <ChevronDown size={14} className="group-open:rotate-180 transition-transform" />
-                                </summary>
-                                <div className="px-4 pb-5 space-y-4 border-t border-slate-100 mt-0 pt-4">
-                                    <div className="space-y-1.5">
-                                        <div className="text-[8px] font-black uppercase tracking-widest text-slate-300">DMP Prompt</div>
-                                        <div className="bg-slate-50 rounded-xl p-3 text-[10px] font-mono text-slate-500 line-clamp-4 leading-relaxed">
-                                            {selectedRow.dmp || "No DMP data found."}
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 pb-2">
-                                        <div>
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-slate-300 mb-1">Row ID</div>
-                                            <div className="text-[10px] font-bold text-slate-400 truncate">{selectedRow.contentCalendarId}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-[8px] font-black uppercase tracking-widest text-slate-300 mb-1">Company</div>
-                                            <div className="text-[10px] font-bold text-slate-400 truncate">{selectedRow.companyId}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </details>
                         </div>
                     </div>
 
@@ -477,6 +1151,7 @@ export function ViewContentModal({
                     <div className="flex items-center justify-end gap-3 border-t border-slate-200/60 p-6 bg-slate-50/30">
                         <button
                             type="button"
+                            disabled={isGeneratingCaption || isLockedInModal}
                             className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
                             onClick={async () => {
                                 if (!selectedRow) return;
@@ -537,6 +1212,7 @@ export function ViewContentModal({
                                     }`}
                                 disabled={
                                     isManualApproving ||
+                                    isLockedInModal ||
                                     !selectedRow.captionOutput
                                 }
                                 onClick={async () => {

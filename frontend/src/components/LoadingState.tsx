@@ -7,15 +7,15 @@ export const CalendarTableSkeleton = () => {
         <thead>
           <tr>
             <th className="calendar-col calendar-col--checkbox">
-              <div className="skeleton-box skeleton-checkbox" />
+              <div className="skeleton-box skeleton-checkbox shadow-sm" />
             </th>
-            <th className="calendar-col calendar-col--primary">Date</th>
-            <th className="calendar-col calendar-col--primary calendar-col--theme">Theme / Content</th>
-            <th className="calendar-col calendar-col--muted">Brand / Promo</th>
-            <th className="calendar-col">Channel / Target</th>
-            <th className="calendar-col">Primary / CTA</th>
-            <th className="calendar-col calendar-col--status">Status</th>
-            <th className="calendar-col calendar-col--actions">Actions</th>
+            <th className="calendar-col px-4"><div className="skeleton-box skeleton-w-16 shadow-sm" /></th>
+            <th className="calendar-col px-4 calendar-col--theme"><div className="skeleton-box skeleton-w-32 shadow-sm" /></th>
+            <th className="calendar-col px-4 calendar-col--muted"><div className="skeleton-box skeleton-w-24 shadow-sm" /></th>
+            <th className="calendar-col px-4"><div className="skeleton-box skeleton-w-28 shadow-sm" /></th>
+            <th className="calendar-col px-4"><div className="skeleton-box skeleton-w-24 shadow-sm" /></th>
+            <th className="calendar-col px-4 calendar-col--status"><div className="skeleton-box skeleton-w-16 shadow-sm mx-auto" /></th>
+            <th className="calendar-col px-4 calendar-col--actions"><div className="skeleton-box skeleton-w-12 shadow-sm ml-auto" /></th>
           </tr>
         </thead>
         <tbody>

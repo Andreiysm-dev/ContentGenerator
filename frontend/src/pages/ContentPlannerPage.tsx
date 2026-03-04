@@ -427,7 +427,33 @@ export function ContentPlannerPage({
                             </div>
 
                             {/* Results Table */}
-                            {items.length > 0 ? (
+                            {isGenerating ? (
+                                <div className="p-10 bg-white rounded-2xl border border-slate-200/60 shadow-sm animate-pulse">
+                                    <div className="grid grid-cols-12 gap-4 mb-8">
+                                        {[2, 3, 2, 3, 2].map((span, i) => (
+                                            <div key={i} className={`col-span-${span} h-3 bg-slate-100 rounded-full`} />
+                                        ))}
+                                    </div>
+                                    <div className="space-y-6">
+                                        {[...Array(3)].map((_, i) => (
+                                            <div key={i} className="grid grid-cols-12 gap-6 items-start">
+                                                <div className="col-span-2 h-10 bg-slate-50 rounded-xl" />
+                                                <div className="col-span-3 space-y-2">
+                                                    <div className="h-4 bg-slate-100 rounded-full w-3/4" />
+                                                    <div className="h-3 bg-slate-50 rounded-full w-1/2" />
+                                                </div>
+                                                <div className="col-span-2 h-4 bg-slate-50 rounded-full" />
+                                                <div className="col-span-3 h-4 bg-slate-50 rounded-full" />
+                                                <div className="col-span-2 h-4 bg-slate-50 rounded-full" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-8 flex items-center justify-center gap-3">
+                                        <div className="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                                        <span className="text-xs font-black text-indigo-900 uppercase tracking-widest">AI is structuring your strategy...</span>
+                                    </div>
+                                </div>
+                            ) : items.length > 0 ? (
                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
                                     {/* Table Header */}
                                     <div className="grid grid-cols-12 gap-4 px-8 py-5 bg-slate-50/50 border-b border-slate-100 items-center">

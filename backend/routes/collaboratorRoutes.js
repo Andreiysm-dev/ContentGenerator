@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../database/db.js';
 import { logAudit } from '../services/auditService.js';
+import { sendNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -169,6 +170,25 @@ export const addCollaborator = async (req, res) => {
     if (calendarUpdateError) {
       console.error('addCollaborator calendar update error', calendarUpdateError);
       return res.status(500).json({ error: 'Failed to update content collaborators' });
+    }
+
+    // Notify the added collaborator
+    try {
+      const { data: ownerProfile } = await db.from('profiles').select('full_name, email').eq('id', userId).single();
+      const ownerName = ownerProfile?.full_name || ownerProfile?.email || 'A team member';
+      const { data: comp } = await db.from('company').select('companyName').eq('companyId', companyId).single();
+
+      await sendNotification({
+        userId: targetUser.id,
+        title: 'Added as Collaborator',
+        message: `${ownerName} added you as a collaborator to "${comp?.companyName || 'a company'}".`,
+        type: 'info',
+        link: `/company/${companyId}/calendar`,
+        triggeredByName: ownerName,
+        companyName: comp?.companyName
+      });
+    } catch (notifyErr) {
+      console.error('Failed to send collaborator notification:', notifyErr);
     }
 
     return res.json({ message: 'Collaborator added' });

@@ -9,6 +9,11 @@ export const getCompanyAuditLogs = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const { entityId, page = 1, pageSize = 20 } = req.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(pageSize);
+        const offset = (pageNum - 1) * limitNum;
+
         // Verify the user is the owner
         const { data: company, error: companyError } = await db
             .from('company')
@@ -24,12 +29,19 @@ export const getCompanyAuditLogs = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden. Only the owner can view audit logs.' });
         }
 
-        const { data: logs, error } = await db
+        let query = db
             .from('audit_logs')
-            .select('*')
-            .or(`and(entity_type.eq.company,entity_id.eq.${companyId}),details->>companyId.eq.${companyId}`)
+            .select('*', { count: 'exact' });
+
+        if (entityId) {
+            query = query.eq('entity_id', entityId);
+        } else {
+            query = query.or(`and(entity_type.eq.company,entity_id.eq.${companyId}),metadata->>companyId.eq.${companyId}`);
+        }
+
+        const { data: logs, count, error } = await query
             .order('created_at', { ascending: false })
-            .limit(200);
+            .range(offset, offset + limitNum - 1);
 
         if (error) {
             console.error('Error fetching audit logs:', error);
@@ -48,7 +60,12 @@ export const getCompanyAuditLogs = async (req, res) => {
             };
         });
 
-        return res.status(200).json({ logs: mappedLogs });
+        return res.status(200).json({
+            logs: mappedLogs,
+            count,
+            page: pageNum,
+            pageSize: limitNum
+        });
     } catch (error) {
         console.error('Unexpected audit error:', error);
         return res.status(500).json({ error: 'Internal server error' });

@@ -11,6 +11,11 @@ import {
     deleteContentCalendarsByCompanyId,
     batchGenerateImages
 } from '../controller/contentCalendarController.js';
+import {
+    getContentComments,
+    createContentComment,
+    deleteContentComment
+} from '../controller/commentController.js';
 import { generateCaptionForContent, generateCaptionsBulk } from '../services/captionGenerationService.js';
 import { reviewContentForCalendarRow, reviewContentBulk } from '../services/contentReviewService.js';
 import { handleDmpChat } from '../controller/dmpChatController.js';
@@ -167,5 +172,10 @@ router.delete('/content-calendar/:id', deleteContentCalendar);
 
 // DELETE - DELETE /api/content-calendar/company/:companyId (delete all for a company)
 router.delete('/content-calendar/company/:companyId', deleteContentCalendarsByCompanyId);
+
+// COMMENTS ROUTES
+router.get('/content-calendar/:contentCalendarId/comments', getContentComments);
+router.post('/content-calendar/:contentCalendarId/comments', createContentComment);
+router.delete('/content-calendar/comments/:commentId', deleteContentComment);
 
 export default router;

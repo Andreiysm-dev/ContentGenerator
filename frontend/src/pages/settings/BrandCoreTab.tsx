@@ -100,12 +100,13 @@ export function BrandCoreTab(props: CompanySettingsShellProps) {
     const resolvedBrandSetupType = props.brandSetupLevel || brandSetupMode || null;
 
     return (
-        <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)]">
+        <div className={`rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)] ${!props.userPermissions?.canEditSettings ? 'opacity-80' : ''}`}>
             {/* Header */}
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div>
-                    <div className="text-xl font-bold text-slate-900">Brand</div>
-                    <p className="mt-1 text-sm font-medium text-slate-600">Controls AI behavior for this company—tone, brand rules, and compliance guardrails. Designed to be guided and reversible.</p>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">Brand Intelligence</h2>
+                    {!props.userPermissions?.canEditSettings && <div className="text-[10px] font-bold text-amber-600 uppercase mb-1">View Only Mode</div>}
+                    <p className="text-sm text-slate-500 font-medium tracking-tight">Define the global voice, compliance, and generation rules for this company.</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -114,8 +115,9 @@ export function BrandCoreTab(props: CompanySettingsShellProps) {
                     {hasBrandIntelligenceConfigured && (
                         <>
                             <button
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-primary btn-sm disabled:opacity-50"
                                 type="button"
+                                disabled={!props.userPermissions?.canEditSettings}
                                 onClick={() => {
                                     setBrandSetupMode(resolvedBrandSetupType === "custom" ? "custom" : resolvedBrandSetupType || "quick");
                                     setBrandSetupStep(1);
@@ -125,8 +127,9 @@ export function BrandCoreTab(props: CompanySettingsShellProps) {
                                 Answer again
                             </button>
                             <button
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-primary btn-sm disabled:opacity-50"
                                 type="button"
+                                disabled={!props.userPermissions?.canEditSettings}
                                 onClick={async () => {
                                     await sendBrandWebhook(buildFormAnswer());
                                 }}
@@ -155,7 +158,7 @@ export function BrandCoreTab(props: CompanySettingsShellProps) {
                         />
                     )}
 
-                    <button className="btn btn-secondary btn-sm bg-white" type="button" onClick={() => loadBrandKB(false, true)}>
+                    <button className="btn btn-secondary btn-sm bg-white disabled:opacity-50" type="button" disabled={!props.userPermissions?.canEditSettings} onClick={() => loadBrandKB(false, true)}>
                         Refresh
                     </button>
                 </div>

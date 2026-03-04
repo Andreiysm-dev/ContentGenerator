@@ -1,4 +1,6 @@
 import db from '../database/db.js';
+import { logAudit } from './auditService.js';
+import { getTargetStatusFromAutomation } from './kanbanAutomationService.js';
 
 import { REVIEW_USER_PROMPT_TEMPLATE } from './prompts.js';
 
@@ -246,8 +248,12 @@ const callOpenAIForReview = async ({ systemPrompt, userPrompt }) => {
   return { ok: true, content: typeof content === 'string' ? content : '', rawEnvelope: data };
 };
 
+// In-memory lock to prevent concurrent reviews on the same row
+const activeReviews = new Set();
+
 export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) {
   const userId = opts.userId;
+  const skipStatusUpdate = opts.skipStatusUpdate === true;
   if (!contentCalendarId) {
     return { ok: false, status: 400, error: 'contentCalendarId is required' };
   }
@@ -276,26 +282,42 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
   const state = String(normalizeStatusState(contentCalendar.status).state || 'Draft');
 
   if (state === 'Reviewing') {
-    return { ok: false, status: 409, error: 'Review already running', code: 'ALREADY_REVIEWING' };
+    // Legacy: if somehow stuck on Reviewing, allow auto-triggered reviews through
+    if (!skipStatusUpdate) {
+      return { ok: false, status: 409, error: 'Review already running', code: 'ALREADY_REVIEWING' };
+    }
   }
 
-  const reviewAllowed = ['Review', 'Ready', 'Needs Revision'].includes(state);
+  // In-memory lock to prevent concurrent reviews (avoids writing 'Reviewing' status to DB)
+  if (activeReviews.has(contentCalendarId)) {
+    return { ok: false, status: 409, error: 'Review already running', code: 'ALREADY_REVIEWING' };
+  }
+  activeReviews.add(contentCalendarId);
+
+  // Fetch company columns to know which statuses are reviewable
+  let customReviewableStatuses = [];
+  try {
+    const { data: compData } = await db.from('company').select('kanban_settings').eq('companyId', companyId).single();
+    const cols = compData?.kanban_settings?.columns || [];
+    customReviewableStatuses = cols
+      .filter(c => c.title && c.title.toLowerCase().includes('review'))
+      .map(c => c.id || c.title);
+  } catch (e) { /* non-blocking */ }
+
+  // When auto-triggered (skipStatusUpdate=true) allow any status through — the unified
+  // caption+review process owns the card regardless of current status.
+  const reviewAllowed = skipStatusUpdate || ['Review', 'Ready', 'Needs Revision', 'For Review', 'Caption Generated', ...customReviewableStatuses].includes(state);
   if (!reviewAllowed) {
+    activeReviews.delete(contentCalendarId);
     return { ok: false, status: 409, error: `Review blocked for status: ${state}`, code: 'STATUS_BLOCKED' };
   }
 
   if (!contentCalendar.captionOutput || !String(contentCalendar.captionOutput).trim()) {
+    activeReviews.delete(contentCalendarId);
     return { ok: false, status: 409, error: 'Missing captionOutput for review', code: 'MISSING_CAPTION' };
   }
 
-  const { error: setReviewingError } = await db
-    .from('contentCalendar')
-    .update({ status: writeStatus('Reviewing') })
-    .eq('contentCalendarId', contentCalendarId);
-
-  if (setReviewingError) {
-    return { ok: false, status: 500, error: 'Failed to set Reviewing status' };
-  }
+  // NO intermediate 'Reviewing' status write — card stays visible in its kanban column during review
 
   const { data: brandKB, error: brandError } = await db
     .from('brandKB')
@@ -313,6 +335,7 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
       })
       .eq('contentCalendarId', contentCalendarId);
 
+    activeReviews.delete(contentCalendarId);
     return { ok: false, status: 500, error: 'Failed to load brandKB' };
   }
 
@@ -332,6 +355,7 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
       })
       .eq('contentCalendarId', contentCalendarId);
 
+    activeReviews.delete(contentCalendarId);
     return { ok: false, status: 500, error: openAiRes.error };
   }
 
@@ -346,27 +370,43 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
       })
       .eq('contentCalendarId', contentCalendarId);
 
+    activeReviews.delete(contentCalendarId);
     return { ok: false, status: 500, error: parsedText.error };
   }
 
   const { decision, reviewNotes, finalCaption, finalCTA, finalHashtags } = parsedText.value;
-  const nextStatus = decision === 'NEEDS REVISION' ? 'Needs Revision' : 'Ready';
 
   // Fallback to drafts if the reviewer failed to output mandatory sections
   const safeCaption = (finalCaption && String(finalCaption).trim()) ? finalCaption : (contentCalendar.captionOutput || '');
   const safeCTA = (finalCTA && String(finalCTA).trim()) ? finalCTA : (contentCalendar.ctaOuput || '');
   const safeHashtags = (finalHashtags && String(finalHashtags).trim()) ? finalHashtags : (contentCalendar.hastagsOutput || '');
 
+  // Get target status from automation rules. Pass null as fallback so if no rule is configured,
+  // we preserve the existing status rather than setting a hardcoded value that may not exist as a column.
+  const currentStatusStr = String(normalizeStatusState(contentCalendar.status).state || '');
+  let finalStatus;
+  if (decision === 'NEEDS REVISION') {
+    finalStatus = await getTargetStatusFromAutomation(companyId, 'revision_requested', null);
+    if (!finalStatus) finalStatus = currentStatusStr; // Keep current if no rule configured
+  } else {
+    finalStatus = await getTargetStatusFromAutomation(companyId, 'content_approved', null);
+    if (!finalStatus) finalStatus = currentStatusStr; // Keep current if no rule configured
+  }
+
+  const reviewUpdatePayload = {
+    reviewDecision: decision,
+    reviewNotes: reviewNotes || null,
+    finalCaption: safeCaption || null,
+    finalCTA: safeCTA || null,
+    finalHashtags: safeHashtags || null,
+    // skipStatusUpdate=true when called as part of caption generation (one unified process).
+    // The caption_generated automation rule already set the final column — review doesn’t move the card.
+    ...(skipStatusUpdate ? {} : { status: writeStatus(finalStatus) }),
+  };
+
   const { data: updatedRows, error: saveError } = await db
     .from('contentCalendar')
-    .update({
-      reviewDecision: decision,
-      reviewNotes: reviewNotes || null,
-      finalCaption: safeCaption || null,
-      finalCTA: safeCTA || null,
-      finalHashtags: safeHashtags || null,
-      status: writeStatus(nextStatus),
-    })
+    .update(reviewUpdatePayload)
     .eq('contentCalendarId', contentCalendarId)
     .select();
 
@@ -379,10 +419,29 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
       })
       .eq('contentCalendarId', contentCalendarId);
 
+    activeReviews.delete(contentCalendarId);
     return { ok: false, status: 500, error: 'Failed to save review outputs' };
   }
 
+  activeReviews.delete(contentCalendarId);
   const updated = Array.isArray(updatedRows) ? updatedRows[0] : null;
+
+  if (updated) {
+    await logAudit(userId, 'CONTENT_REVIEW', 'contentCalendar', contentCalendarId, {
+      companyId,
+      decision,
+      automated: true
+    });
+
+    // Notification for Locked Columns (Approvals)
+    const { checkAndNotifyApproval } = await import('./notificationService.js');
+    await checkAndNotifyApproval({
+      companyId,
+      status: finalStatus,
+      contentTheme: updated.theme,
+      userId
+    });
+  }
 
   return {
     ok: true,
@@ -430,7 +489,7 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
     return { ok: false, status: 409, error: 'Review already running', code: 'ALREADY_REVIEWING' };
   }
 
-  const reviewAllowed = ['Review', 'Ready', 'Needs Revision'].includes(effectiveState);
+  const reviewAllowed = ['Review', 'Ready', 'Needs Revision', 'For Review'].includes(effectiveState);
   if (!reviewAllowed) {
     return { ok: false, status: 409, error: `Review blocked for status: ${effectiveState}`, code: 'STATUS_BLOCKED' };
   }
@@ -501,12 +560,18 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
   }
 
   const { decision, reviewNotes, finalCaption, finalCTA, finalHashtags } = parsedText.value;
-  const nextStatus = decision === 'NEEDS REVISION' ? 'Needs Revision' : 'Ready';
 
   // Fallback to drafts if the reviewer failed to output mandatory sections
   const safeCaption = (finalCaption && String(finalCaption).trim()) ? finalCaption : (contentCalendar.captionOutput || '');
   const safeCTA = (finalCTA && String(finalCTA).trim()) ? finalCTA : (contentCalendar.ctaOuput || '');
   const safeHashtags = (finalHashtags && String(finalHashtags).trim()) ? finalHashtags : (contentCalendar.hastagsOutput || '');
+
+  let finalStatus;
+  if (decision === 'NEEDS REVISION') {
+    finalStatus = await getTargetStatusFromAutomation(companyId, 'revision_requested', 'Needs Revision');
+  } else {
+    finalStatus = await getTargetStatusFromAutomation(companyId, 'content_approved', 'Ready');
+  }
 
   const { data: updatedRows, error: saveError } = await db
     .from('contentCalendar')
@@ -516,7 +581,7 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
       finalCaption: safeCaption || null,
       finalCTA: safeCTA || null,
       finalHashtags: safeHashtags || null,
-      status: writeStatus(nextStatus),
+      status: writeStatus(finalStatus),
     })
     .eq('contentCalendarId', contentCalendarId)
     .select();

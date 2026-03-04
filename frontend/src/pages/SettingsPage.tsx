@@ -4,8 +4,9 @@ import { useNavigate, useParams, NavLink } from "react-router-dom";
 import { Settings as SettingsIcon, Trash2, Plus, Pencil, Save, X, ShieldCheck, Zap, UserPlus, Users, Check, Info, Activity } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { BrandCoreTab } from "./settings/BrandCoreTab";
+import { WorkflowSettingsTab } from "./settings/WorkflowSettingsTab";
 
-export type CompanySettingsTab = "overview" | "brand-intelligence" | "team" | "integrations" | "audit";
+export type CompanySettingsTab = "overview" | "brand-intelligence" | "workflow" | "team" | "integrations" | "audit";
 
 export type CompanySettingsShellProps = {
   tab: CompanySettingsTab;
@@ -120,6 +121,7 @@ export type CompanySettingsShellProps = {
     canGenerate: boolean;
     canCreate: boolean;
     canDelete: boolean;
+    canEditSettings: boolean;
     isOwner: boolean;
   };
   customRoles: any[];
@@ -333,11 +335,13 @@ export function SettingsPage(props: CompanySettingsShellProps) {
       canGenerate: false,
       canCreate: false,
       canDelete: false,
+      canEditSettings: false,
       isOwner: false
     },
   } = props;
 
   const isOwner = userPermissions.isOwner;
+  const canEditSettings = userPermissions.canEditSettings;
 
   const { companyId } = useParams<{ companyId: string }>();
   const [localAccounts, setLocalAccounts] = useState<any[]>([]);
@@ -348,10 +352,10 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDesc, setNewRoleDesc] = useState("");
   const [newRolePermissions, setNewRolePermissions] = useState({
-    canApprove: true,
     canGenerate: true,
     canCreate: true,
-    canDelete: false
+    canDelete: false,
+    canEditSettings: false
   });
   const [showRolesGuide, setShowRolesGuide] = useState(false);
   const [editingRoleIdx, setEditingRoleIdx] = useState<number | null>(null);
@@ -514,6 +518,9 @@ export function SettingsPage(props: CompanySettingsShellProps) {
               <TabLink to={`${companyUrlBase}/brand-intelligence`} id="brand-intelligence" pressedTab={pressedTab} onClick={() => setPressedTab("brand-intelligence")}>
                 Brand Core
               </TabLink>
+              <TabLink to={`${companyUrlBase}/workflow`} id="workflow" pressedTab={pressedTab} onClick={() => setPressedTab("workflow")}>
+                Workflow
+              </TabLink>
               <TabLink to={`${companyUrlBase}/team`} id="team" pressedTab={pressedTab} onClick={() => setPressedTab("team")}>
                 Team
               </TabLink>
@@ -563,18 +570,19 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-700">Company Name</label>
-                            <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+                            <Input disabled={!canEditSettings} value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
                           </div>
                           <div className="space-y-1.5 sm:col-span-2">
                             <label className="text-xs font-bold text-slate-700">Company Description</label>
-                            <Textarea rows={3} value={companyDescription} onChange={(e) => setCompanyDescription(e.target.value)} />
+                            <Textarea disabled={!canEditSettings} rows={3} value={companyDescription} onChange={(e) => setCompanyDescription(e.target.value)} />
                           </div>
                         </div>
                         <div className="mt-4 flex justify-end">
                           <button
                             type="button"
+                            disabled={!canEditSettings}
                             onClick={onSaveCompanyDetails}
-                            className="btn bg-[#3fa9f5] text-white border border-[#3fa9f5] hover:bg-[#2f97e6] hover:border-[#2f97e6] transition-colors text-sm font-semibold px-4 py-2 rounded-lg shadow-sm"
+                            className="btn bg-[#3fa9f5] text-white border border-[#3fa9f5] hover:bg-[#2f97e6] hover:border-[#2f97e6] transition-colors text-sm font-semibold px-4 py-2 rounded-lg shadow-sm disabled:opacity-50"
                           >
                             Save Changes
                           </button>
@@ -582,7 +590,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                       </Card>
 
                       {/* Danger Zone */}
-                      <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-sm mt-8 opacity-80 hover:opacity-100 transition-opacity">
+                      <div className={`rounded-2xl border border-red-200 bg-white p-6 shadow-sm mt-8 opacity-80 hover:opacity-100 transition-opacity ${!isOwner ? 'hidden' : ''}`}>
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <div className="text-sm font-bold text-red-900">Danger Zone</div>
@@ -642,6 +650,10 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                 <BrandCoreTab {...props} />
               )}
 
+              {tab === "workflow" && (
+                <WorkflowSettingsTab {...props} companyId={companyId} />
+              )}
+
               {tab === "team" && (
                 <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)]">
                   <div className="mb-5">
@@ -650,7 +662,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                   </div>
 
                   {/* Invite Teammates Card */}
-                  <Card className="bg-white border-slate-200/60 shadow-sm" title="Invite Teammates" subtitle="Add coworkers to collaborate on content and branding.">
+                  <Card className={`bg-white border-slate-200/60 shadow-sm ${!canEditSettings ? 'opacity-60 pointer-events-none' : ''}`} title="Invite Teammates" subtitle="Add coworkers to collaborate on content and branding.">
                     <div className="space-y-4">
                       <div className="space-y-2 relative">
                         <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider ml-1">New Teammate Email</label>
@@ -732,6 +744,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                             {roleDef.permissions?.canGenerate && (<span title="Generate"><Zap size={10} className="text-purple-600" /></span>)}
                                             {roleDef.permissions?.canCreate && (<span title="Create"><Plus size={10} className="text-blue-600" /></span>)}
                                             {roleDef.permissions?.canDelete && (<span title="Delete"><Trash2 size={10} className="text-red-600" /></span>)}
+                                            {roleDef.permissions?.canEditSettings && (<span title="Settings"><SettingsIcon size={10} className="text-slate-600" /></span>)}
                                           </div>
                                         );
                                       })()}
@@ -740,11 +753,10 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  {isOwner && c.role !== "owner" && (
+                                  {(isOwner || canEditSettings) && c.role !== "owner" && (
                                     <div className="flex items-center gap-2">
                                       <select
                                         className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-[#3fa9f5]/20 focus:border-[#3fa9f5]/40 transition-all outline-none cursor-pointer"
-                                        value={c.role}
                                         onChange={(e) => onAssignRole(c.id, e.target.value)}
                                       >
                                         <option value="collaborator">Collaborator</option>
@@ -771,7 +783,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                   </Card>
 
                   {/* Custom Roles Management */}
-                  {isOwner && (
+                  {(isOwner || canEditSettings) && (
                     <Card className="bg-white border-slate-200/60 shadow-sm" title="Custom Roles" subtitle="Define up to 5 granular roles for specialized team members.">
                       <div className="space-y-4">
                         <div className="flex items-center justify-between px-1">
@@ -825,6 +837,15 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                   <p className="text-[9px] text-slate-500 font-medium leading-normal">Permits the removal of content entries and their associated media from the system.</p>
                                 </div>
                               </div>
+                              <div className="flex gap-3">
+                                <div className="h-6 w-6 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-600 shrink-0">
+                                  <SettingsIcon size={12} />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] font-black uppercase text-slate-900">Settings</div>
+                                  <p className="text-[9px] text-slate-500 font-medium leading-normal">Allows modification of company profile, brand core, workflow, and integrations.</p>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -853,7 +874,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                       setEditingRoleIdx(idx);
                                       setNewRoleName(role.name);
                                       setNewRoleDesc(role.description || "");
-                                      setNewRolePermissions(role.permissions || { canApprove: false, canGenerate: false, canCreate: false, canDelete: false });
+                                      setNewRolePermissions(role.permissions || { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false });
                                     }}
                                     className="p-1 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
                                   >
@@ -889,6 +910,11 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                     <Trash2 size={8} /> Del
                                   </div>
                                 )}
+                                {role.permissions?.canEditSettings && (
+                                  <div className="px-1.5 py-0.5 rounded-md bg-slate-50 text-[8px] font-black uppercase text-slate-700 flex items-center gap-1 border border-slate-100/50">
+                                    <SettingsIcon size={8} /> Sett
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -907,7 +933,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                     setEditingRoleIdx(null);
                                     setNewRoleName("");
                                     setNewRoleDesc("");
-                                    setNewRolePermissions({ canApprove: true, canGenerate: true, canCreate: true, canDelete: false });
+                                    setNewRolePermissions({ canGenerate: true, canCreate: true, canDelete: false, canEditSettings: false });
                                   }} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">
                                     Cancel
                                   </button>
@@ -940,16 +966,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
 
                                 <div className="space-y-2">
                                   <div className="grid grid-cols-2 gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => setNewRolePermissions(p => ({ ...p, canApprove: !p.canApprove }))}
-                                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[9px] font-black uppercase transition-all ${newRolePermissions.canApprove ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-100 text-slate-400'}`}
-                                    >
-                                      <div className={`h-2.5 w-2.5 rounded-full border flex items-center justify-center ${newRolePermissions.canApprove ? 'bg-green-500 border-green-600' : 'bg-white border-slate-200'}`}>
-                                        {newRolePermissions.canApprove && <Check size={6} className="text-white" />}
-                                      </div>
-                                      Approve
-                                    </button>
+
                                     <button
                                       type="button"
                                       onClick={() => setNewRolePermissions(p => ({ ...p, canGenerate: !p.canGenerate }))}
@@ -980,6 +997,16 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                       </div>
                                       Delete
                                     </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewRolePermissions(p => ({ ...p, canEditSettings: !p.canEditSettings }))}
+                                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[9px] font-black uppercase transition-all ${newRolePermissions.canEditSettings ? 'bg-slate-100 border-slate-300 text-slate-700' : 'bg-white border-slate-100 text-slate-400'}`}
+                                    >
+                                      <div className={`h-2.5 w-2.5 rounded-full border flex items-center justify-center ${newRolePermissions.canEditSettings ? 'bg-slate-700 border-slate-800' : 'bg-white border-slate-200'}`}>
+                                        {newRolePermissions.canEditSettings && <Check size={6} className="text-white" />}
+                                      </div>
+                                      Settings
+                                    </button>
                                   </div>
                                 </div>
 
@@ -998,7 +1025,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                       }
                                       setNewRoleName("");
                                       setNewRoleDesc("");
-                                      setNewRolePermissions({ canApprove: true, canGenerate: true, canCreate: true, canDelete: false });
+                                      setNewRolePermissions({ canGenerate: true, canCreate: true, canDelete: false, canEditSettings: false });
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-black uppercase tracking-widest text-slate-900 border border-slate-200 bg-slate-50 rounded-xl hover:bg-slate-900 hover:text-white transition-all duration-300 disabled:opacity-50"
@@ -1072,7 +1099,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                       <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Track permission changes and team modifications.</p>
                     </div>
                   </div>
-                  {isOwner && (
+                  {(isOwner || canEditSettings) && (
                     <Card className="bg-white border-slate-200/60 shadow-sm overflow-hidden p-0" title="" subtitle="">
                       <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
                         <div>
@@ -1167,11 +1194,12 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                   </div>
                                   <button
                                     type="button"
+                                    disabled={!canEditSettings}
                                     onClick={async () => {
                                       await onDisconnectAccount(acc.id);
                                       setLocalAccounts(prev => prev.filter(a => a.id !== acc.id));
                                     }}
-                                    className="text-xs font-bold text-slate-400 hover:text-red-600 transition-colors uppercase tracking-wider"
+                                    className="text-xs font-bold text-slate-400 hover:text-red-600 transition-colors uppercase tracking-wider disabled:opacity-50"
                                   >
                                     Disconnect
                                   </button>
@@ -1184,8 +1212,9 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         <div className="pt-2 flex flex-wrap gap-3">
                           <button
                             type="button"
+                            disabled={!canEditSettings}
                             onClick={onConnectLinkedIn}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#0077b5] text-white rounded-lg font-semibold text-sm hover:bg-[#006097] transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-[#0077b5] text-white rounded-lg font-semibold text-sm hover:bg-[#006097] transition-colors disabled:opacity-50"
                           >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" /></svg>
                             Connect LinkedIn
@@ -1193,8 +1222,9 @@ export function SettingsPage(props: CompanySettingsShellProps) {
 
                           <button
                             type="button"
+                            disabled={!canEditSettings}
                             onClick={onConnectFacebook}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#1877F2] text-white rounded-lg font-semibold text-sm hover:bg-[#166fe5] transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-[#1877F2] text-white rounded-lg font-semibold text-sm hover:bg-[#166fe5] transition-colors disabled:opacity-50"
                           >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
                             Connect Facebook Pages

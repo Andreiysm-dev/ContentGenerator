@@ -51,8 +51,10 @@ import { MediaLibraryPage } from '@/pages/MediaLibraryPage';
 import { ContentPlannerPage } from '@/pages/ContentPlannerPage';
 import Faq from "@/pages/Faq";
 import { ImageHubPage } from '@/pages/ImageHubPage';
+import { SOKMED_COLUMNS } from './pages/Workboard/types';
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { MaintenancePage } from '@/pages/MaintenancePage';
+
 
 
 import {
@@ -86,6 +88,7 @@ type FormState = {
   targetAudience: string;
   primaryGoal: string;
   cta: string;
+  cardName: string;
   promoType: string;
 };
 
@@ -129,6 +132,7 @@ function App() {
     primaryGoal: '',
     cta: '',
     promoType: '',
+    cardName: '',
   });
 
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
@@ -183,7 +187,7 @@ function App() {
   }, [backendBaseUrl]);
 
   const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: string }>>([]);
-  const [customRoles, setCustomRoles] = useState<Array<{ name: string; description?: string; permissions?: { canApprove: boolean; canGenerate: boolean; canCreate: boolean; canDelete: boolean } }>>([]);
+  const [customRoles, setCustomRoles] = useState<Array<{ name: string; description?: string; permissions?: { canApprove: boolean; canGenerate: boolean; canCreate: boolean; canDelete: boolean; canEditSettings: boolean } }>>([]);
   const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
 
@@ -392,7 +396,12 @@ function App() {
 
   const handleDraftPublishIntent = async () => {
     if (!selectedRow) return;
-    const nextStatus = draftPublishIntent === 'ready' ? 'Ready' : selectedRow.status ?? '';
+
+    const studioSettings = activeCompany?.kanban_settings?.studio_settings;
+    const nextStatus = draftPublishIntent === 'ready'
+      ? (studioSettings?.postedStatus || 'Ready')
+      : (selectedRow.status ?? '');
+
     const nextPostStatus = draftPublishIntent === 'ready' ? 'ready' : 'draft';
     const payload = {
       status: nextStatus,
@@ -530,6 +539,42 @@ function App() {
     });
   }, [activeCompanyId]);
 
+  const activeCompany = useMemo(
+    () => companies.find((c) => c.companyId === activeCompanyId) || null,
+    [companies, activeCompanyId],
+  );
+
+  const userPermissions = useMemo(() => {
+    if (!session?.user || !activeCompany) return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, isOwner: false };
+    const userId = session.user.id;
+
+    if (activeCompany.user_id === userId) {
+      return { canApprove: true, canGenerate: true, canCreate: true, canDelete: true, canEditSettings: true, isOwner: true, roleName: 'owner' };
+    }
+
+    const collaboratorEntry = collaborators.find(c => c.id === userId);
+    if (!collaboratorEntry) {
+      return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, isOwner: false, roleName: null };
+    }
+
+    const roleName = collaboratorEntry.role;
+    const roleDef = customRoles.find(r => r.name === roleName);
+
+    return {
+      canApprove: roleDef?.permissions?.canApprove || false,
+      canGenerate: roleDef?.permissions?.canGenerate || false,
+      canCreate: roleDef?.permissions?.canCreate || false,
+      canDelete: roleDef?.permissions?.canDelete || false,
+      canEditSettings: roleDef?.permissions?.canEditSettings || false,
+      isOwner: false,
+      roleName
+    };
+  }, [session, activeCompany, collaborators, customRoles]);
+
+  const automations = useMemo(() => {
+    return (activeCompany as any)?.kanban_settings?.automations || [];
+  }, [activeCompany]);
+
   // Trigger product tour for new users (including collaborators)
   useEffect(() => {
     if (!userProfile?.id || !activeCompanyId) return;
@@ -553,9 +598,8 @@ function App() {
   }, [activeCompanyId, userProfile?.id, isOnboardingOpen]);
 
   useEffect(() => {
-    const isSettingsRoute = /^\/company\/[^/]+\/settings/.test(location.pathname);
-    if (!isSettingsRoute) return;
-    if (!activeCompanyId) return;
+    const isCompanyRoute = /^\/company\/[^/]+/.test(location.pathname);
+    if (!isCompanyRoute || !activeCompanyId) return;
     fetchCollaborators(activeCompanyId);
   }, [location.pathname, activeCompanyId]);
 
@@ -574,28 +618,7 @@ function App() {
   };
 
 
-  const userPermissions = useMemo(() => {
-    if (!session?.user || !activeCompanyId) return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, isOwner: false };
-    const userId = session.user.id;
-    const activeCompany = companies.find((c: any) => c.companyId === activeCompanyId);
 
-    if (activeCompany?.user_id === userId) {
-      return { canApprove: true, canGenerate: true, canCreate: true, canDelete: true, isOwner: true };
-    }
-
-    const collaboratorEntry = collaborators.find(c => c.id === userId);
-    if (!collaboratorEntry) {
-      return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, isOwner: false };
-    }
-
-    const roleName = collaboratorEntry.role;
-    const roleDef = customRoles.find(r => r.name === roleName);
-
-    return {
-      ...(roleDef?.permissions || { canApprove: false, canGenerate: false, canCreate: false, canDelete: false }),
-      isOwner: false
-    };
-  }, [session, activeCompanyId, companies, collaborators, customRoles]);
 
   const handleConnectLinkedIn = async () => {
     if (!activeCompanyId) return;
@@ -1064,7 +1087,7 @@ function App() {
     'No medical/legal promises',
   ];
 
-  const getStatusValue = (status: any): string => {
+  function getStatusValue(status: any): string {
     if (status === null || status === undefined) return '';
     if (typeof status === 'string') return status;
     if (typeof status === 'object') {
@@ -1077,7 +1100,7 @@ function App() {
     } catch {
       return '';
     }
-  };
+  }
 
   const getImageGeneratedUrl = (row: any | null): string | null => {
     if (!row) return null;
@@ -1376,6 +1399,9 @@ function App() {
     loadCalendar();
   }, [activeCompanyId, session]);
 
+  // Track recently-moved card statuses so the poll doesn't overwrite them
+  const recentStatusMoves = useRef<Map<string, { status: string; originalStatus?: any; ts: number }>>(new Map());
+
   // Auto-refresh the content calendar table periodically
   useEffect(() => {
     if (!activeCompanyId || !session) return;
@@ -1389,15 +1415,56 @@ function App() {
         if (!listRes.ok) return;
         const data = await listRes.json().catch(() => ({}));
         const unwrapped = (data && (data.contentCalendars || data)) as any;
-        if (!canceled) {
-          setCalendarRows(Array.isArray(unwrapped) ? unwrapped : []);
+        if (!canceled && Array.isArray(unwrapped)) {
+          // Smart merge: preserve status for rows moved within the last 30 seconds
+          const PRESERVE_MS = 30_000;
+          const now = Date.now();
+          // Purge stale entries
+          recentStatusMoves.current.forEach((v, k) => {
+            if (now - v.ts > PRESERVE_MS) recentStatusMoves.current.delete(k);
+          });
+          const updatedRows = unwrapped.map((incoming: any) => {
+            const id = incoming.contentCalendarId;
+            const recent = recentStatusMoves.current.get(id);
+            if (recent && now - recent.ts < PRESERVE_MS) {
+              const incomingStatus = getStatusValue(incoming.status);
+              const recentStatus = getStatusValue(recent.status);
+              const originalStatus = recent.originalStatus ? getStatusValue(recent.originalStatus) : null;
+
+              if (incomingStatus === recentStatus) {
+                recentStatusMoves.current.delete(id);
+                return incoming;
+              }
+              if (originalStatus && incomingStatus === originalStatus) {
+                return { ...incoming, status: recent.status };
+              }
+              recentStatusMoves.current.delete(id);
+              return incoming;
+            }
+            return incoming;
+          });
+
+          setCalendarRows(updatedRows);
+
+          // Sync selectedRow if modal is open to avoid stale status display
+          if (isViewModalOpen && selectedRow) {
+            const currentInList = updatedRows.find((r: any) => r.contentCalendarId === selectedRow.contentCalendarId);
+            if (currentInList) {
+              const hasChanged = currentInList.status !== selectedRow.status ||
+                currentInList.finalCaption !== selectedRow.finalCaption ||
+                currentInList.imageGenerated !== selectedRow.imageGenerated;
+              if (hasChanged) {
+                setSelectedRow((prev: any) => prev ? { ...prev, ...currentInList } : prev);
+              }
+            }
+          }
         }
       } catch (err) {
         // ignore polling errors
       }
     };
 
-    const id = window.setInterval(fetchList, CALENDAR_POLL_MS);
+    const id = window.setInterval(fetchList, 10_000);
     // initial tick
     fetchList();
     return () => {
@@ -1630,9 +1697,18 @@ function App() {
     const search = calendarSearch.trim().toLowerCase();
     const statusFilter = calendarStatusFilter.toLowerCase();
 
+    const kanbanCols = (activeCompany as any)?.kanban_settings?.columns || SOKMED_COLUMNS;
+
     const filtered = calendarRows.filter((row) => {
       const statusValue = getStatusValue(row.status).toLowerCase();
       const isPublished = statusValue === 'published';
+
+      // Map dynamic status ID to title for consistent filtering
+      const colMatch = kanbanCols.find((c: any) =>
+        c.id.toLowerCase() === statusValue ||
+        c.title.toLowerCase() === statusValue
+      );
+      const displayStatus = colMatch ? colMatch.title.toLowerCase() : statusValue;
 
       // Filter by tab mode
       if (isPublishedTab) {
@@ -1640,7 +1716,7 @@ function App() {
       }
 
       // Filter by status dropdown
-      if (statusFilter !== 'all' && statusValue !== statusFilter) return false;
+      if (statusFilter !== 'all' && displayStatus !== statusFilter) return false;
 
       // Filter by search
       if (!search) return true;
@@ -1682,12 +1758,12 @@ function App() {
       };
       return parseDate(a) - parseDate(b);
     });
-  }, [calendarRows, calendarSearch, calendarStatusFilter, location.pathname]);
+  }, [calendarRows, calendarSearch, calendarStatusFilter, location.pathname, activeCompany]);
 
   const calendarStatusOptions = useMemo(() => {
-    const base = statusOptions.filter((opt) => opt && opt.trim());
-    return ['all', ...base];
-  }, []);
+    const columns = (activeCompany as any)?.kanban_settings?.columns || SOKMED_COLUMNS;
+    return ['all', ...columns.map((c: any) => c.title)];
+  }, [activeCompany]);
 
   // Clamp current page if data length changes
   useEffect(() => {
@@ -2023,10 +2099,7 @@ function App() {
     });
   };
 
-  const activeCompany = useMemo(
-    () => companies.find((c) => c.companyId === activeCompanyId) || null,
-    [companies, activeCompanyId],
-  );
+
 
   const activeNavKey = useMemo(() => {
     const path = location.pathname;
@@ -2126,7 +2199,8 @@ function App() {
         if (res.ok) {
           successes.push(id);
         } else {
-          const msg = await res.text().catch(() => 'Unknown error');
+          const data = await res.json().catch(() => ({}));
+          const msg = data.error || 'Operation failed';
           failures.push({ id, error: msg });
         }
       } catch (e) {
@@ -2144,7 +2218,9 @@ function App() {
     setIsBatchDeleting(false);
 
     if (failures.length > 0) {
-      notify(`Deleted ${successes.length} items, but ${failures.length} failed.`, 'error');
+      const uniqueErrors = [...new Set(failures.map(f => f.error))];
+      const errorMsg = uniqueErrors.length === 1 ? uniqueErrors[0] : `${failures.length} items failed.`;
+      notify(`Deleted ${successes.length} items. Error: ${errorMsg}`, 'error');
     } else {
       notify(`Successfully deleted all ${successes.length} selected items.`, 'success');
     }
@@ -2430,6 +2506,7 @@ function App() {
         primaryGoal: form.primaryGoal || null,
         cta: form.cta || null,
         promoType: form.promoType || null,
+        card_name: form.cardName || null,
         companyId: activeCompanyId,
       } as any;
 
@@ -2456,6 +2533,7 @@ function App() {
         primaryGoal: '',
         cta: '',
         promoType: '',
+        cardName: '',
       }));
     } catch (err) {
       console.error('Add error:', err);
@@ -2480,6 +2558,15 @@ function App() {
         body: JSON.stringify({
           companyName: newCompanyName.trim(),
           companyDescription: newCompanyDescription.trim(),
+          kanban_settings: {
+            columns: SOKMED_COLUMNS,
+            automations: [],
+            studio_settings: {
+              schedulingStatus: 'Scheduled',
+              postedStatus: 'Published',
+              unscheduledStatus: 'Drafts'
+            }
+          }
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -2947,14 +3034,14 @@ function App() {
             />
           )}
 
-          <div className={`flex-1 ml-0 lg:ml-[280px] transition-all duration-300 ${isAiAssistantOpen ? 'lg:mr-[400px]' : 'mr-0'} overflow-y-auto h-full bg-gray-50`}>
-            <div>
+          <div className={`flex-1 ml-0 lg:ml-[280px] transition-all duration-300 ${isAiAssistantOpen ? 'lg:mr-[400px]' : 'mr-0'} overflow-hidden h-full flex flex-col bg-gray-50`}>
+            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
               <Routes>
                 <Route
                   path="/"
                   element={
                     activeCompanyId
-                      ? <Navigate to={`/company/${encodeURIComponent(activeCompanyId)}/dashboard`} replace />
+                      ? <Navigate to={`/company/${encodeURIComponent(activeCompanyId)}/calendar`} replace />
                       : (
                         <div className="app-main">
                           <div className="empty-state">
@@ -3096,6 +3183,8 @@ function App() {
                       getStatusValue={getStatusValue}
                       setSelectedRow={setSelectedRow}
                       setIsViewModalOpen={setIsViewModalOpen}
+                      isViewModalOpen={isViewModalOpen}
+                      selectedRow={selectedRow}
                       pageSize={pageSize}
                       setPageSize={setPageSize}
                       page={page}
@@ -3105,6 +3194,9 @@ function App() {
                       authedFetch={authedFetch}
                       backendBaseUrl={backendBaseUrl}
                       notify={notify}
+                      onStatusMoved={(postId, status, originalStatus) => {
+                        recentStatusMoves.current.set(postId, { status, originalStatus, ts: Date.now() });
+                      }}
                       userPermissions={userPermissions}
                     />
                   }
@@ -3142,6 +3234,8 @@ function App() {
                       getStatusValue={getStatusValue}
                       setSelectedRow={setSelectedRow}
                       setIsViewModalOpen={setIsViewModalOpen}
+                      isViewModalOpen={isViewModalOpen}
+                      selectedRow={selectedRow}
                       pageSize={pageSize}
                       setPageSize={setPageSize}
                       page={page}
@@ -3151,6 +3245,9 @@ function App() {
                       authedFetch={authedFetch}
                       backendBaseUrl={backendBaseUrl}
                       notify={notify}
+                      onStatusMoved={(postId, status, originalStatus) => {
+                        recentStatusMoves.current.set(postId, { status, originalStatus, ts: Date.now() });
+                      }}
                       userPermissions={userPermissions}
                     />
                   }
@@ -3168,6 +3265,7 @@ function App() {
                       setIsViewModalOpen={setIsViewModalOpen}
                       notify={notify}
                       activeCompanyId={activeCompanyId}
+                      activeCompany={activeCompany}
                       connectedAccounts={connectedAccounts}
                       authedFetch={authedFetch}
                       backendBaseUrl={backendBaseUrl}
@@ -3208,6 +3306,7 @@ function App() {
                       requestConfirm={requestConfirm}
                       setSelectedRow={setSelectedRow}
                       userPermissions={userPermissions}
+                      activeCompany={activeCompany}
                     />
                   }
                 />
@@ -3232,6 +3331,7 @@ function App() {
                   path="/company/:companyId/leads"
                   element={<LeadMagnetsPage />}
                 />
+
 
                 <Route
                   path="/company/:companyId/brand"
@@ -3429,10 +3529,6 @@ function App() {
                       cancelBrandRuleEdit={cancelBrandRuleEdit}
                       saveBrandRuleEdit={saveBrandRuleEdit}
                       saveBrandSetup={saveBrandSetup}
-                      connectedAccounts={connectedAccounts}
-                      onConnectLinkedIn={handleConnectLinkedIn}
-                      onConnectFacebook={handleConnectFacebook}
-                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
                       sendBrandWebhook={sendBrandWebhook}
                       buildFormAnswer={buildFormAnswer}
                       brandBasicsGoal={brandBasicsGoal}
@@ -3443,9 +3539,6 @@ function App() {
                       setLegalReview={setLegalReview}
                       isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
                       brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
-                      isEditingBrandSetup={isEditingBrandSetup}
-                      brandEditingRef={brandEditingRef}
-                      formAnswerCache={formAnswerCache}
                       industryOptions={industryOptions}
                       audienceRoleOptions={audienceRoleOptions}
                       painPointOptions={painPointOptions}
@@ -3506,7 +3599,142 @@ function App() {
                       onRemoveCollaborator={handleRemoveCollaborator}
                       onTransferOwnership={handleTransferOwnership}
                       userPermissions={userPermissions}
+                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
+                      connectedAccounts={connectedAccounts}
+                      onConnectLinkedIn={handleConnectLinkedIn}
+                      onConnectFacebook={handleConnectFacebook}
+                      isEditingBrandSetup={isEditingBrandSetup}
+                      brandEditingRef={brandEditingRef}
                       onDisconnectAccount={handleDisconnectAccount}
+                      formAnswerCache={formAnswerCache}
+                      backendBaseUrl={backendBaseUrl}
+                    />
+                  }
+                />
+                <Route
+                  path="/company/:companyId/settings/workflow"
+                  element={
+                    <SettingsPage
+                      tab="workflow"
+                      notify={notify}
+                      authedFetch={authedFetch}
+                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
+                      brandIntelligenceReady={brandIntelligenceReady}
+                      brandSetupMode={brandSetupMode}
+                      setBrandSetupMode={setBrandSetupMode}
+                      brandSetupLevel={brandSetupLevel}
+                      setBrandSetupLevel={setBrandSetupLevel}
+                      brandSetupStep={brandSetupStep}
+                      setBrandSetupStep={setBrandSetupStep}
+                      setIsEditingBrandSetup={setIsEditingBrandSetup}
+                      collaborators={collaborators}
+                      customRoles={customRoles}
+                      onUpdateCustomRoles={handleUpdateCustomRoles}
+                      onAssignRole={handleAssignRole}
+                      companyName={companyName}
+                      setCompanyName={setCompanyName}
+                      companyDescription={companyDescription}
+                      setCompanyDescription={setCompanyDescription}
+                      loadBrandKB={loadBrandKB}
+                      brandKbId={brandKbId}
+                      onSaveCompanyDetails={handleUpdateCompany}
+                      brandPack={brandPack}
+                      setBrandPack={setBrandPack}
+                      brandCapability={brandCapability}
+                      setBrandCapability={setBrandCapability}
+                      emojiRule={emojiRule}
+                      setEmojiRule={setEmojiRule}
+                      systemInstruction={systemInstruction}
+                      setSystemInstruction={setSystemInstruction}
+                      aiWriterSystemPrompt={aiWriterSystemPrompt}
+                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
+                      aiWriterUserPrompt={aiWriterUserPrompt}
+                      setAiWriterUserPrompt={setAiWriterUserPrompt}
+                      activeBrandRuleEdit={activeBrandRuleEdit}
+                      brandRuleDraft={brandRuleDraft}
+                      setBrandRuleDraft={setBrandRuleDraft}
+                      startBrandRuleEdit={startBrandRuleEdit}
+                      cancelBrandRuleEdit={cancelBrandRuleEdit}
+                      saveBrandRuleEdit={saveBrandRuleEdit}
+                      saveBrandSetup={saveBrandSetup}
+                      sendBrandWebhook={sendBrandWebhook}
+                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
+                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
+                      buildFormAnswer={buildFormAnswer}
+                      industryOptions={industryOptions}
+                      audienceRoleOptions={audienceRoleOptions}
+                      painPointOptions={painPointOptions}
+                      noSayOptions={noSayOptions}
+                      brandBasicsName={brandBasicsName}
+                      setBrandBasicsName={setBrandBasicsName}
+                      brandBasicsIndustry={brandBasicsIndustry}
+                      setBrandBasicsIndustry={setBrandBasicsIndustry}
+                      brandBasicsType={brandBasicsType}
+                      setBrandBasicsType={setBrandBasicsType}
+                      brandBasicsOffer={brandBasicsOffer}
+                      setBrandBasicsOffer={setBrandBasicsOffer}
+                      brandBasicsGoal={brandBasicsGoal}
+                      setBrandBasicsGoal={setBrandBasicsGoal}
+                      audienceRole={audienceRole}
+                      setAudienceRole={setAudienceRole}
+                      audienceIndustry={audienceIndustry}
+                      setAudienceIndustry={setAudienceIndustry}
+                      audiencePainPoints={audiencePainPoints}
+                      setAudiencePainPoints={setAudiencePainPoints}
+                      audienceOutcome={audienceOutcome}
+                      setAudienceOutcome={setAudienceOutcome}
+                      toneFormal={toneFormal}
+                      setToneFormal={setToneFormal}
+                      toneEnergy={toneEnergy}
+                      setToneEnergy={setToneEnergy}
+                      toneBold={toneBold}
+                      setToneBold={setToneBold}
+                      emojiUsage={emojiUsage}
+                      setEmojiUsage={setEmojiUsage}
+                      writingLength={writingLength}
+                      setWritingLength={setWritingLength}
+                      ctaStrength={ctaStrength}
+                      setCtaStrength={setCtaStrength}
+                      absoluteTruths={absoluteTruths}
+                      setAbsoluteTruths={setAbsoluteTruths}
+                      noSayRules={noSayRules}
+                      setNoSayRules={setNoSayRules}
+                      regulatedIndustry={regulatedIndustry}
+                      setRegulatedIndustry={setRegulatedIndustry}
+                      legalReview={legalReview}
+                      setLegalReview={setLegalReview}
+                      advancedPositioning={advancedPositioning}
+                      setAdvancedPositioning={setAdvancedPositioning}
+                      advancedDifferentiators={advancedDifferentiators}
+                      setAdvancedDifferentiators={setAdvancedDifferentiators}
+                      advancedPillars={advancedPillars}
+                      setAdvancedPillars={setAdvancedPillars}
+                      advancedCompetitors={advancedCompetitors}
+                      setAdvancedCompetitors={setAdvancedCompetitors}
+                      advancedProofPoints={advancedProofPoints}
+                      setAdvancedProofPoints={setAdvancedProofPoints}
+                      advancedRequiredPhrases={advancedRequiredPhrases}
+                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
+                      advancedForbiddenPhrases={advancedForbiddenPhrases}
+                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
+                      advancedComplianceNotes={advancedComplianceNotes}
+                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
+                      writerRulesUnlocked={writerRulesUnlocked}
+                      reviewerRulesUnlocked={reviewerRulesUnlocked}
+                      newCollaboratorEmail={newCollaboratorEmail}
+                      setNewCollaboratorEmail={setNewCollaboratorEmail}
+                      onAddCollaborator={handleAddCollaborator}
+                      onRemoveCollaborator={handleRemoveCollaborator}
+                      onTransferOwnership={handleTransferOwnership}
+                      userPermissions={userPermissions}
+                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
+                      connectedAccounts={connectedAccounts}
+                      onConnectLinkedIn={handleConnectLinkedIn}
+                      onConnectFacebook={handleConnectFacebook}
+                      isEditingBrandSetup={isEditingBrandSetup}
+                      brandEditingRef={brandEditingRef}
+                      onDisconnectAccount={handleDisconnectAccount}
+                      formAnswerCache={formAnswerCache}
                       backendBaseUrl={backendBaseUrl}
                     />
                   }
@@ -4072,9 +4300,13 @@ function App() {
           setIsImageModalOpen={setIsImageModalOpen}
           setIsViewModalOpen={setIsViewModalOpen}
           activeCompanyId={activeCompanyId}
+          activeCompany={activeCompany}
           setBrandKbId={setBrandKbId}
           setSystemInstruction={setSystemInstruction}
           isAiAssistantOpen={isAiAssistantOpen}
+          collaborators={collaborators}
+          automations={automations}
+          userPermissions={userPermissions}
         />
 
         <ImageGenerationModal
@@ -4171,7 +4403,7 @@ function App() {
           backendBaseUrl={backendBaseUrl}
         />
       </div >
-    </NotificationProvider>
+    </NotificationProvider >
   );
 }
 
