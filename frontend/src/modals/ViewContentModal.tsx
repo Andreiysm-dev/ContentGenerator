@@ -683,6 +683,16 @@ export function ViewContentModal({
                         </div>
                         <div className="flex items-center gap-2">
                             <button
+                                onClick={() => {
+                                    onClose();
+                                    navigate(`/company/${activeCompanyId}/studio/${selectedRow.contentCalendarId}`);
+                                }}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                            >
+                                <Edit3 size={16} />
+                                Edit in Studio
+                            </button>
+                            <button
                                 type="button"
                                 onClick={onClose}
                                 className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all active:scale-95"

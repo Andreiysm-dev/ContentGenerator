@@ -90,6 +90,7 @@ type FormState = {
   cta: string;
   cardName: string;
   promoType: string;
+  caption: string;
 };
 
 
@@ -133,6 +134,7 @@ function App() {
     cta: '',
     promoType: '',
     cardName: '',
+    caption: '',
   });
 
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
@@ -2531,6 +2533,7 @@ function App() {
         cta: form.cta || null,
         promoType: form.promoType || null,
         card_name: form.cardName || null,
+        finalCaption: form.caption || null,
         companyId: activeCompanyId,
       } as any;
 
@@ -2558,6 +2561,7 @@ function App() {
         cta: '',
         promoType: '',
         cardName: '',
+        caption: '',
       }));
     } catch (err) {
       console.error('Add error:', err);
@@ -2641,6 +2645,7 @@ function App() {
           primaryGoal,
           cta,
           promoType,
+          caption,
         ] = row;
 
         const payload = {
@@ -2654,6 +2659,7 @@ function App() {
           primaryGoal: primaryGoal || null,
           cta: cta || null,
           promoType: promoType || null,
+          finalCaption: caption || null,
           companyId: activeCompanyId,
         };
 

@@ -13,11 +13,12 @@ interface FormState {
   cta: string;
   cardName: string;
   promoType: string;
+  caption: string;
 }
 
 interface CreatePageProps {
   form: FormState;
-  handleChange: ChangeEventHandler<HTMLInputElement | HTMLSelectElement>;
+  handleChange: ChangeEventHandler<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
   handleAdd: () => Promise<void>;
   isAdding: boolean;
   setBulkText: (value: string) => void;
@@ -51,7 +52,7 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
             className="relative z-10 inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold bg-white/10 text-white border border-white/20 backdrop-blur-sm shadow-sm transition hover:bg-white/20 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
             onClick={() => {
               setBulkText("");
-              setBulkPreview([Array(9).fill('')]);
+              setBulkPreview([Array(10).fill('')]);
               setShowPreview(true); // Default to showing the grid
               setIsBulkModalOpen(true);
             }}
@@ -117,8 +118,8 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
                     className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl"
                   />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="block text-xs font-bold text-brand-dark/70 uppercase tracking-wider ml-1">Theme</label>
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="block text-xs font-bold text-brand-dark/70 uppercase tracking-wider ml-1">Theme / Topic</label>
                   <input
                     type="text"
                     name="theme"
@@ -127,6 +128,18 @@ export function CreatePage({ form, handleChange, handleAdd, isAdding, setBulkTex
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl"
                   />
+                </div>
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="block text-xs font-bold text-brand-dark/70 uppercase tracking-wider ml-1">Pre-written Caption (Optional)</label>
+                  <textarea
+                    name="caption"
+                    placeholder="If you already have a caption, paste it here..."
+                    value={form.caption}
+                    onChange={handleChange as any}
+                    rows={4}
+                    className="w-full px-4 py-2.5 text-sm font-medium bg-slate-50/50 border border-slate-200 rounded-xl resize-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  />
+                  <p className="text-[10px] text-slate-400 ml-1">If provided, AI will use this instead of generating a new caption.</p>
                 </div>
               </div>
             </div>

@@ -35,7 +35,9 @@ import {
   SearchX,
   Lock,
   Bell,
-  Loader2
+  Loader2,
+  XCircle,
+  Info
 } from "lucide-react";
 import { KanbanView } from "./Workboard/KanbanView";
 import type { Post, KanbanColumn } from "./Workboard/types";
@@ -231,6 +233,34 @@ export function CalendarPage(props: CalendarPageProps) {
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
   const [isSavingNotifications, setIsSavingNotifications] = useState(false);
 
+  // Automation preferences
+  const [showAutomations, setShowAutomations] = useState(false);
+  const [automationPrefs, setAutomationPrefs] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+    const prefKey = `automation_pref_${activeCompanyId}`;
+    try {
+      const saved = localStorage.getItem(prefKey);
+      setAutomationPrefs(saved ? JSON.parse(saved) : {});
+    } catch (e) {
+      setAutomationPrefs({});
+    }
+  }, [activeCompanyId]);
+
+  const updateAutomationPref = (columnId: string, pref: string | null) => {
+    if (!activeCompanyId) return;
+    const prefKey = `automation_pref_${activeCompanyId}`;
+    const newPrefs = { ...automationPrefs };
+    if (!pref || pref === 'ask') {
+      delete newPrefs[columnId];
+    } else {
+      newPrefs[columnId] = pref;
+    }
+    setAutomationPrefs(newPrefs);
+    localStorage.setItem(prefKey, JSON.stringify(newPrefs));
+  };
+
   const PRESET_COLORS = ['#6366f1', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
 
   useEffect(() => {
@@ -388,10 +418,7 @@ export function CalendarPage(props: CalendarPageProps) {
   const onConfirmMoveAction = (shouldAutomate: boolean) => {
     if (!pendingMove) return;
     if (rememberChoice) {
-      const prefKey = `automation_pref_${activeCompanyId}`;
-      const prefs = JSON.parse(localStorage.getItem(prefKey) || '{}');
-      prefs[pendingMove.status] = shouldAutomate ? 'automate' : 'skip';
-      localStorage.setItem(prefKey, JSON.stringify(prefs));
+      updateAutomationPref(pendingMove.status, shouldAutomate ? 'automate' : 'skip');
     }
     executeStatusChange(pendingMove.postId, pendingMove.status, !shouldAutomate);
     setPendingMove(null);
@@ -610,8 +637,129 @@ export function CalendarPage(props: CalendarPageProps) {
 
                 <div className="relative">
                   <button
+                    title="Automation preferences"
+                    onClick={() => {
+                      setShowAutomations(v => !v);
+                      setShowNotifications(false);
+                      setShowAddColumn(false);
+                    }}
+                    className={`p-2 rounded-xl transition-all border ${showAutomations
+                      ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+                      }`}
+                  >
+                    <Zap className="w-4 h-4" />
+                  </button>
+
+                  {showAutomations && (
+                    <div className="absolute right-0 top-full mt-2 z-50 w-96 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+                          <Zap size={16} />
+                        </div>
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Automation Controls</h4>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mb-8 font-medium leading-relaxed">
+                        Manage how automations trigger when moving cards between columns.
+                      </p>
+
+                      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 mb-2 custom-scrollbar">
+                        {kanbanColumns.map((col: any) => {
+                          const moveToRules = automations.filter((a: any) => a.type === 'move_to' && a.targetColumn === col.id);
+                          const lockRule = automations.find((a: any) => a.type === 'access_rule' && a.columnId === col.id);
+                          const hasRules = moveToRules.length > 0 || lockRule;
+
+                          if (!hasRules) return null;
+
+                          const currentMovePref = automationPrefs[col.id] || 'ask';
+                          const currentLockPref = automationPrefs[`lock_${col.id}`] || 'ask';
+
+                          return (
+                            <div key={col.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50 hover:bg-white hover:border-blue-100 transition-all group">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: col.color }} />
+                                  <span className="text-xs font-bold text-slate-700">{col.title}</span>
+                                </div>
+                                <div className="flex gap-1">
+                                  {moveToRules.length > 0 && (
+                                    <span className="text-[9px] font-black uppercase text-blue-500 bg-blue-50 px-2 py-0.5 rounded">
+                                      {moveToRules.length} Automations
+                                    </span>
+                                  )}
+                                  {lockRule && (
+                                    <span className="text-[9px] font-black uppercase text-amber-500 bg-amber-50 px-2 py-0.5 rounded flex items-center gap-1">
+                                      <Lock size={8} /> Protected
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {moveToRules.length > 0 && (
+                                <div className="mb-3">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Card Automations</p>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                      { id: 'ask', label: 'Ask', icon: Info },
+                                      { id: 'automate', label: 'Auto', icon: Zap },
+                                      { id: 'skip', label: 'Skip', icon: XCircle }
+                                    ].map(opt => (
+                                      <button
+                                        key={opt.id}
+                                        onClick={() => updateAutomationPref(col.id, opt.id)}
+                                        className={`flex flex-col items-center gap-1.5 py-2.5 rounded-xl border transition-all ${currentMovePref === opt.id ? 'bg-white border-blue-200 shadow-sm text-blue-600 ring-4 ring-blue-50' : 'bg-transparent border-slate-200 text-slate-400 hover:bg-white hover:border-slate-300'}`}
+                                      >
+                                        <opt.icon size={12} />
+                                        <span className="text-[9px] font-bold uppercase">{opt.label}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {lockRule && (
+                                <div>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Lock/Approval Access</p>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                      { id: 'ask', label: 'Always Ask', icon: Info },
+                                      { id: 'automate', label: 'Auto-Submit', icon: Lock }
+                                    ].map(opt => (
+                                      <button
+                                        key={opt.id}
+                                        onClick={() => updateAutomationPref(`lock_${col.id}`, opt.id)}
+                                        className={`flex flex-col items-center gap-1.5 py-2.5 rounded-xl border transition-all ${currentLockPref === opt.id ? 'bg-white border-amber-200 shadow-sm text-amber-600 ring-4 ring-amber-50' : 'bg-transparent border-slate-200 text-slate-400 hover:bg-white hover:border-slate-300'}`}
+                                      >
+                                        <opt.icon size={12} />
+                                        <span className="text-[9px] font-bold uppercase">{opt.label}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {kanbanColumns.filter(col => automations.some(a => (a.type === 'move_to' && a.targetColumn === col.id) || (a.type === 'access_rule' && a.columnId === col.id))).length === 0 && (
+                          <div className="text-center py-10">
+                            <Wand2 className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                            <p className="text-xs font-bold text-slate-400">No automation rules defined.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <button
                     title="Notification settings"
-                    onClick={() => setShowNotifications(v => !v)}
+                    onClick={() => {
+                      setShowNotifications(v => !v);
+                      setShowAutomations(false);
+                      setShowAddColumn(false);
+                    }}
                     className={`p-2 rounded-xl transition-all border ${showNotifications
                       ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
                       : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
@@ -736,20 +884,27 @@ export function CalendarPage(props: CalendarPageProps) {
 
                   // If moving to a locked column (unless owner), require approval confirmation
                   if (lockRule && !userPermissions.isOwner) {
+                    const savedLockPref = automationPrefs[`lock_${status}`];
+                    if (savedLockPref === 'automate') {
+                      executeStatusChange(postId, status, true);
+                      return;
+                    }
                     setPendingApprovalMove({ postId, status, roleName: lockRule.roleName });
+                    setRememberChoice(false);
                     return;
                   }
 
                   if (matchingRules.length > 0) {
-                    const prefKey = `automation_pref_${activeCompanyId}`;
-                    const savedPref = JSON.parse(localStorage.getItem(prefKey) || '{}')[status];
+                    const savedPref = automationPrefs[status];
                     if (savedPref === 'automate') executeStatusChange(postId, status, false);
                     else if (savedPref === 'skip') executeStatusChange(postId, status, true);
                     else {
                       setPendingMove({ postId, status, rules: matchingRules });
                       setRememberChoice(false);
                     }
-                  } else executeStatusChange(postId, status, true);
+                  } else {
+                    executeStatusChange(postId, status, true);
+                  }
                 }}
                 onCardClick={post => {
                   const row = calendarRows.find(r => r.contentCalendarId === post.id);
@@ -935,9 +1090,21 @@ export function CalendarPage(props: CalendarPageProps) {
               Moving this card to <span className="text-slate-900 font-bold">"{kanbanColumns.find(c => c.id === pendingApprovalMove.status)?.title}"</span> will lock it.
               A notification will be sent to the <span className="text-blue-600 font-bold">{pendingApprovalMove.roleName}</span> role for review.
             </p>
+            <label className="flex items-center justify-center gap-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 mb-8 cursor-pointer group hover:bg-white hover:border-amber-200 transition-all">
+              <input
+                type="checkbox"
+                checked={rememberChoice}
+                onChange={e => setRememberChoice(e.target.checked)}
+                className="w-5 h-5 rounded-lg border-slate-300 text-amber-600 focus:ring-amber-500 transition-all cursor-pointer"
+              />
+              <span className="text-[11px] font-black uppercase text-slate-600 tracking-wide">Remember my choice for this column</span>
+            </label>
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => {
+                  if (rememberChoice) {
+                    updateAutomationPref(`lock_${pendingApprovalMove.status}`, 'automate');
+                  }
                   executeStatusChange(pendingApprovalMove.postId, pendingApprovalMove.status, true);
                   setPendingApprovalMove(null);
                 }}

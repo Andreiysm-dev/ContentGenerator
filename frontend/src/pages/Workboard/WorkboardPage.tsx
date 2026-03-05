@@ -60,6 +60,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     // Automation state
     const [automations, setAutomations] = useState<any[]>([]);
     const [pendingMove, setPendingMove] = useState<{ postId: string; status: string; rules: any[] } | null>(null);
+    const [pendingApprovalMove, setPendingApprovalMove] = useState<{ postId: string; status: string; roleName: string } | null>(null);
     const [rememberChoice, setRememberChoice] = useState(false);
     // Per-card generation cooldown — card is locked while AI is processing
     const [generatingPostIds, setGeneratingPostIds] = useState<Set<string>>(new Set());
@@ -76,6 +77,34 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     const [showNotifications, setShowNotifications] = useState(false);
     const [watchedColumns, setWatchedColumns] = useState<Record<string, boolean>>({});
     const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+
+    // Automation preferences (localStorage based)
+    const [showAutomations, setShowAutomations] = useState(false);
+    const [automationPrefs, setAutomationPrefs] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        if (!companyId) return;
+        const prefKey = `automation_pref_${companyId}`;
+        try {
+            const saved = localStorage.getItem(prefKey);
+            setAutomationPrefs(saved ? JSON.parse(saved) : {});
+        } catch (e) {
+            setAutomationPrefs({});
+        }
+    }, [companyId]);
+
+    const updateAutomationPref = (columnId: string, pref: string | null) => {
+        if (!companyId) return;
+        const prefKey = `automation_pref_${companyId}`;
+        const newPrefs = { ...automationPrefs };
+        if (!pref || pref === 'ask') {
+            delete newPrefs[columnId];
+        } else {
+            newPrefs[columnId] = pref;
+        }
+        setAutomationPrefs(newPrefs);
+        localStorage.setItem(prefKey, JSON.stringify(newPrefs));
+    };
 
     // Fetch real data from backend
     const fetchPosts = async () => {
@@ -259,12 +288,24 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
             fetchPosts(); // revert any visual drift
             return;
         }
+
         const matchingRules = automations.filter(rule => rule.type === 'move_to' && rule.targetColumn === newStatus);
+        const lockRule = automations.find(rule => rule.type === 'access_rule' && rule.columnId === newStatus);
+
+        // If moving to a locked column (unless owner), require approval confirmation
+        if (lockRule && !userPermissions.isOwner) {
+            const savedLockPref = automationPrefs[`lock_${newStatus}`];
+            if (savedLockPref === 'automate') {
+                executeStatusChange(postId, newStatus, true);
+                return;
+            }
+            setPendingApprovalMove({ postId, status: newStatus, roleName: lockRule.roleName });
+            setRememberChoice(false);
+            return;
+        }
 
         if (matchingRules.length > 0) {
-            const prefKey = `automation_pref_${companyId}`;
-            const prefs = JSON.parse(localStorage.getItem(prefKey) || '{}');
-            const savedPref = prefs[newStatus];
+            const savedPref = automationPrefs[newStatus];
 
             if (savedPref === 'automate') {
                 executeStatusChange(postId, newStatus, false);
@@ -282,10 +323,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     const onConfirmMoveAction = (shouldAutomate: boolean) => {
         if (!pendingMove) return;
         if (rememberChoice) {
-            const prefKey = `automation_pref_${companyId}`;
-            const prefs = JSON.parse(localStorage.getItem(prefKey) || '{}');
-            prefs[pendingMove.status] = shouldAutomate ? 'automate' : 'skip';
-            localStorage.setItem(prefKey, JSON.stringify(prefs));
+            updateAutomationPref(pendingMove.status, shouldAutomate ? 'automate' : 'skip');
         }
         executeStatusChange(pendingMove.postId, pendingMove.status, !shouldAutomate);
         setPendingMove(null);
@@ -504,7 +542,11 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
 
                 <div className="flex items-center gap-3 relative">
                     <button
-                        onClick={() => setShowAddColumn(!showAddColumn)}
+                        onClick={() => {
+                            setShowAddColumn(!showAddColumn);
+                            setShowNotifications(false);
+                            setShowAutomations(false);
+                        }}
                         className={`p-2.5 rounded-xl transition-all ${showAddColumn ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
                         title="Add Column"
                     >
@@ -512,7 +554,23 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                     </button>
 
                     <button
-                        onClick={() => setShowNotifications(!showNotifications)}
+                        onClick={() => {
+                            setShowAutomations(!showAutomations);
+                            setShowAddColumn(false);
+                            setShowNotifications(false);
+                        }}
+                        className={`p-2.5 rounded-xl transition-all ${showAutomations ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                        title="Automation Settings"
+                    >
+                        <Zap size={20} />
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            setShowNotifications(!showNotifications);
+                            setShowAddColumn(false);
+                            setShowAutomations(false);
+                        }}
                         className={`p-2.5 rounded-xl transition-all ${showNotifications ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
                         title="Notification Settings"
                     >
@@ -558,6 +616,106 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                                 >
                                     Cancel
                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {showAutomations && (
+                        <div className="absolute right-0 top-full mt-4 z-50 w-96 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                                    <Zap size={16} />
+                                </div>
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Automation Controls</h4>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mb-8 font-medium leading-relaxed">
+                                Manage how automations trigger when moving cards between columns.
+                            </p>
+
+                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 mb-2 custom-scrollbar">
+                                {columns.map((col: any) => {
+                                    const moveToRules = automations.filter((a: any) => a.type === 'move_to' && a.targetColumn === col.id);
+                                    const lockRule = automations.find((a: any) => a.type === 'access_rule' && a.columnId === col.id);
+                                    const hasRules = moveToRules.length > 0 || lockRule;
+
+                                    if (!hasRules) return null;
+
+                                    const currentMovePref = automationPrefs[col.id] || 'ask';
+                                    const currentLockPref = automationPrefs[`lock_${col.id}`] || 'ask';
+
+                                    return (
+                                        <div key={col.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50 hover:bg-white hover:border-blue-100 transition-all group">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: col.color }} />
+                                                    <span className="text-xs font-bold text-slate-700">{col.title}</span>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    {moveToRules.length > 0 && (
+                                                        <span className="text-[9px] font-black uppercase text-blue-500 bg-blue-50 px-2 py-0.5 rounded">
+                                                            {moveToRules.length} Automations
+                                                        </span>
+                                                    )}
+                                                    {lockRule && (
+                                                        <span className="text-[9px] font-black uppercase text-amber-500 bg-amber-50 px-2 py-0.5 rounded flex items-center gap-1">
+                                                            <Lock size={8} /> Protected
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {moveToRules.length > 0 && (
+                                                <div className="mb-3">
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Card Automations</p>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {[
+                                                            { id: 'ask', label: 'Ask', icon: Info },
+                                                            { id: 'automate', label: 'Auto', icon: Zap },
+                                                            { id: 'skip', label: 'Skip', icon: XCircle }
+                                                        ].map(opt => (
+                                                            <button
+                                                                key={opt.id}
+                                                                onClick={() => updateAutomationPref(col.id, opt.id)}
+                                                                className={`flex flex-col items-center gap-1.5 py-2.5 rounded-xl border transition-all ${currentMovePref === opt.id ? 'bg-white border-blue-200 shadow-sm text-blue-600 ring-4 ring-blue-50' : 'bg-transparent border-slate-200 text-slate-400 hover:bg-white hover:border-slate-300'}`}
+                                                            >
+                                                                <opt.icon size={12} />
+                                                                <span className="text-[9px] font-bold uppercase">{opt.label}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {lockRule && (
+                                                <div>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Lock/Approval Access</p>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {[
+                                                            { id: 'ask', label: 'Always Ask', icon: Info },
+                                                            { id: 'automate', label: 'Auto-Submit', icon: Lock }
+                                                        ].map(opt => (
+                                                            <button
+                                                                key={opt.id}
+                                                                onClick={() => updateAutomationPref(`lock_${col.id}`, opt.id)}
+                                                                className={`flex flex-col items-center gap-1.5 py-2.5 rounded-xl border transition-all ${currentLockPref === opt.id ? 'bg-white border-amber-200 shadow-sm text-amber-600 ring-4 ring-amber-50' : 'bg-transparent border-slate-200 text-slate-400 hover:bg-white hover:border-slate-300'}`}
+                                                            >
+                                                                <opt.icon size={12} />
+                                                                <span className="text-[9px] font-bold uppercase">{opt.label}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                {columns.filter(col => automations.some(a => (a.type === 'move_to' && a.targetColumn === col.id) || (a.type === 'access_rule' && a.columnId === col.id))).length === 0 && (
+                                    <div className="text-center py-10">
+                                        <Wand2 className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                                        <p className="text-xs font-bold text-slate-400">No move-to rules defined.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -700,6 +858,58 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                                 Cancel Move
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Approval Modal */}
+            {pendingApprovalMove && (
+                <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden p-10 text-center animate-in zoom-in-95 duration-300 border border-slate-100">
+                        <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 mb-6 mx-auto shadow-sm">
+                            <Lock className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Submit for Approval?</h3>
+                        <p className="text-sm text-slate-500 font-medium mb-10 leading-relaxed px-4">
+                            Moving this card to <span className="text-slate-900 font-bold">"{columns.find(c => c.id === pendingApprovalMove.status)?.title}"</span> will lock it.
+                            A notification will be sent to the <span className="text-indigo-600 font-bold">{pendingApprovalMove.roleName}</span> role for review.
+                        </p>
+                        <label className="flex items-center justify-center gap-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 mb-10 cursor-pointer group hover:bg-white hover:border-amber-200 transition-all">
+                            <input
+                                type="checkbox"
+                                checked={rememberChoice}
+                                onChange={e => setRememberChoice(e.target.checked)}
+                                className="w-5 h-5 rounded-lg border-slate-300 text-amber-600 focus:ring-amber-500 transition-all cursor-pointer"
+                            />
+                            <span className="text-[11px] font-black uppercase text-slate-600 tracking-wide">Remember my choice for this column</span>
+                        </label>
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={() => {
+                                    if (rememberChoice) {
+                                        updateAutomationPref(`lock_${pendingApprovalMove.status}`, 'automate');
+                                    }
+                                    executeStatusChange(pendingApprovalMove.postId, pendingApprovalMove.status, true);
+                                    setPendingApprovalMove(null);
+                                }}
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-sm shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
+                            >
+                                Send for Approval
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setPendingApprovalMove(null);
+                                    fetchPosts(); // revert any visual drift
+                                }}
+                                className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-sm hover:bg-slate-200 transition-all"
+                            >
+                                Cancel Move
+                            </button>
+                        </div>
+                        <p className="mt-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
+                            <span className="w-1 h-1 rounded-full bg-slate-300" />
+                            Once moved, you may lose edit access
+                            <span className="w-1 h-1 rounded-full bg-slate-300" />
+                        </p>
                     </div>
                 </div>
             )}

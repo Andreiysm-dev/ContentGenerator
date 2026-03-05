@@ -76,7 +76,7 @@ export function BulkImportModal({
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            const headers = ['Date', 'Brand highlight (80%)', 'Cross promo (20%)', 'Theme', 'Content type', 'Target audience', 'Primary goal', 'CTA', 'Promo type'];
+                                            const headers = ['Date', 'Brand highlight (80%)', 'Cross promo (20%)', 'Theme', 'Content type', 'Target audience', 'Primary goal', 'CTA', 'Promo type', 'Caption'];
                                             navigator.clipboard.writeText(headers.join('\t'));
                                             // Simple custom notification logic if needed, otherwise alert is fine for now
                                             alert('Excel headers copied! Paste them into your sheet to prepare your data.');
@@ -97,7 +97,7 @@ export function BulkImportModal({
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                const newRows = Array.from({ length: addCount }, () => Array(9).fill(''));
+                                                const newRows = Array.from({ length: addCount }, () => Array(10).fill(''));
                                                 setBulkPreview([...bulkPreview, ...newRows]);
                                             }}
                                             className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-[10px] font-black bg-emerald-500 text-white transition hover:bg-emerald-600 active:scale-95 whitespace-nowrap"
@@ -109,7 +109,7 @@ export function BulkImportModal({
                                         type="button"
                                         onClick={() => {
                                             if (confirm('Clear all data?')) {
-                                                setBulkPreview([Array(9).fill('')]);
+                                                setBulkPreview([Array(10).fill('')]);
                                                 setBulkText('');
                                             }
                                         }}
@@ -129,7 +129,7 @@ export function BulkImportModal({
                                                 <th className="w-10 px-2 py-3 text-[90px] font-black text-slate-300 text-center opacity-20 select-none">#</th>
                                                 {[
                                                     'Date', 'Brand Highlight', 'Cross Promo', 'Theme',
-                                                    'Content Type', 'Audience', 'Goal', 'CTA', 'Promo Type'
+                                                    'Content Type', 'Audience', 'Goal', 'CTA', 'Promo Type', 'Caption'
                                                 ].map((col) => (
                                                     <th key={col} className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 border-l border-slate-200 first:border-l-0">
                                                         {col}
@@ -145,7 +145,7 @@ export function BulkImportModal({
                                                         <td className="px-2 py-3 text-[10px] font-black text-slate-400 text-center bg-slate-50/50 group-hover/row:bg-blue-100/50 transition-colors select-none">
                                                             {rowIndex + 1}
                                                         </td>
-                                                        {row.slice(0, 9).map((cell, colIndex) => (
+                                                        {row.slice(0, 10).map((cell, colIndex) => (
                                                             <td key={colIndex} className="p-0 border-l border-slate-100 first:border-l-0 relative focus-within:ring-2 focus-within:ring-blue-500/30 focus-within:z-10">
                                                                 <input
                                                                     type="text"
@@ -203,8 +203,8 @@ export function BulkImportModal({
                                                                                 return s;
                                                                             });
 
-                                                                            // If pasting into the first column and we have a list that fits a single row (<= 9 items)
-                                                                            if (colIndex === 0 && cleanLines.length > 1 && cleanLines.length <= 9) {
+                                                                            // If pasting into the first column and we have a list that fits a single row (<= 10 items)
+                                                                            if (colIndex === 0 && cleanLines.length > 1 && cleanLines.length <= 10) {
                                                                                 parsedRows = [cleanLines]; // Transpose to a single row
                                                                             } else {
                                                                                 parsedRows = cleanLines.map(l => [l]); // Standard vertical paste
@@ -216,11 +216,11 @@ export function BulkImportModal({
                                                                         parsedRows.forEach((pRow, rIdx) => {
                                                                             const targetRowIdx = rowIndex + rIdx;
                                                                             if (!newPreview[targetRowIdx]) {
-                                                                                newPreview[targetRowIdx] = Array(9).fill('');
+                                                                                newPreview[targetRowIdx] = Array(10).fill('');
                                                                             }
                                                                             pRow.forEach((pCell, cIdx) => {
                                                                                 const targetColIdx = colIndex + cIdx;
-                                                                                if (targetColIdx < 9) {
+                                                                                if (targetColIdx < 10) {
                                                                                     newPreview[targetRowIdx][targetColIdx] = pCell;
                                                                                 }
                                                                             });
@@ -241,7 +241,7 @@ export function BulkImportModal({
                                                                 type="button"
                                                                 onClick={() => {
                                                                     const newPreview = bulkPreview.filter((_, i) => i !== rowIndex);
-                                                                    setBulkPreview(newPreview.length ? newPreview : [Array(9).fill('')]);
+                                                                    setBulkPreview(newPreview.length ? newPreview : [Array(10).fill('')]);
                                                                 }}
                                                                 className="opacity-0 group-hover/row:opacity-100 transition-opacity p-1 text-slate-300 hover:text-rose-500"
                                                             >
