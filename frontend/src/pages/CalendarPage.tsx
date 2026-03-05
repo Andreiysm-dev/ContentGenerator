@@ -712,6 +712,7 @@ export function CalendarPage(props: CalendarPageProps) {
                   design_deadline: row.design_deadline || row.scheduled_at,
                   tags: row.tags,
                   collaborators: row.collaborators,
+                  checklist: row.checklist,
                 }))}
                 automations={automations}
                 userPermissions={userPermissions}

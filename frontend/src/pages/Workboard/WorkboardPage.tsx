@@ -126,6 +126,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                     organization_id: companyId,
                     tags: row.tags,
                     collaborators: row.collaborators,
+                    checklist: row.checklist,
                 };
             });
 

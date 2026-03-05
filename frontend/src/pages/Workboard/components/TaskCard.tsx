@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Loader2, Users, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { Calendar, Loader2, Users, Clock, AlertCircle, Trash2, CheckSquare } from 'lucide-react';
 import type { Post } from '../types';
 
 interface TaskCardProps {
@@ -55,6 +55,28 @@ export function TaskCard({ post, onClick, onDelete, isGenerating, statusColor }:
             deadlineStatus === 'high' ? 'bg-amber-100/60 text-amber-700 border-amber-200 shadow-sm shadow-amber-100 ring-1 ring-amber-200/30' :
                 deadlineStatus === 'safe' ? 'bg-emerald-100/60 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100 ring-1 ring-emerald-200/30' :
                     'bg-slate-50 text-slate-400 border-slate-100';
+
+    // Checklist Progress
+    const getChecklistArray = () => {
+        if (!post.checklist) return [];
+        if (Array.isArray(post.checklist)) return post.checklist;
+        if (typeof post.checklist === 'string') {
+            try {
+                return JSON.parse(post.checklist);
+            } catch (e) {
+                console.error('Failed to parse checklist JSON:', e);
+                return [];
+            }
+        }
+        return [];
+    };
+
+    const checklistData = getChecklistArray();
+    const allChecklistItems = checklistData.flatMap((list: any) => list.items || []);
+    const totalItems = allChecklistItems.length;
+    const completedItems = allChecklistItems.filter((i: any) => i.completed).length;
+    const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+    const hasChecklists = checklistData.length > 0;
 
     return (
         <div
@@ -132,9 +154,28 @@ export function TaskCard({ post, onClick, onDelete, isGenerating, statusColor }:
                     </div>
                 )}
 
-                <p className="text-[10px] font-medium text-slate-500 mb-3 px-1.5 py-0.5 bg-slate-50 rounded inline-block">
-                    {post.contentType}
-                </p>
+                <div className="flex items-center gap-3 mb-3">
+                    <p className="text-[10px] font-medium text-slate-500 px-1.5 py-0.5 bg-slate-50 rounded">
+                        {post.contentType}
+                    </p>
+                    {hasChecklists && (
+                        <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-tighter">
+                            <CheckSquare size={10} className={totalItems > 0 && progressPercent === 100 ? 'text-green-500' : 'text-blue-500'} />
+                            <span className={totalItems > 0 && progressPercent === 100 ? 'text-green-600' : ''}>
+                                {totalItems > 0 ? `${completedItems}/${totalItems}` : 'List'}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {totalItems > 0 && (
+                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mb-3">
+                        <div
+                            className={`h-full transition-all duration-500 ${progressPercent === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                            style={{ width: `${progressPercent}%` }}
+                        />
+                    </div>
+                )}
 
                 <div className="flex items-center justify-between pt-3 border-t border-slate-50">
                     <div className="flex items-center gap-3">

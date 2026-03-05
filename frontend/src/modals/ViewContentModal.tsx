@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Wand2, Check, Copy, Clock, Target, Layout, MessageSquare, Calendar, Zap, ClipboardList, PenLine, X, Eye, FileText, MousePointer2, Tag as TagIcon, Share2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Info, ShieldCheck, BarChart3, ArrowRight, Send, Trash2, MessageCircle, Plus, X as XIcon, Hash, Loader2, Edit3 } from 'lucide-react';
+import { ExternalLink, Wand2, Check, Copy, Clock, Target, Layout, MessageSquare, Calendar, Zap, ClipboardList, PenLine, X, Eye, FileText, MousePointer2, Tag as TagIcon, Share2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Info, ShieldCheck, BarChart3, ArrowRight, Send, Trash2, MessageCircle, Plus, X as XIcon, Hash, Loader2, Edit3, Maximize2 } from 'lucide-react';
 import type { Tag } from '../pages/Workboard/types';
 import { useNavigate } from 'react-router-dom';
 
@@ -37,6 +37,8 @@ interface ViewContentModalProps {
     collaborators?: any[];
     automations?: any[];
     userPermissions?: any;
+    allRows?: any[];
+    onNavigate?: (row: any) => void;
 }
 
 export function ViewContentModal({
@@ -67,6 +69,8 @@ export function ViewContentModal({
     collaborators = [],
     automations = [],
     userPermissions = {},
+    allRows = [],
+    onNavigate,
 }: ViewContentModalProps) {
     const navigate = useNavigate();
     const [isManualApproving, setIsManualApproving] = useState(false);
@@ -99,6 +103,14 @@ export function ViewContentModal({
     const [isEditingName, setIsEditingName] = useState(false);
     const [tempName, setTempName] = useState('');
     const [isSavingName, setIsSavingName] = useState(false);
+    const [checklists, setChecklists] = useState<{ id: string; title: string; items: { id: string; text: string; completed: boolean }[] }[]>([]);
+    const [isUpdatingChecklist, setIsUpdatingChecklist] = useState(false);
+    const [newChecklistTitle, setNewChecklistTitle] = useState('');
+    const [isAddingNewList, setIsAddingNewList] = useState(false);
+    const [editingListId, setEditingListId] = useState<string | null>(null);
+    const [editingListTitle, setEditingListTitle] = useState('');
+    const [isFullscreenImage, setIsFullscreenImage] = useState(false);
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
     const hasCaptionContent = !!(
         selectedRow?.finalCaption ||
         selectedRow?.captionOutput ||
@@ -123,6 +135,10 @@ export function ViewContentModal({
             fetchTagPool();
             if (selectedRow.status === 'PUBLISHED' && selectedRow.social_provider === 'facebook') {
                 fetchAnalytics();
+            }
+            setChecklists(Array.isArray(selectedRow.checklist) ? selectedRow.checklist : []);
+            if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTop = 0;
             }
         } else {
             setAnalytics(null);
@@ -451,6 +467,110 @@ export function ViewContentModal({
         }
     };
 
+    const handleNavigate = (direction: 'prev' | 'next') => {
+        if (!onNavigate || !allRows || allRows.length === 0) return;
+        const currentIndex = allRows.findIndex(r => r.contentCalendarId === selectedRow?.contentCalendarId);
+        if (currentIndex === -1) return;
+
+        let nextIndex;
+        if (direction === 'prev') {
+            nextIndex = currentIndex > 0 ? currentIndex - 1 : allRows.length - 1;
+        } else {
+            nextIndex = currentIndex < allRows.length - 1 ? currentIndex + 1 : 0;
+        }
+        onNavigate(allRows[nextIndex]);
+    };
+
+    const handleChecklistUpdate = async (updatedChecklists: typeof checklists) => {
+        setChecklists(updatedChecklists);
+        if (!selectedRow?.contentCalendarId) return;
+
+        setIsUpdatingChecklist(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ checklist: updatedChecklists })
+            });
+
+            if (res.ok) {
+                await refreshCalendarRow(selectedRow.contentCalendarId);
+            } else {
+                notify('Failed to update checklists', 'error');
+            }
+        } catch (err) {
+            console.error('Checklist update error:', err);
+            notify('Error updating checklists', 'error');
+        } finally {
+            setIsUpdatingChecklist(false);
+        }
+    };
+
+    const addChecklist = () => {
+        const title = newChecklistTitle.trim() || 'Checklist';
+        const newList = { id: `list-${Date.now()}`, title, items: [] };
+        handleChecklistUpdate([...checklists, newList]);
+        setNewChecklistTitle('');
+        setIsAddingNewList(false);
+    };
+
+    const deleteChecklist = (listId: string) => {
+        handleChecklistUpdate(checklists.filter(l => l.id !== listId));
+    };
+
+    const addChecklistItem = (listId: string, text: string) => {
+        const next = checklists.map(list => {
+            if (list.id === listId) {
+                return {
+                    ...list,
+                    items: [...list.items, { id: `item-${Date.now()}`, text, completed: false }]
+                };
+            }
+            return list;
+        });
+        handleChecklistUpdate(next);
+    };
+
+    const toggleChecklistItem = (listId: string, itemId: string) => {
+        const next = checklists.map(list => {
+            if (list.id === listId) {
+                return {
+                    ...list,
+                    items: list.items.map(item =>
+                        item.id === itemId ? { ...item, completed: !item.completed } : item
+                    )
+                };
+            }
+            return list;
+        });
+        handleChecklistUpdate(next);
+    };
+
+    const deleteChecklistItem = (listId: string, itemId: string) => {
+        const next = checklists.map(list => {
+            if (list.id === listId) {
+                return { ...list, items: list.items.filter(i => i.id !== itemId) };
+            }
+            return list;
+        });
+        handleChecklistUpdate(next);
+    };
+
+    const renameChecklist = (listId: string, newTitle: string) => {
+        if (!newTitle.trim()) {
+            setEditingListId(null);
+            return;
+        }
+        const next = checklists.map(list => {
+            if (list.id === listId) {
+                return { ...list, title: newTitle.trim() };
+            }
+            return list;
+        });
+        handleChecklistUpdate(next);
+        setEditingListId(null);
+    };
+
     if (!isOpen || !selectedRow) return null;
 
     return (
@@ -463,9 +583,29 @@ export function ViewContentModal({
                 if (e.target === e.currentTarget) onClose();
             }}
         >
-            <div className="w-full max-w-[95vw] xl:max-w-6xl 2xl:max-w-[1400px]">
+            {/* Outside Navigation Arrows */}
+            {allRows.length > 1 && (
+                <>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleNavigate('prev'); }}
+                        className="fixed left-4 lg:left-12 top-1/2 -translate-y-1/2 z-[210] p-4 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full text-white shadow-2xl transition-all hover:scale-110 active:scale-95 group hidden md:flex"
+                        title="Previous Card"
+                    >
+                        <ChevronLeft size={32} className="group-hover:-translate-x-1 transition-transform" />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleNavigate('next'); }}
+                        className="fixed right-4 lg:right-12 top-1/2 -translate-y-1/2 z-[210] p-4 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full text-white shadow-2xl transition-all hover:scale-110 active:scale-95 group hidden md:flex"
+                        title="Next Card"
+                    >
+                        <ChevronRight size={32} className="group-hover:translate-x-1 transition-transform" />
+                    </button>
+                </>
+            )}
+
+            <div className="w-full max-w-[95vw] xl:max-w-6xl 2xl:max-w-[1400px] relative z-[205]">
                 <div className="rounded-2xl border border-slate-200/60 bg-white shadow-xl overflow-hidden flex flex-col">
-                    {/* Header: Premium Workspace Style */}
+
                     <div className="flex items-center justify-between gap-4 border-b border-slate-200/80 p-6 bg-white sticky top-0 z-30">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white shrink-0">
@@ -541,19 +681,21 @@ export function ViewContentModal({
                                 </div>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
-                        >
-                            <X size={20} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="p-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Body: Focused two-column layout */}
                     <div className="flex flex-col lg:flex-row h-full max-h-[70vh] min-h-[500px]">
                         {/* Main: Caption + CTA + Hashtags */}
-                        <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-6 bg-slate-50/30">
+                        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-6 bg-slate-50/30">
 
                             {/* Final Caption */}
                             <section className="space-y-3">
@@ -574,24 +716,41 @@ export function ViewContentModal({
                                 </div>
                             </section>
 
-                            {/* Visual Asset — inline in left column */}
-                            <div className="space-y-3">
-                                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
-                                    <Layout size={13} />
-                                    Visual Asset
-                                </h3>
-                                <div className="w-full bg-slate-100 rounded-[1.5rem] border border-slate-200 relative overflow-hidden transition-all hover:border-blue-200 group" style={{ minHeight: '280px' }}>
+                            {/* Focused Post Visual */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+                                        <Layout size={14} className="text-blue-500" />
+                                        Post Visual
+                                    </h3>
+                                    {getImageGeneratedUrl(selectedRow) && (
+                                        <button
+                                            onClick={() => setIsFullscreenImage(true)}
+                                            className="text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg transition-all active:scale-95"
+                                        >
+                                            <Maximize2 size={12} />
+                                            View Fullscreen
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-[1.5rem] border-4 border-white shadow-xl relative overflow-hidden group max-w-2xl mx-auto">
                                     {getImageGeneratedUrl(selectedRow) ? (
-                                        <img
-                                            src={`${getImageGeneratedUrl(selectedRow)}${getImageGeneratedUrl(selectedRow)?.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
-                                            alt="Generated visual"
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                            style={{ minHeight: '280px' }}
-                                        />
+                                        <div className="relative group/img cursor-pointer" onClick={() => setIsFullscreenImage(true)}>
+                                            <img
+                                                src={`${getImageGeneratedUrl(selectedRow)}${getImageGeneratedUrl(selectedRow)?.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
+                                                alt="Generated visual"
+                                                className="w-full h-auto object-contain mx-auto transition-all duration-300"
+                                                style={{ maxHeight: '320px' }}
+                                            />
+                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-all flex items-center justify-center">
+                                                <Maximize2 size={24} className="text-white opacity-0 group-hover/img:opacity-100 transition-all" />
+                                            </div>
+                                            <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-[1.5rem] pointer-events-none" />
+                                        </div>
                                     ) : (
-                                        <div className="flex flex-col items-center justify-center py-16 px-4 h-full" style={{ minHeight: '280px' }}>
-                                            <Layout size={36} className="text-slate-300 mb-3" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">No visual yet</span>
+                                        <div className="flex flex-col items-center justify-center py-16 px-4 h-full bg-slate-50/50">
+                                            <Layout size={40} className="text-slate-200 mb-3" />
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Image not generated yet</span>
                                         </div>
                                     )}
                                 </div>
@@ -635,6 +794,171 @@ export function ViewContentModal({
                                     </div>
                                 </section>
                             </div>
+
+                            {/* Checklist Section */}
+                            <section className="space-y-8 pt-8 border-t border-slate-200/60">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+                                        <Check size={14} className="text-blue-500" />
+                                        Task Checklists
+                                    </h3>
+                                    {!isAddingNewList && (
+                                        <button
+                                            onClick={() => setIsAddingNewList(true)}
+                                            className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg"
+                                        >
+                                            <Plus size={12} />
+                                            Add Checklist
+                                        </button>
+                                    )}
+                                </div>
+
+                                {isAddingNewList && (
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 animate-in zoom-in-95 duration-200">
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            placeholder="Checklist title..."
+                                            value={newChecklistTitle}
+                                            onChange={e => setNewChecklistTitle(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && addChecklist()}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/10 mb-3"
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={addChecklist}
+                                                className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-all"
+                                            >
+                                                Add
+                                            </button>
+                                            <button
+                                                onClick={() => setIsAddingNewList(false)}
+                                                className="px-4 py-1.5 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-600 transition-all"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-10">
+                                    {checklists.map(list => {
+                                        const completedCount = list.items.filter(i => i.completed).length;
+                                        const progress = list.items.length > 0 ? Math.round((completedCount / list.items.length) * 100) : 0;
+
+                                        return (
+                                            <div key={list.id} className="space-y-4 group/list">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                        <ClipboardList size={14} className="text-slate-400 shrink-0" />
+                                                        {editingListId === list.id ? (
+                                                            <input
+                                                                autoFocus
+                                                                className="flex-1 bg-white border border-blue-400 rounded px-2 py-0.5 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/10 min-w-0"
+                                                                value={editingListTitle}
+                                                                onChange={(e) => setEditingListTitle(e.target.value)}
+                                                                onBlur={() => renameChecklist(list.id, editingListTitle)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                                                    else if (e.key === 'Escape') {
+                                                                        setEditingListId(null);
+                                                                    }
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <h4
+                                                                onClick={() => {
+                                                                    setEditingListId(list.id);
+                                                                    setEditingListTitle(list.title);
+                                                                }}
+                                                                className="text-sm font-black text-slate-800 tracking-tight cursor-text hover:text-blue-600 transition-colors truncate"
+                                                            >
+                                                                {list.title}
+                                                            </h4>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => deleteChecklist(list.id)}
+                                                        className="opacity-0 group-hover/list:opacity-100 p-1.5 text-slate-300 hover:text-red-500 transition-all"
+                                                        title="Delete List"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+
+                                                {list.items.length > 0 && (
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-[0.1em]">
+                                                            <span>Progress</span>
+                                                            <span className={progress === 100 ? 'text-green-500' : 'text-blue-500'}>{progress}%</span>
+                                                        </div>
+                                                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full transition-all duration-500 ease-out ${progress === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                                                                style={{ width: `${progress}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="space-y-1">
+                                                    {list.items.map(item => (
+                                                        <div key={item.id} className="group/item flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-all">
+                                                            <button
+                                                                onClick={() => toggleChecklistItem(list.id, item.id)}
+                                                                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${item.completed
+                                                                    ? 'bg-green-500 border-green-500 text-white shadow-lg shadow-green-500/20'
+                                                                    : 'border-slate-300 hover:border-blue-400 bg-white hover:shadow-md'
+                                                                    }`}
+                                                            >
+                                                                {item.completed && <Check size={14} strokeWidth={3} />}
+                                                            </button>
+                                                            <span className={`text-sm font-medium flex-1 transition-all ${item.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                                                {item.text}
+                                                            </span>
+                                                            <button
+                                                                onClick={() => deleteChecklistItem(list.id, item.id)}
+                                                                className="opacity-0 group-hover/item:opacity-100 p-1.5 text-slate-300 hover:text-red-500 transition-all"
+                                                            >
+                                                                <XIcon size={12} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+
+                                                    <form
+                                                        onSubmit={(e) => {
+                                                            e.preventDefault();
+                                                            const input = e.currentTarget.elements.namedItem('itemText') as HTMLInputElement;
+                                                            if (input.value.trim()) {
+                                                                addChecklistItem(list.id, input.value.trim());
+                                                                input.value = '';
+                                                            }
+                                                        }}
+                                                        className="flex items-center gap-3 pl-2 mt-2 group/form"
+                                                    >
+                                                        <div className="w-6 h-6 rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 group-hover/form:border-blue-200 transition-colors shrink-0">
+                                                            <Plus size={14} />
+                                                        </div>
+                                                        <input
+                                                            name="itemText"
+                                                            type="text"
+                                                            placeholder="Add a task to this list..."
+                                                            className="flex-1 bg-transparent text-sm font-medium text-slate-500 outline-none border-b border-transparent focus:border-blue-200 py-1 transition-all focus:text-slate-900"
+                                                        />
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {checklists.length === 0 && !isAddingNewList && (
+                                    <div className="flex flex-col items-center justify-center py-10 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                                        <ClipboardList size={24} className="text-slate-300 mb-2" />
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No checklists added</p>
+                                    </div>
+                                )}
+                            </section>
 
                             {/* Collapsible: AI Draft Outputs */}
                             <details className="group">
@@ -1345,6 +1669,29 @@ export function ViewContentModal({
                     </div>
                 </div>
             </div>
+
+            {/* Lightbox / Fullscreen Image Overlay */}
+            {isFullscreenImage && getImageGeneratedUrl(selectedRow) && (
+                <div
+                    className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 sm:p-20 animate-in fade-in duration-300"
+                    onClick={() => setIsFullscreenImage(false)}
+                >
+                    <button
+                        onClick={() => setIsFullscreenImage(false)}
+                        className="absolute top-8 right-8 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-[310]"
+                    >
+                        <X size={32} />
+                    </button>
+                    <img
+                        src={`${getImageGeneratedUrl(selectedRow)}${getImageGeneratedUrl(selectedRow)?.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
+                        alt="Fullscreen view"
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-500"
+                    />
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/60 text-[10px] font-black uppercase tracking-widest bg-white/5 px-4 py-2 rounded-full backdrop-blur-md">
+                        Press anywhere to close
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

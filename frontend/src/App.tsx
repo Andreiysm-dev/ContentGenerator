@@ -4336,6 +4336,8 @@ function App() {
           collaborators={collaborators}
           automations={automations}
           userPermissions={userPermissions}
+          allRows={filteredCalendarRows}
+          onNavigate={(row) => setSelectedRow(row)}
         />
 
         <ImageGenerationModal

@@ -28,6 +28,7 @@ export interface Post {
     kanban_order?: number;
     tags?: Tag[];
     collaborators?: Collaborator[];
+    checklist?: any[];
 }
 
 export interface KanbanColumn {
