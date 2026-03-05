@@ -235,7 +235,7 @@ export function CalendarPage(props: CalendarPageProps) {
 
   useEffect(() => {
     fetchNotificationSettings();
-  }, [activeCompanyId]);
+  }, [activeCompanyId, authedFetch]);
 
   const fetchNotificationSettings = async () => {
     if (!activeCompanyId) return;

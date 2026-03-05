@@ -607,9 +607,9 @@ function App() {
 
   useEffect(() => {
     const isCompanyRoute = /^\/company\/[^/]+/.test(location.pathname);
-    if (!isCompanyRoute || !activeCompanyId) return;
+    if (!isCompanyRoute || !activeCompanyId || !session) return;
     fetchCollaborators(activeCompanyId);
-  }, [location.pathname, activeCompanyId]);
+  }, [location.pathname, activeCompanyId, session]);
 
   const fetchConnectedAccounts = async (companyId: string) => {
     try {
