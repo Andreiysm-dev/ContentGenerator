@@ -257,7 +257,7 @@ export function AIAssistant({
                                 <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Suggested Commands</h5>
                                 <div className="grid gap-2">
                                     {[
-                                        { icon: Layout, label: "View Content Calendar", text: "What's my schedule looking like?" },
+                                        { icon: Layout, label: "View Content Board", text: "What's my schedule looking like?" },
                                         { icon: Zap, label: "Review Writing Style", text: "How is our writing style defined right now?" },
                                         { icon: Target, label: "Optimize Brand Pack", text: "Propose a more professional writing style for our brand." }
                                     ].map((s, i) => (

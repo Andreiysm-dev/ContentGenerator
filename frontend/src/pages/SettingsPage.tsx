@@ -825,7 +825,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                 </div>
                                 <div className="space-y-0.5">
                                   <div className="text-[10px] font-black uppercase text-slate-900">Create</div>
-                                  <p className="text-[9px] text-slate-500 font-medium leading-normal">Allows members to add new entries to the content calendar and draft campaign ideas.</p>
+                                  <p className="text-[9px] text-slate-500 font-medium leading-normal">Allows members to add new entries to the content board and draft campaign ideas.</p>
                                 </div>
                               </div>
                               <div className="flex gap-3">

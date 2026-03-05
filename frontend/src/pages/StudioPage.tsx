@@ -31,7 +31,9 @@ import {
   HelpCircle,
   ArrowRight as ArrowRightIcon,
   RotateCcw,
-  Save
+  Save,
+  ShieldCheck,
+  Wand2
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
@@ -94,39 +96,55 @@ export function StudioPage({
   const [activeTab, setActiveTab] = useState<string>((location.state as any)?.activeTab || studioTabs[0].id);
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [localStudioSettings, setLocalStudioSettings] = useState<any>(() => ({
-    studioTabs: studioSettings?.studioTabs || studioTabs,
-    schedulingStatus: studioSettings?.schedulingStatus || 'Scheduled',
-    postedStatus: studioSettings?.postedStatus || 'Published',
-    unscheduledStatus: studioSettings?.unscheduledStatus || 'Drafts'
+    studioTabs: activeCompany?.kanban_settings?.studio_settings?.studioTabs || studioTabs
   }));
+  const [localAutomations, setLocalAutomations] = useState<any[]>(activeCompany?.kanban_settings?.automations || []);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const columns = activeCompany?.kanban_settings?.columns || [];
 
   // Robust sync: update local state whenever company props update, 
   // but only if we're not currently editing to avoid losing unsaved changes.
   useEffect(() => {
-    if (activeCompany?.kanban_settings?.studio_settings && !isConfiguring) {
-      const settings = activeCompany.kanban_settings.studio_settings;
+    if (activeCompany?.kanban_settings && !isConfiguring) {
+      const ks = activeCompany.kanban_settings;
       setLocalStudioSettings({
-        studioTabs: settings.studioTabs || studioTabs,
-        schedulingStatus: settings.schedulingStatus || 'Scheduled',
-        postedStatus: settings.postedStatus || 'Published',
-        unscheduledStatus: settings.unscheduledStatus || 'Drafts'
+        studioTabs: ks.studio_settings?.studioTabs || studioTabs
       });
+      setLocalAutomations(ks.automations || []);
     }
-  }, [activeCompany?.kanban_settings?.studio_settings, isConfiguring, studioTabs]);
+  }, [activeCompany?.kanban_settings, isConfiguring, studioTabs]);
 
   // Specific refresh when opening the modal to ensure fresh data
   const handleOpenConfig = () => {
-    const settings = activeCompany?.kanban_settings?.studio_settings;
+    const ks = activeCompany?.kanban_settings;
     setLocalStudioSettings({
-      studioTabs: settings?.studioTabs || studioTabs,
-      schedulingStatus: settings?.schedulingStatus || 'Scheduled',
-      postedStatus: settings?.postedStatus || 'Published',
-      unscheduledStatus: settings?.unscheduledStatus || 'Drafts'
+      studioTabs: ks?.studio_settings?.studioTabs || studioTabs
     });
+    setLocalAutomations(ks?.automations || []);
     setIsConfiguring(true);
   };
+
+  const addEventTrigger = () => {
+    setLocalAutomations([...localAutomations, { id: `event-${Date.now()}`, type: 'event', event: 'caption_generated', targetStatus: columns[0]?.id || '' }]);
+  };
+
+  const addMoveTrigger = () => {
+    setLocalAutomations([...localAutomations, { id: `move-${Date.now()}`, type: 'move_to', targetColumn: columns[0]?.id || '', action: 'generate_caption' }]);
+  };
+
+  const addLockRule = () => {
+    setLocalAutomations([...localAutomations, { id: `lock-${Date.now()}`, type: 'access_rule', columnId: columns[0]?.id || '', roleName: '' }]);
+  };
+
+  const updateAutomation = (id: string, updates: any) => {
+    setLocalAutomations(localAutomations.map(a => a.id === id ? { ...a, ...updates } : a));
+  };
+
+  const removeAutomation = (id: string) => {
+    setLocalAutomations(localAutomations.filter(a => a.id !== id));
+  };
+
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
@@ -936,68 +954,143 @@ export function StudioPage({
                   </div>
 
                   <div className="space-y-4 pt-6 border-t border-slate-100">
-                    <div>
-                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                        <ArrowRightIcon size={14} className="text-indigo-500" />
-                        Section 2: System Mappings
-                      </h3>
-                      <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">Automate status changes based on content lifecycle events.</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                          <Wand2 size={14} className="text-indigo-500" />
+                          Section 2: Triggers & Automations
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">Automate status changes and restrict access based on events.</p>
+                      </div>
+                      <div className="relative">
+                        <button
+                          onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100"
+                        >
+                          <PlusIcon size={12} /> Add Trigger
+                        </button>
+                        {isAddMenuOpen && (
+                          <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[110] flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+                            <button onClick={() => { addEventTrigger(); setIsAddMenuOpen(false); }} className="p-2 text-left hover:bg-indigo-50 rounded-xl transition-all">
+                              <div className="text-[10px] font-black uppercase text-indigo-600">Event Trigger</div>
+                              <div className="text-[9px] text-slate-400 font-medium tracking-tight">On content change</div>
+                            </button>
+                            <button onClick={() => { addMoveTrigger(); setIsAddMenuOpen(false); }} className="p-2 text-left hover:bg-blue-50 rounded-xl transition-all border-t border-slate-50">
+                              <div className="text-[10px] font-black uppercase text-blue-600">Move Trigger</div>
+                              <div className="text-[9px] text-slate-400 font-medium tracking-tight">On status move</div>
+                            </button>
+                            <button onClick={() => { addLockRule(); setIsAddMenuOpen(false); }} className="p-2 text-left hover:bg-amber-50 rounded-xl transition-all border-t border-slate-50">
+                              <div className="text-[10px] font-black uppercase text-amber-600">Lock Rule</div>
+                              <div className="text-[9px] text-slate-400 font-medium tracking-tight">Restrict access</div>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-                        <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                            <Clock size={10} className="text-blue-500" />
-                            On Scheduled
-                          </label>
-                          <p className="text-[9px] text-slate-400 font-medium ml-1 mt-0.5">Where content moves when a date is selected.</p>
-                        </div>
-                        <select
-                          value={localStudioSettings.schedulingStatus}
-                          onChange={(e) => setLocalStudioSettings({ ...localStudioSettings, schedulingStatus: e.target.value })}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold shadow-sm outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/10 focus:border-blue-300 transition-all"
-                        >
-                          <option value="">Manual Only - No Auto-Move</option>
-                          {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
-                        </select>
-                      </div>
+                    <div className="space-y-3">
+                      {localAutomations.map((rule: any) => (
+                        <div key={rule.id} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-200 flex flex-col gap-3 group/rule">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {rule.type === 'access_rule' ? (
+                                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-600 tracking-wider">
+                                  <ShieldCheck size={12} />
+                                  Lock Rule
+                                </div>
+                              ) : rule.type === 'move_to' ? (
+                                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-blue-600 tracking-wider">
+                                  <RotateCcw size={12} />
+                                  Move Trigger
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-600 tracking-wider">
+                                  <Wand2 size={12} />
+                                  Event Trigger
+                                </div>
+                              )}
+                            </div>
+                            <button onClick={() => removeAutomation(rule.id)} className="p-1.5 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover/rule:opacity-100">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
 
-                      <div className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-                        <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                            <Send size={10} className="text-emerald-500" />
-                            On Posted
-                          </label>
-                          <p className="text-[9px] text-slate-400 font-medium ml-1 mt-0.5">Where content moves after social media delivery.</p>
+                          {rule.type === 'access_rule' ? (
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">Lock</span>
+                              <select
+                                value={rule.columnId}
+                                onChange={(e) => updateAutomation(rule.id, { columnId: e.target.value })}
+                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                              >
+                                {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                              </select>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0 text-[8px]">to</span>
+                              <select
+                                value={rule.roleName}
+                                onChange={(e) => updateAutomation(rule.id, { roleName: e.target.value })}
+                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                              >
+                                <option value="">Select Role</option>
+                                {activeCompany?.custom_roles?.map((r: any) => (
+                                  <option key={r.name} value={r.name}>{r.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : rule.type === 'move_to' ? (
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">In</span>
+                              <select
+                                value={rule.targetColumn}
+                                onChange={(e) => updateAutomation(rule.id, { targetColumn: e.target.value })}
+                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                              >
+                                {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                              </select>
+                              <ArrowRightIcon size={14} className="text-slate-300 shrink-0" />
+                              <select
+                                value={rule.action}
+                                onChange={(e) => updateAutomation(rule.id, { action: e.target.value })}
+                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                              >
+                                <option value="generate_caption">AI: Write Caption</option>
+                                <option value="generate_image">AI: Design Image</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <select
+                                value={rule.event}
+                                onChange={(e) => updateAutomation(rule.id, { event: e.target.value })}
+                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                              >
+                                <option value="caption_generated">AI Caption Generated</option>
+                                <option value="image_generated">AI Image Generated</option>
+                                <option value="comment_added">New Comment Added</option>
+                                <option value="revision_requested">Revision Requested</option>
+                                <option value="content_approved">Content Approved</option>
+                                <option value="content_scheduled">When a post is scheduled</option>
+                                <option value="content_posted">When a post is live</option>
+                                <option value="content_unscheduled">When a post is unscheduled</option>
+                              </select>
+                              <ArrowRightIcon size={14} className="text-slate-300 shrink-0" />
+                              <select
+                                value={rule.targetStatus}
+                                onChange={(e) => updateAutomation(rule.id, { targetStatus: e.target.value })}
+                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                              >
+                                {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                              </select>
+                            </div>
+                          )}
                         </div>
-                        <select
-                          value={localStudioSettings.postedStatus}
-                          onChange={(e) => setLocalStudioSettings({ ...localStudioSettings, postedStatus: e.target.value })}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold shadow-sm outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/10 focus:border-blue-300 transition-all"
-                        >
-                          <option value="">Manual Only - No Auto-Move</option>
-                          {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
-                        </select>
-                      </div>
+                      ))}
 
-                      <div className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-                        <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                            <RotateCcw size={10} className="text-amber-500" />
-                            On Unscheduled
-                          </label>
-                          <p className="text-[9px] text-slate-400 font-medium ml-1 mt-0.5">Where content moves when a date is removed.</p>
+                      {localAutomations.length === 0 && (
+                        <div className="py-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
+                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">No custom triggers active</p>
                         </div>
-                        <select
-                          value={localStudioSettings.unscheduledStatus}
-                          onChange={(e) => setLocalStudioSettings({ ...localStudioSettings, unscheduledStatus: e.target.value })}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold shadow-sm outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/10 focus:border-blue-300 transition-all"
-                        >
-                          <option value="">Manual Only - No Auto-Move</option>
-                          {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
-                        </select>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1026,7 +1119,8 @@ export function StudioPage({
                             body: JSON.stringify({
                               kanban_settings: {
                                 ...activeCompany.kanban_settings,
-                                studio_settings: localStudioSettings
+                                studio_settings: localStudioSettings,
+                                automations: localAutomations
                               }
                             })
                           });

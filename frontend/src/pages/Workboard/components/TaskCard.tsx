@@ -1,16 +1,18 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Loader2, Users, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, Loader2, Users, Clock, AlertCircle, Trash2 } from 'lucide-react';
 import type { Post } from '../types';
 
 interface TaskCardProps {
     post: Post;
     onClick?: (post: Post) => void;
+    onDelete?: (postId: string, e: React.MouseEvent) => void;
     isGenerating?: boolean;
+    statusColor?: string;
 }
 
-export function TaskCard({ post, onClick, isGenerating }: TaskCardProps) {
+export function TaskCard({ post, onClick, onDelete, isGenerating, statusColor }: TaskCardProps) {
     const {
         attributes,
         listeners,
@@ -48,12 +50,6 @@ export function TaskCard({ post, onClick, isGenerating }: TaskCardProps) {
 
     const deadlineStatus = getDeadlineStatus(post.content_deadline || post.design_deadline || post.postDate);
 
-    const accentColor =
-        post.status === 'Approved' ? 'border-l-emerald-500' :
-            post.status === 'Revision' ? 'border-l-rose-500' :
-                post.status === 'For Review' ? 'border-l-amber-500' :
-                    'border-l-indigo-500';
-
     const deadlineClasses =
         deadlineStatus === 'overdue' ? 'bg-rose-100/60 text-rose-700 border-rose-200 shadow-sm shadow-rose-100 ring-1 ring-rose-200/30' :
             deadlineStatus === 'high' ? 'bg-amber-100/60 text-amber-700 border-amber-200 shadow-sm shadow-amber-100 ring-1 ring-amber-200/30' :
@@ -63,10 +59,10 @@ export function TaskCard({ post, onClick, isGenerating }: TaskCardProps) {
     return (
         <div
             ref={setNodeRef}
-            style={style}
+            style={{ ...style, borderLeftColor: statusColor || '#6366f1' }}
             {...attributes}
             {...(isGenerating ? {} : listeners)}
-            className={`relative bg-white rounded-xl shadow-sm border border-slate-100 border-l-4 ${accentColor} hover:shadow-md hover:border-l-indigo-400 transition-all group overflow-hidden ${isGenerating ? 'cursor-wait' : 'cursor-pointer'}`}
+            className={`relative bg-white rounded-xl shadow-sm border border-slate-100 border-l-4 hover:shadow-md transition-all group overflow-hidden ${isGenerating ? 'cursor-wait' : 'cursor-pointer'}`}
             onClick={() => !isGenerating && onClick?.(post)}
         >
             {/* Generating overlay */}
@@ -76,6 +72,25 @@ export function TaskCard({ post, onClick, isGenerating }: TaskCardProps) {
                     <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Generating...</span>
                 </div>
             )}
+            {/* Delete Button - Absolute corner with high z-index */}
+            {onDelete && !isGenerating && (
+                <button
+                    onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onDelete(post.id, e);
+                    }}
+                    className="absolute top-2 right-2 z-[60] p-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-lg ring-1 ring-black/5"
+                    title="Delete Card"
+                >
+                    <Trash2 size={14} className="shrink-0" />
+                </button>
+            )}
+
             {/* Image thumbnail — shown when image exists */}
             {post.imageUrl && (
                 <div className="w-full h-32 overflow-hidden bg-slate-100">

@@ -1089,17 +1089,32 @@ function App() {
 
   function getStatusValue(status: any): string {
     if (status === null || status === undefined) return '';
-    if (typeof status === 'string') return status;
-    if (typeof status === 'object') {
-      if (typeof status.state === 'string') return status.state;
-      if (typeof status.value === 'string') return status.value;
-      if (typeof status.status === 'string') return status.status;
+    let s = '';
+    if (typeof status === 'string') {
+      s = status;
+    } else if (typeof status === 'object') {
+      s = status.state || status.value || status.status || '';
+    } else {
+      try {
+        s = String(status);
+      } catch {
+        return '';
+      }
     }
-    try {
-      return String(status);
-    } catch {
-      return '';
-    }
+
+    if (!s) return '';
+
+    // Try to find a match in company custom columns
+    const columns = (activeCompany as any)?.kanban_settings?.columns || [];
+    const match = columns.find((c: any) =>
+      c.id.toLowerCase() === s.toLowerCase() ||
+      c.title.toLowerCase() === s.toLowerCase()
+    );
+
+    if (match) return match.title;
+
+    // Fallback: Replace underscores and capitalize
+    return s.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
   }
 
   const getImageGeneratedUrl = (row: any | null): string | null => {
@@ -1370,13 +1385,13 @@ function App() {
       const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to load content calendar');
+        throw new Error(data.error || 'Failed to load content board');
       }
       setCalendarRows(data.contentCalendars || data);
       setIsBackendWaking(false);
     } catch (err: any) {
-      console.error('Error loading content calendar:', err);
-      setCalendarError(err.message || 'Failed to load content calendar');
+      console.error('Error loading content board:', err);
+      setCalendarError(err.message || 'Failed to load content board');
       setIsBackendWaking(true);
     } finally {
       setIsLoadingCalendar(false);
@@ -1394,7 +1409,7 @@ function App() {
     await Promise.all(promises);
   };
 
-  // Load existing content calendar entries for this company
+  // Load existing content board entries for this company
   useEffect(() => {
     loadCalendar();
   }, [activeCompanyId, session]);
@@ -1402,7 +1417,7 @@ function App() {
   // Track recently-moved card statuses so the poll doesn't overwrite them
   const recentStatusMoves = useRef<Map<string, { status: string; originalStatus?: any; ts: number }>>(new Map());
 
-  // Auto-refresh the content calendar table periodically
+  // Auto-refresh the content board table periodically
   useEffect(() => {
     if (!activeCompanyId || !session) return;
     let canceled = false;
@@ -1701,7 +1716,8 @@ function App() {
 
     const filtered = calendarRows.filter((row) => {
       const statusValue = getStatusValue(row.status).toLowerCase();
-      const isPublished = statusValue === 'published';
+      const rawId = typeof row.status === 'string' ? row.status.toLowerCase() : (row.status?.state?.toLowerCase() || "");
+      const isPublished = statusValue === 'published' || rawId === 'published';
 
       // Map dynamic status ID to title for consistent filtering
       const colMatch = kanbanCols.find((c: any) =>
@@ -2158,7 +2174,7 @@ function App() {
     if (selectedIds.length === 0) return;
     const proceed = await requestConfirm({
       title: 'Delete content items?',
-      description: `You're about to delete ${selectedIds.length} content items from your content calendar. This action is permanent and cannot be undone.`,
+      description: `You're about to delete ${selectedIds.length} content items from your content board. This action is permanent and cannot be undone.`,
       confirmLabel: `Delete ${selectedIds.length} items`,
       cancelLabel: 'Keep items',
       confirmVariant: 'danger',
@@ -3069,6 +3085,10 @@ function App() {
                       activeCompanyId={activeCompanyId}
                       dashboardStats={dashboardStats}
                       brandIntelligenceReady={brandIntelligenceReady}
+                      calendarRows={calendarRows}
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
                     />
                   }
                 />

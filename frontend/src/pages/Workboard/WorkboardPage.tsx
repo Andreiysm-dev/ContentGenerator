@@ -63,6 +63,14 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     // Per-card generation cooldown — card is locked while AI is processing
     const [generatingPostIds, setGeneratingPostIds] = useState<Set<string>>(new Set());
 
+    // Add-column popover state
+    const [showAddColumn, setShowAddColumn] = useState(false);
+    const [newColName, setNewColName] = useState('');
+    const [newColColor, setNewColColor] = useState('#6366f1');
+    const [isSavingCol, setIsSavingCol] = useState(false);
+
+    const PRESET_COLORS = ['#6366f1', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#64748b', '#1e293b'];
+
     // Fetch real data from backend
     const fetchPosts = async () => {
         if (!companyId) return;
@@ -73,13 +81,36 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
             if (!res.ok) throw new Error(data.error || 'Failed to fetch posts');
 
             const unwrapped = data.contentCalendars || data;
+
+            // Fetch kanban settings first to map status titles to IDs if needed
+            let currentColumns = SOKMED_COLUMNS;
+            const compRes = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`);
+            if (compRes.ok) {
+                const compData = await compRes.json();
+                if (compData.company?.kanban_settings?.columns?.length > 0) {
+                    currentColumns = compData.company.kanban_settings.columns;
+                    setColumns(currentColumns);
+                    if (compData.company.kanban_settings.automations) {
+                        setAutomations(compData.company.kanban_settings.automations);
+                    }
+                }
+            }
+
             const mappedPosts: Post[] = unwrapped.map((row: any) => {
-                const statusStr = getStatusValue(row.status);
+                const statusStr = getStatusValue(row.status).trim();
+                // Find matching column ID if DB status is a title
+                const match = currentColumns.find(c =>
+                    c.id === statusStr ||
+                    c.title === statusStr ||
+                    c.id.toLowerCase() === statusStr.toLowerCase() ||
+                    c.title.toLowerCase() === statusStr.toLowerCase()
+                );
+
                 return {
                     id: row.contentCalendarId,
                     theme: row.theme || row.topic || 'Untitled Post',
                     contentType: row.contentType || 'Social Post',
-                    status: statusStr,
+                    status: match ? match.id : statusStr,
                     postDate: row.scheduled_at ? new Date(row.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Draft',
                     brandName: row.brandName || '',
                     cardName: row.card_name,
@@ -93,17 +124,6 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
             });
 
             setPosts(mappedPosts);
-
-            // Also fetch kanban settings
-            const compRes = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`);
-            if (compRes.ok) {
-                const compData = await compRes.json();
-                if (compData.company?.kanban_settings) {
-                    const { columns: savedCols, automations: savedAutos } = compData.company.kanban_settings;
-                    if (savedCols?.length > 0) setColumns(savedCols);
-                    setAutomations(savedAutos || []);
-                }
-            }
         } catch (err: any) {
             notify(err.message || 'Error loading workboard', 'error');
         } finally {
@@ -306,20 +326,97 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
         handleStatusMove(activeId, targetColumnId);
     };
 
-    const handleAddColumn = () => {
-        const name = window.prompt('Enter column name:');
-        if (name) {
-            const newCol: KanbanColumn = {
-                id: name as SokMedStatus,
-                title: name,
-                description: 'Custom column'
-            };
-            setColumns([...columns, newCol]);
+    const handleAddColumn = async () => {
+        const name = newColName.trim();
+        if (!name || !companyId) return;
+
+        const newCol: KanbanColumn = {
+            id: `custom-${Date.now()}` as SokMedStatus,
+            title: name,
+            color: newColColor
+        };
+        const updatedColumns = [...columns, newCol];
+        setIsSavingCol(true);
+
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kanban_settings: { columns: updatedColumns, automations } }),
+            });
+            if (!res.ok) throw new Error('Failed to save');
+
+            setColumns(updatedColumns);
+            setNewColName('');
+            setNewColColor('#6366f1');
+            setShowAddColumn(false);
+            notify(`Column "${name}" added!`, 'success');
+        } catch (err) {
+            notify('Failed to save column', 'error');
+        } finally {
+            setIsSavingCol(false);
+        }
+    };
+
+    const handleColumnRename = async (columnId: string, newTitle: string) => {
+        if (!companyId) return;
+        const updatedColumns = columns.map(c =>
+            c.id === columnId ? { ...c, title: newTitle } : c
+        );
+        try {
+            await authedFetch(`${backendBaseUrl}/api/company/${companyId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kanban_settings: { columns: updatedColumns, automations } }),
+            });
+            setColumns(updatedColumns);
+            notify(`Column renamed to "${newTitle}"`, 'success');
+        } catch {
+            notify('Failed to rename column', 'error');
+        }
+    };
+
+    const handleColumnColorChange = async (columnId: string, newColor: string) => {
+        if (!companyId) return;
+        const updatedColumns = columns.map(c =>
+            c.id === columnId ? { ...c, color: newColor } : c
+        );
+        try {
+            await authedFetch(`${backendBaseUrl}/api/company/${companyId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kanban_settings: { columns: updatedColumns, automations } }),
+            });
+            setColumns(updatedColumns);
+            notify(`Column color updated!`, 'success');
+        } catch {
+            notify('Failed to update color', 'error');
+        }
+    };
+
+    const handleDeletePost = async (postId: string, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent card click
+        if (!window.confirm('Are you sure you want to delete this post?')) return;
+
+        // Optimistic UI update
+        const originalPosts = [...posts];
+        setPosts(prev => prev.filter(p => p.id !== postId));
+
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${postId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) throw new Error('Failed to delete post');
+            notify('Post deleted successfully', 'success');
+        } catch (err: any) {
+            setPosts(originalPosts);
+            notify(err.message || 'Error deleting post', 'error');
         }
     };
 
     const filteredPosts = posts.filter(p =>
         p.theme.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.cardName && p.cardName.toLowerCase().includes(searchQuery.toLowerCase())) ||
         p.contentType.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -355,14 +452,57 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                     </button>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 relative">
                     <button
-                        onClick={handleAddColumn}
-                        className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                        title="Manage Columns"
+                        onClick={() => setShowAddColumn(!showAddColumn)}
+                        className={`p-2.5 rounded-xl transition-all ${showAddColumn ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                        title="Add Column"
                     >
                         <Settings2 size={20} />
                     </button>
+
+                    {showAddColumn && (
+                        <div className="absolute right-0 top-full mt-4 z-50 w-72 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-6 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100">
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">New Column Context</h4>
+                            <input
+                                autoFocus
+                                type="text"
+                                placeholder="Status title..."
+                                value={newColName}
+                                onChange={e => setNewColName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleAddColumn()}
+                                className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 mb-5 transition-all"
+                            />
+
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Branding Colour</p>
+                            <div className="flex gap-2.5 flex-wrap mb-6">
+                                {PRESET_COLORS.map(c => (
+                                    <button
+                                        key={c}
+                                        onClick={() => setNewColColor(c)}
+                                        className={`w-6 h-6 rounded-full border-2 transition-all hover:scale-125 ${newColColor === c ? 'border-slate-800 scale-125 shadow-lg' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                                        style={{ backgroundColor: c }}
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleAddColumn}
+                                    disabled={!newColName.trim() || isSavingCol}
+                                    className="flex-1 py-3 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 disabled:opacity-40 shadow-lg shadow-indigo-100 transition-all active:scale-95 flex items-center justify-center min-h-[40px]"
+                                >
+                                    {isSavingCol ? <Loader2 size={14} className="animate-spin" /> : 'Create Status'}
+                                </button>
+                                <button
+                                    onClick={() => { setShowAddColumn(false); setNewColName(''); }}
+                                    className="px-4 py-3 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-all active:scale-95"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <button className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95">
                         <Plus size={18} />
@@ -393,13 +533,21 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                                     column={column}
                                     posts={filteredPosts.filter(p => p.status === column.id)}
                                     generatingPostIds={generatingPostIds}
+                                    onRename={handleColumnRename}
+                                    onColorChange={handleColumnColorChange}
+                                    onDeletePost={handleDeletePost}
                                 />
                             ))}
                         </div>
 
                         {createPortal(
                             <DragOverlay>
-                                {activePost && <TaskCard post={activePost} />}
+                                {activePost && (
+                                    <TaskCard
+                                        post={activePost}
+                                        statusColor={columns.find(c => c.id === activePost.status)?.color}
+                                    />
+                                )}
                             </DragOverlay>,
                             document.body
                         )}

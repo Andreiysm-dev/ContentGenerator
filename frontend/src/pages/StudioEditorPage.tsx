@@ -330,7 +330,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
     };
 
     const handleSave = async (newStatus: 'DRAFT' | 'REVIEWED' | 'READY' | 'SCHEDULED' | 'PUBLISHED' | 'For Approval' = 'DRAFT', isPublishing = false): Promise<string | null> => {
-        // 1. Save Content Calendar Draft first
+        // 1. Save Content Board Draft first
         // If create mode, this gets us the ID.
         const effectiveStatus = newStatus === 'SCHEDULED' ? 'SCHEDULED' : newStatus;
         const savedId = await saveContentCalendar(effectiveStatus, isPublishing || newStatus === 'SCHEDULED' || newStatus === 'PUBLISHED');

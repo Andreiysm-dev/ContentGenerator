@@ -26,6 +26,8 @@ interface KanbanViewProps {
     onCardClick?: (post: Post) => void;
     columns?: KanbanColumn[];
     onColumnRename?: (columnId: string, newTitle: string) => void;
+    onColumnColorChange?: (columnId: string, newColor: string) => void;
+    onCardDelete?: (postId: string, e: React.MouseEvent) => void;
     automations?: any[];
     userPermissions?: any;
 }
@@ -38,6 +40,8 @@ export function KanbanView({
     onCardClick,
     columns: initialColumns = SOKMED_COLUMNS,
     onColumnRename,
+    onColumnColorChange,
+    onCardDelete,
     automations = [],
     userPermissions = {}
 }: KanbanViewProps) {
@@ -193,6 +197,8 @@ export function KanbanView({
                                 posts={posts.filter(p => p.status === column.id)}
                                 onCardClick={onCardClick}
                                 onRename={onColumnRename}
+                                onColorChange={onColumnColorChange}
+                                onCardDelete={onCardDelete}
                                 isLocked={automations?.some(a => a.type === 'access_rule' && a.columnId === column.id)}
                             />
                         ))}
@@ -201,7 +207,12 @@ export function KanbanView({
 
                 {createPortal(
                     <DragOverlay>
-                        {activePost && <TaskCard post={activePost} />}
+                        {activePost && (
+                            <TaskCard
+                                post={activePost}
+                                statusColor={columns.find(c => c.id === activePost.status || c.title === activePost.status)?.color}
+                            />
+                        )}
                         {activeColumn && (
                             <div className="w-80 bg-slate-100 rounded-2xl p-4 opacity-80 border-2 border-slate-300 shadow-2xl">
                                 <div className="font-bold text-slate-700">{activeColumn.title}</div>

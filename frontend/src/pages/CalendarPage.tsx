@@ -272,6 +272,28 @@ export function CalendarPage(props: CalendarPageProps) {
     }
   };
 
+  const handleColumnColorChange = async (columnId: string, newColor: string) => {
+    if (!activeCompanyId) return;
+    const updatedColumns = kanbanColumns.map(c =>
+      c.id === columnId ? { ...c, color: newColor } : c
+    );
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kanban_settings: { columns: updatedColumns, automations } }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update color');
+      }
+      setKanbanColumns(updatedColumns);
+      notify(`Column color updated!`, 'success');
+    } catch (err: any) {
+      notify(`Failed to update color: ${err.message}`, 'error');
+    }
+  };
+
   const executeStatusChange = async (postId: string, status: string, skipAutomation = false) => {
     const row = calendarRows.find(r => r.contentCalendarId === postId);
     onStatusMoved?.(postId, status, row?.status);
@@ -374,7 +396,7 @@ export function CalendarPage(props: CalendarPageProps) {
         <header className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 flex-shrink-0">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">Workflow Planner</div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Content Calendar</h2>
+            <h2 className="text-2xl font-black text-white tracking-tight">Content Board</h2>
           </div>
           <div className="flex items-center gap-3">
             {userPermissions.canCreate && (
@@ -396,8 +418,14 @@ export function CalendarPage(props: CalendarPageProps) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 bg-white overflow-x-auto no-scrollbar">
             <div className="flex items-center min-w-fit">
               <div className="flex border-r border-slate-100">
-                <TabButton active={viewMode === 'drafts'} onClick={() => navigate(`/company/${companyId}/calendar`)} icon={Layout} label="Pipeline" count={calendarRows.filter(r => getStatusValue(r.status).toLowerCase() !== 'published').length} />
-                <TabButton active={viewMode === 'published'} onClick={() => navigate(`/company/${companyId}/calendar/published`)} icon={CheckCircle2} label="Archives" count={calendarRows.filter(r => getStatusValue(r.status).toLowerCase() === 'published').length} />
+                <TabButton active={viewMode === 'drafts'} onClick={() => navigate(`/company/${companyId}/calendar`)} icon={Layout} label="Pipeline" count={calendarRows.filter(r => {
+                  const s = typeof r.status === 'string' ? r.status.toLowerCase() : (r.status?.state?.toLowerCase() || r.status?.value?.toLowerCase() || "");
+                  return s !== 'published' && getStatusValue(r.status).toLowerCase() !== 'published';
+                }).length} />
+                <TabButton active={viewMode === 'published'} onClick={() => navigate(`/company/${companyId}/calendar/published`)} icon={CheckCircle2} label="Archives" count={calendarRows.filter(r => {
+                  const s = typeof r.status === 'string' ? r.status.toLowerCase() : (r.status?.state?.toLowerCase() || r.status?.value?.toLowerCase() || "");
+                  return s === 'published' || getStatusValue(r.status).toLowerCase() === 'published';
+                }).length} />
               </div>
 
               <div className="px-4 py-3 min-w-[200px] md:min-w-[320px]">
@@ -567,6 +595,20 @@ export function CalendarPage(props: CalendarPageProps) {
                 }))}
                 automations={automations}
                 userPermissions={userPermissions}
+                onCardDelete={async (postId, e) => {
+                  e.stopPropagation();
+                  if (!window.confirm('Delete this post?')) return;
+                  try {
+                    const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${postId}`, {
+                      method: 'DELETE'
+                    });
+                    if (!res.ok) throw new Error('Delete failed');
+                    setCalendarRows(prev => prev.filter(r => r.contentCalendarId !== postId));
+                    notify('Post deleted', 'success');
+                  } catch (err: any) {
+                    notify(err.message, 'error');
+                  }
+                }}
                 onStatusChange={async (postId, status) => {
                   const matchingRules = automations.filter(rule => rule.type === 'move_to' && rule.targetColumn === status);
                   const lockRule = automations.find(rule => rule.type === 'access_rule' && rule.columnId === status);
@@ -593,6 +635,7 @@ export function CalendarPage(props: CalendarPageProps) {
                   if (row) { setSelectedRow(row); setIsViewModalOpen(true); }
                 }}
                 onColumnRename={handleColumnRename}
+                onColumnColorChange={handleColumnColorChange}
                 onColumnReorder={async (newCols) => {
                   if (!activeCompanyId) return;
                   setKanbanColumns(newCols);

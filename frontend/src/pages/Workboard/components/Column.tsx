@@ -13,11 +13,15 @@ interface ColumnProps {
     onCardClick?: (post: Post) => void;
     generatingPostIds?: Set<string>;
     onRename?: (columnId: string, newTitle: string) => void;
+    onColorChange?: (columnId: string, newColor: string) => void;
+    onDeletePost?: (postId: string, e: React.MouseEvent) => void;
+    onCardDelete?: (postId: string, e: React.MouseEvent) => void;
     isLocked?: boolean;
 }
 
-export function Column({ column, posts, onCardClick, generatingPostIds, onRename, isLocked }: ColumnProps) {
+export function Column({ column, posts, onCardClick, generatingPostIds, onRename, onColorChange, onDeletePost, onCardDelete, isLocked }: ColumnProps) {
     const [isEditing, setIsEditing] = React.useState(false);
+    const [isEditingColor, setIsEditingColor] = React.useState(false);
     const [title, setTitle] = React.useState(column.title);
 
     // Make the column itself sortable (for column reordering)
@@ -62,10 +66,28 @@ export function Column({ column, posts, onCardClick, generatingPostIds, onRename
                     >
                         <GripVertical size={14} className="text-slate-300 group-hover/header:text-slate-400" />
                     </div>
-                    <div
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: column.color || '#94a3b8' }}
-                    />
+                    <div className="relative group/color">
+                        <button
+                            onClick={() => setIsEditingColor(!isEditingColor)}
+                            className="w-2 h-2 rounded-full shrink-0 transition-transform hover:scale-150"
+                            style={{ backgroundColor: column.color || '#94a3b8' }}
+                        />
+                        {isEditingColor && (
+                            <div className="absolute left-0 top-full mt-2 z-50 p-2 bg-white border border-slate-200 shadow-xl rounded-xl flex gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+                                {['#6366f1', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#64748b', '#1e293b'].map(c => (
+                                    <button
+                                        key={c}
+                                        onClick={() => {
+                                            onColorChange?.(column.id, c);
+                                            setIsEditingColor(false);
+                                        }}
+                                        className={`w-3 h-3 rounded-full border ${column.color === c ? 'border-slate-900 border-2' : 'border-transparent'}`}
+                                        style={{ backgroundColor: c }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
                     {isEditing ? (
                         <input
                             autoFocus
@@ -112,7 +134,14 @@ export function Column({ column, posts, onCardClick, generatingPostIds, onRename
                 <SortableContext items={posts.map(p => p.id)} strategy={verticalListSortingStrategy}>
                     <div className="flex flex-col gap-3">
                         {posts.map((post) => (
-                            <TaskCard key={post.id} post={post} onClick={onCardClick} isGenerating={generatingPostIds?.has(post.id)} />
+                            <TaskCard
+                                key={post.id}
+                                post={post}
+                                onClick={onCardClick}
+                                onDelete={onDeletePost || onCardDelete}
+                                isGenerating={generatingPostIds?.has(post.id)}
+                                statusColor={column.color}
+                            />
                         ))}
                         {posts.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-40 text-center px-4">

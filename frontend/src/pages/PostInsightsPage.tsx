@@ -30,7 +30,10 @@ export function PostInsightsPage({ calendarRows, getStatusValue, activeCompanyId
     };
 
     // Filter for published posts only
-    const publishedPosts = calendarRows.filter(row => getStatusValue(row.status).toLowerCase() === 'published');
+    const publishedPosts = calendarRows.filter(row => {
+        const s = typeof row.status === 'string' ? row.status.toLowerCase() : (row.status?.state?.toLowerCase() || row.status?.value?.toLowerCase() || "");
+        return s === 'published' || getStatusValue(row.status).toLowerCase() === 'published';
+    });
 
     const filteredPosts = publishedPosts.filter(post =>
         (post.finalCaption || post.captionOutput || "").toLowerCase().includes(search.toLowerCase()) ||

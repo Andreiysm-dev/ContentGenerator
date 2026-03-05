@@ -90,6 +90,8 @@ export function ViewContentModal({
     const [tagPool, setTagPool] = useState<Tag[]>([]);
     const [isAddingTag, setIsAddingTag] = useState(false);
     const [newTagName, setNewTagName] = useState('');
+    const [selectedTagColor, setSelectedTagColor] = useState('#3b82f6');
+    const [isCreatingTag, setIsCreatingTag] = useState(false);
     const [isUpdatingTags, setIsUpdatingTags] = useState(false);
     const [isAddingCollaborator, setIsAddingCollaborator] = useState(false);
     const [isUpdatingCollaborators, setIsUpdatingCollaborators] = useState(false);
@@ -240,6 +242,9 @@ export function ViewContentModal({
             nextTags = [...currentTags, tag];
         }
 
+        // Optimistic UI update
+        selectedRow.tags = nextTags;
+
         try {
             const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
                 method: 'PUT',
@@ -251,6 +256,7 @@ export function ViewContentModal({
                 await refreshCalendarRow(selectedRow.contentCalendarId);
             } else {
                 notify('Failed to update tags', 'error');
+                // Revert on failure (refresh handles this usually)
             }
         } catch (err) {
             console.error('Tag update error:', err);
@@ -298,19 +304,19 @@ export function ViewContentModal({
 
     const handleCreateTag = async () => {
         const name = newTagName.trim();
-        if (!name || !activeCompanyId) return;
+        if (!name || !activeCompanyId || isCreatingTag) return;
 
-        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        const newTag: Tag = { id: `tag-${Date.now()}`, name, color: randomColor };
+        setIsCreatingTag(true);
+        const newTag: Tag = { id: `tag-${Date.now()}`, name, color: selectedTagColor };
 
+        // Optimistic UI update for the tag pool
         const nextPool = [...tagPool, newTag];
+        setTagPool(nextPool);
 
         try {
-            // Fetch current company settings first to ensure we don't overwrite other fields
-            const cRes = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`);
-            const cData = await cRes.json();
-            const currentSettings = cData.company?.kanban_settings || {};
+            // We use the existing kanban_settings from activeCompany props if possible, 
+            // or we just send the updated tags. The backend should handle partial updates or we send what we have.
+            const currentSettings = activeCompany?.kanban_settings || {};
 
             const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`, {
                 method: 'PUT',
@@ -324,16 +330,22 @@ export function ViewContentModal({
             });
 
             if (res.ok) {
-                setTagPool(nextPool);
                 setNewTagName('');
                 setIsAddingTag(false);
                 notify(`Tag "${name}" created!`, 'success');
                 // Automatically assign it to the current card
                 handleToggleTag(newTag);
+            } else {
+                // Rollback if failed
+                setTagPool(tagPool);
+                notify('Failed to create tag', 'error');
             }
         } catch (err) {
             console.error('Create tag error:', err);
+            setTagPool(tagPool); // Rollback
             notify('Failed to create tag', 'error');
+        } finally {
+            setIsCreatingTag(false);
         }
     };
     const fetchAnalytics = async () => {
@@ -488,7 +500,7 @@ export function ViewContentModal({
                                                 : undefined;
                                             return (
                                                 <div
-                                                    className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm"
+                                                    className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-widest border shadow-sm"
                                                     style={badgeStyle}
                                                 >
                                                     {match.title}
@@ -497,7 +509,7 @@ export function ViewContentModal({
                                         }
 
                                         return (
-                                            <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm ${statusBadgeClasses(statusKey(rawStatus))
+                                            <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-widest border shadow-sm ${statusBadgeClasses(statusKey(rawStatus))
                                                 }`}>
                                                 {rawStatus}
                                             </div>
@@ -840,18 +852,18 @@ export function ViewContentModal({
                                                                 <span className="text-slate-500">Status updated</span>
                                                                 {log.metadata?.oldStatus && log.metadata?.newStatus && (
                                                                     <div className="flex items-center gap-1.5 py-0.5">
-                                                                        <span className="text-[9px] font-black uppercase bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded leading-none line-through opacity-70">
+                                                                        <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded leading-none line-through opacity-70">
                                                                             {getStatusValue(log.metadata.oldStatus)}
                                                                         </span>
                                                                         <ArrowRight size={10} className="text-slate-300" />
-                                                                        <span className="text-[9px] font-black uppercase bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded leading-none">
+                                                                        <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded leading-none">
                                                                             {getStatusValue(log.metadata.newStatus)}
                                                                         </span>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         ) : (
-                                                            log.action?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                                                            getStatusValue(log.action)
                                                         )}
                                                     </div>
                                                     <div className="text-[10px] text-slate-400 font-medium flex items-center gap-2">
@@ -910,10 +922,23 @@ export function ViewContentModal({
                                             />
                                             <button
                                                 onClick={handleCreateTag}
-                                                className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                                disabled={isCreatingTag || !newTagName.trim()}
+                                                className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 min-w-[32px] flex items-center justify-center"
                                             >
-                                                <Check size={14} />
+                                                {isCreatingTag ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                                             </button>
+                                        </div>
+
+                                        <div className="flex gap-1.5 flex-wrap mb-4 px-1">
+                                            {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#64748b', '#000000'].map(color => (
+                                                <button
+                                                    key={color}
+                                                    onClick={() => setSelectedTagColor(color)}
+                                                    className={`w-5 h-5 rounded-full border-2 transition-transform hover:scale-110 ${selectedTagColor === color ? 'border-slate-800 scale-110' : 'border-transparent'}`}
+                                                    style={{ backgroundColor: color }}
+                                                    title={color}
+                                                />
+                                            ))}
                                         </div>
 
                                         {tagPool.some(t => !selectedRow.tags?.some((st: any) => st.id === t.id)) && (
@@ -940,18 +965,24 @@ export function ViewContentModal({
                                     {selectedRow.tags?.map((tag: any) => (
                                         <div
                                             key={tag.id}
-                                            className="group flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border shadow-sm animate-in zoom-in-95 duration-200"
+                                            className="group flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border shadow-sm animate-in zoom-in-95 duration-200 relative overflow-hidden"
                                             style={{
                                                 color: tag.color,
                                                 borderColor: `${tag.color}40`,
                                                 backgroundColor: `${tag.color}15`
                                             }}
                                         >
+                                            {isUpdatingTags && (
+                                                <div className="absolute inset-0 bg-white/40 flex items-center justify-center">
+                                                    <Loader2 size={10} className="animate-spin" />
+                                                </div>
+                                            )}
                                             <Hash size={10} className="opacity-50" />
                                             {tag.name}
                                             <button
                                                 onClick={() => handleToggleTag(tag)}
-                                                className="ml-0.5 p-0.5 hover:bg-black/5 rounded-md transition-colors"
+                                                disabled={isUpdatingTags}
+                                                className="ml-0.5 p-0.5 hover:bg-black/5 rounded-md transition-colors disabled:opacity-30"
                                             >
                                                 <XIcon size={10} />
                                             </button>

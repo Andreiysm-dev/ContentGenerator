@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Plus, Trash2, ArrowRight, Save, Wand2, ImageIcon, CheckCircle2, RotateCcw, GripVertical, ShieldCheck } from 'lucide-react';
+import { Layout, Plus, Trash2, ArrowRight, Save, Wand2, ImageIcon, CheckCircle2, RotateCcw, GripVertical, ShieldCheck, Pencil, Calendar } from 'lucide-react';
 import { Card, SectionTitle, Input, Select } from '../SettingsPage';
 
 export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, notify, customRoles, userPermissions }: any) => {
@@ -31,35 +31,50 @@ export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, no
 
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+
+    const [isAddingStatus, setIsAddingStatus] = useState(false);
+    const [newStatusTitle, setNewStatusTitle] = useState('');
+    const [newStatusColor, setNewStatusColor] = useState('#6366f1');
+
+    const PRESET_COLORS = ['#6366f1', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#64748b', '#1e293b'];
+
+    const fetchSettings = async () => {
+        if (!companyId) return;
+        setIsLoading(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.company?.kanban_settings) {
+                    const { columns: savedCols, automations: savedAutos, studio_settings: savedStudio } = data.company.kanban_settings;
+                    if (savedCols && savedCols.length > 0) setColumns(savedCols);
+                    if (savedAutos) setAutomations(savedAutos);
+                    if (savedStudio) setStudioSettings(savedStudio);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to fetch kanban settings', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchSettings = async () => {
-            if (!companyId) return;
-            setIsLoading(true);
-            try {
-                const res = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.company?.kanban_settings) {
-                        const { columns: savedCols, automations: savedAutos, studio_settings: savedStudio } = data.company.kanban_settings;
-                        if (savedCols && savedCols.length > 0) setColumns(savedCols);
-                        if (savedAutos) setAutomations(savedAutos);
-                        if (savedStudio) setStudioSettings(savedStudio);
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to fetch kanban settings', err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchSettings();
     }, [companyId]);
 
+    const handleCancel = () => {
+        setIsEditing(false);
+        fetchSettings(); // Revert by re-fetching
+    };
+
     const addColumn = () => {
+        if (!newStatusTitle.trim()) return;
         const newId = `custom-${Date.now()}`;
-        setColumns([...columns, { id: newId, title: 'New Category', color: '#cbd5e1' }]);
+        setColumns([...columns, { id: newId, title: newStatusTitle.trim(), color: newStatusColor }]);
+        setNewStatusTitle('');
+        setIsAddingStatus(false);
     };
 
     const removeColumn = (id: string) => {
@@ -70,6 +85,8 @@ export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, no
     const updateColumn = (id: string, updates: any) => {
         setColumns(columns.map(c => c.id === id ? { ...c, ...updates } : c));
     };
+
+    const [editingColorId, setEditingColorId] = useState<string | null>(null);
 
     const addEventAutomation = () => {
         setAutomations([...automations as any[], { id: Date.now().toString(), type: 'event', event: 'caption_generated', targetStatus: columns[0].id }]);
@@ -107,6 +124,7 @@ export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, no
 
             if (res.ok) {
                 notify('Workflow settings saved successfully!', 'success');
+                setIsEditing(false);
             } else {
                 throw new Error('Save failed');
             }
@@ -127,381 +145,412 @@ export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, no
     }
 
     return (
-        <div className={`space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 ${!userPermissions?.canEditSettings ? 'opacity-70 pointer-events-none' : ''}`}>
-            <div className="flex items-center justify-between">
+        <div className={`space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm">
                 <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight">Workflow & Statuses</h3>
-                    {!userPermissions?.canEditSettings && <div className="text-[10px] font-bold text-amber-600 uppercase mb-1">View Only Mode</div>}
-                    <p className="text-sm text-slate-500 font-medium">Define the lifecycle of your content and how it moves between stages.</p>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                        <Layout className="w-5 h-5 text-blue-500" />
+                        Workflow & Statuses
+                    </h3>
+                    <p className="text-sm text-slate-500 font-medium">Define the lifecycle of your content and automate movement between stages.</p>
                 </div>
-                <button
-                    onClick={handleSave}
-                    disabled={isSaving || !userPermissions?.canEditSettings}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 disabled:opacity-50"
-                >
-                    {isSaving ? <RotateCcw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    Save Workflow
-                </button>
+                <div className="flex items-center gap-2">
+                    {isEditing ? (
+                        <>
+                            <button
+                                onClick={handleCancel}
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={isSaving}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
+                            >
+                                {isSaving ? <RotateCcw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                Save Changes
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            disabled={!userPermissions?.canEditSettings}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 disabled:opacity-50 font-bold"
+                        >
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit Workflow
+                        </button>
+                    )}
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
                 {/* Column Management */}
-                <div className="space-y-4">
-                    <SectionTitle>Content Statuses</SectionTitle>
-                    <Card className="bg-white border-slate-200 shadow-sm overflow-visible">
-                        <div className="space-y-3">
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2 px-1">Configure columns for the board and universal lifecycle states.</p>
-                            {columns.map((col, index) => (
-                                <div key={col.id} className="flex items-center gap-3 p-3 bg-slate-50/50 rounded-2xl border border-slate-100 group">
-                                    <div className="cursor-grab text-slate-300 group-hover:text-slate-400 transition-colors">
-                                        <GripVertical size={18} />
-                                    </div>
-                                    <div
-                                        className="w-4 h-4 rounded-full border shadow-sm shrink-0"
-                                        style={{ backgroundColor: col.color }}
-                                    />
-                                    <div className="flex-1">
-                                        <input
-                                            value={col.title}
-                                            onChange={(e) => updateColumn(col.id, { title: e.target.value })}
-                                            placeholder="Column Title"
-                                            className="w-full bg-transparent border-none text-sm font-bold text-slate-800 focus:ring-0 p-0"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={() => removeColumn(col.id)}
-                                        className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            ))}
-                            <button
-                                onClick={addColumn}
-                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all flex items-center justify-center gap-2 text-xs font-bold"
-                            >
-                                <Plus size={14} /> Add Column
-                            </button>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Studio Layout & System Mapping */}
-                <div className="space-y-4">
-                    <SectionTitle>Studio Tabs (Dashboard)</SectionTitle>
-                    <Card className="bg-white border-slate-200 shadow-sm overflow-visible">
-                        <div className="space-y-4">
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2 px-1">Configure which statuses are grouped into each Studio tab.</p>
-
-                            {studioSettings.studioTabs.map((tab: any, tIdx: number) => (
-                                <div key={tab.id} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex flex-col gap-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Input
-                                                value={tab.label}
-                                                onChange={(e) => {
-                                                    const newTabs = [...studioSettings.studioTabs];
-                                                    newTabs[tIdx].label = e.target.value;
-                                                    setStudioSettings({ ...studioSettings, studioTabs: newTabs });
-                                                }}
-                                                className="h-8 font-black uppercase text-[10px] w-40"
+                <div className="space-y-6">
+                    <div>
+                        <SectionTitle>Content Statuses</SectionTitle>
+                        <Card className="mt-4 bg-white border-slate-200 shadow-sm overflow-visible p-6">
+                            <div className="space-y-3">
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-4 px-1">Configure columns for the board and universal lifecycle states.</p>
+                                {columns.map((col, index) => (
+                                    <div key={col.id} className="flex items-center gap-3 p-3 bg-slate-50/50 rounded-2xl border border-slate-100 group transition-all hover:border-blue-200">
+                                        {isEditing && (
+                                            <div className="cursor-grab text-slate-300 group-hover:text-slate-400 transition-colors">
+                                                <GripVertical size={18} />
+                                            </div>
+                                        )}
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => isEditing && setEditingColorId(editingColorId === col.id ? null : col.id)}
+                                                disabled={!isEditing}
+                                                className={`w-4 h-4 rounded-full border shadow-sm shrink-0 transition-transform ${isEditing ? 'hover:scale-110 cursor-pointer' : 'cursor-default'}`}
+                                                style={{ backgroundColor: col.color }}
                                             />
-                                            <div className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] text-slate-400 font-bold uppercase">
-                                                ID: {tab.id}
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                const newTabs = studioSettings.studioTabs.filter((_: any, i: number) => i !== tIdx);
-                                                setStudioSettings({ ...studioSettings, studioTabs: newTabs });
-                                            }}
-                                            className="p-1.5 text-slate-400 hover:text-rose-500"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-
-                                    <div className="flex flex-wrap gap-2">
-                                        {columns.map(col => {
-                                            const isSelected = tab.statuses.includes(col.id);
-                                            return (
-                                                <button
-                                                    key={col.id}
-                                                    onClick={() => {
-                                                        const newTabs = [...studioSettings.studioTabs];
-                                                        if (isSelected) {
-                                                            newTabs[tIdx].statuses = tab.statuses.filter((s: string) => s !== col.id);
-                                                        } else {
-                                                            newTabs[tIdx].statuses = [...tab.statuses, col.id];
-                                                        }
-                                                        setStudioSettings({ ...studioSettings, studioTabs: newTabs });
-                                                    }}
-                                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${isSelected
-                                                        ? 'bg-slate-900 border-slate-900 text-white shadow-md'
-                                                        : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
-                                                        }`}
-                                                >
-                                                    {col.title}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-
-                            <button
-                                onClick={() => {
-                                    setStudioSettings({
-                                        ...studioSettings,
-                                        studioTabs: [
-                                            ...studioSettings.studioTabs,
-                                            { id: `tab-${Date.now()}`, label: 'New Tab', icon: 'Edit', statuses: [] }
-                                        ]
-                                    });
-                                }}
-                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all flex items-center justify-center gap-2 text-xs font-bold"
-                            >
-                                <Plus size={14} /> Add Studio Tab
-                            </button>
-                        </div>
-                    </Card>
-
-                    <SectionTitle>System Status Mappings</SectionTitle>
-                    <Card className="bg-white border-slate-200 shadow-sm overflow-visible">
-                        <div className="space-y-6">
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest px-1">Define how statuses change automatically based on system events.</p>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Target status when scheduled (date set)</label>
-                                    <Select
-                                        value={studioSettings.schedulingStatus || ''}
-                                        onChange={(e: any) => setStudioSettings({ ...studioSettings, schedulingStatus: e.target.value })}
-                                        className="h-10"
-                                    >
-                                        <option value="">Manual Only (No change)</option>
-                                        {columns.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Target status when posted to social media</label>
-                                    <Select
-                                        value={studioSettings.postedStatus || ''}
-                                        onChange={(e: any) => setStudioSettings({ ...studioSettings, postedStatus: e.target.value })}
-                                        className="h-10"
-                                    >
-                                        <option value="">Manual Only (No change)</option>
-                                        {columns.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">Target status when Unscheduled (Undo Schedule)</label>
-                                    <Select
-                                        value={studioSettings.unscheduledStatus || ''}
-                                        onChange={(e: any) => setStudioSettings({ ...studioSettings, unscheduledStatus: e.target.value })}
-                                        className="h-10"
-                                    >
-                                        <option value="">Manual Only (No change)</option>
-                                        {columns.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                                    </Select>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Triggers */}
-                <div className="space-y-4">
-                    <SectionTitle>Triggers</SectionTitle>
-                    <Card className="bg-white border-slate-200 shadow-sm">
-                        <div className="space-y-4">
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest px-1">Configure automated actions and approval workflows.</p>
-
-                            {(automations as any[]).map((rule: any) => {
-                                if (rule.type === 'move_to') {
-                                    // Move-to trigger: drag card to column → trigger action
-                                    return (
-                                        <div key={rule.id} className="p-4 bg-indigo-50/40 rounded-2xl border border-indigo-100 flex flex-col gap-3 relative">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-500 tracking-wider">
-                                                    <Wand2 size={12} />
-                                                    Move Card Trigger
+                                            {isEditing && editingColorId === col.id && (
+                                                <div className="absolute left-0 top-full mt-2 z-50 p-2 bg-white border border-slate-200 shadow-xl rounded-xl flex gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+                                                    {PRESET_COLORS.map(c => (
+                                                        <button
+                                                            key={c}
+                                                            onClick={() => {
+                                                                updateColumn(col.id, { color: c });
+                                                                setEditingColorId(null);
+                                                            }}
+                                                            className={`w-4 h-4 rounded-full border ${col.color === c ? 'border-slate-900 border-2' : 'border-transparent'}`}
+                                                            style={{ backgroundColor: c }}
+                                                        />
+                                                    ))}
                                                 </div>
-                                                <button onClick={() => removeAutomation(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
-                                                <span className="shrink-0">When moved to</span>
-                                                <Select
-                                                    value={rule.targetColumn}
-                                                    onChange={(e: any) => updateAutomation(rule.id, { targetColumn: e.target.value })}
-                                                    className="flex-1 h-9"
-                                                >
-                                                    {columns.map((c: any) => (
-                                                        <option key={c.id} value={c.id}>{c.title}</option>
-                                                    ))}
-                                                </Select>
-                                                <ArrowRight size={14} className="text-slate-300 shrink-0" />
-                                                <Select
-                                                    value={rule.action}
-                                                    onChange={(e: any) => updateAutomation(rule.id, { action: e.target.value })}
-                                                    className="flex-1 h-9"
-                                                >
-                                                    <option value="generate_caption">Generate Caption</option>
-                                                    <option value="generate_image">Generate Image</option>
-                                                </Select>
-                                            </div>
+                                            )}
                                         </div>
-                                    );
-                                }
-                                if (rule.type === 'access_rule') {
-                                    return (
-                                        <div key={rule.id} className="p-4 bg-amber-50/40 rounded-2xl border border-amber-100 flex flex-col gap-3 relative">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-600 tracking-wider">
-                                                    <ShieldCheck size={12} />
-                                                    Approval / Locking Rule
-                                                </div>
-                                                <button onClick={() => removeAutomation(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                            <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
-                                                <span className="shrink-0">Lock Column</span>
-                                                <Select
-                                                    value={rule.columnId}
-                                                    onChange={(e: any) => updateAutomation(rule.id, { columnId: e.target.value })}
-                                                    className="flex-1 h-9"
-                                                >
-                                                    {columns.map((c: any) => (
-                                                        <option key={c.id} value={c.id}>{c.title}</option>
-                                                    ))}
-                                                </Select>
-                                                <span className="shrink-0">to Role</span>
-                                                <Select
-                                                    value={rule.roleName}
-                                                    onChange={(e: any) => updateAutomation(rule.id, { roleName: e.target.value })}
-                                                    className="flex-1 h-9"
-                                                >
-                                                    <option value="">Select Role</option>
-                                                    {customRoles?.map((r: any) => (
-                                                        <option key={r.name} value={r.name}>{r.name}</option>
-                                                    ))}
-                                                </Select>
-                                            </div>
-                                            <p className="text-[10px] text-amber-700/70 font-medium italic">
-                                                * Only users with this role and the Owner can move or edit cards in this column.
-                                            </p>
+                                        <div className="flex-1">
+                                            <input
+                                                value={col.title}
+                                                disabled={!isEditing}
+                                                onChange={(e) => updateColumn(col.id, { title: e.target.value })}
+                                                placeholder="Column Title"
+                                                className={`w-full bg-transparent border-none text-sm font-bold text-slate-800 focus:ring-0 p-0 ${!isEditing ? 'cursor-default' : ''}`}
+                                            />
                                         </div>
-                                    );
-                                }
-                                // Default: event → status rule
-                                return (
-                                    <div key={rule.id} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex flex-col gap-3 relative">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                                                <Wand2 size={12} className="text-blue-500" />
-                                                Event Trigger
-                                            </div>
-                                            <button onClick={() => removeAutomation(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
+                                        {isEditing && (
+                                            <button
+                                                onClick={() => removeColumn(col.id)}
+                                                className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                                            >
                                                 <Trash2 size={14} />
                                             </button>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <Select
-                                                value={rule.event}
-                                                onChange={(e: any) => updateAutomation(rule.id, { event: e.target.value })}
-                                                className="flex-1 h-10"
-                                            >
-                                                <option value="caption_generated">AI Caption Generated</option>
-                                                <option value="image_generated">AI Image Generated</option>
-                                                <option value="comment_added">New Comment Added</option>
-                                                <option value="revision_requested">Revision Requested</option>
-                                                <option value="content_approved">Content Approved</option>
-                                            </Select>
-                                            <ArrowRight size={16} className="text-slate-300 shrink-0" />
-                                            <Select
-                                                value={rule.targetStatus}
-                                                onChange={(e: any) => updateAutomation(rule.id, { targetStatus: e.target.value })}
-                                                className="flex-1 h-10"
-                                            >
-                                                {columns.map((c: any) => (
-                                                    <option key={c.id} value={c.id}>{c.title}</option>
-                                                ))}
-                                            </Select>
-                                        </div>
+                                        )}
                                     </div>
-                                );
-                            })}
+                                ))}
+                                {isEditing && (
+                                    isAddingStatus ? (
+                                        <div className="p-4 bg-slate-50 rounded-2xl border border-blue-100 animate-in zoom-in-95 duration-200 mt-4">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">New Status Details</p>
+                                            <div className="flex gap-2 mb-4">
+                                                <input
+                                                    autoFocus
+                                                    value={newStatusTitle}
+                                                    onChange={e => setNewStatusTitle(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && addColumn()}
+                                                    placeholder="Status title..."
+                                                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                />
+                                                <button
+                                                    onClick={addColumn}
+                                                    disabled={!newStatusTitle.trim()}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase transition-all hover:bg-blue-700 disabled:opacity-40"
+                                                >
+                                                    Add
+                                                </button>
+                                            </div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Colour</p>
+                                            <div className="flex gap-2 flex-wrap mb-4">
+                                                {PRESET_COLORS.map(c => (
+                                                    <button
+                                                        key={c}
+                                                        onClick={() => setNewStatusColor(c)}
+                                                        className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${newStatusColor === c ? 'border-slate-800 scale-110' : 'border-transparent'}`}
+                                                        style={{ backgroundColor: c }}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <button
+                                                onClick={() => setIsAddingStatus(false)}
+                                                className="w-full py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setIsAddingStatus(true)}
+                                            className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all flex items-center justify-center gap-2 text-xs font-bold mt-2"
+                                        >
+                                            <Plus size={14} /> Add Column
+                                        </button>
+                                    )
+                                )}
+                            </div>
+                        </Card>
+                    </div>
 
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-                                    className="w-full py-3.5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/30 transition-all flex items-center justify-center gap-2 text-sm font-bold shadow-sm"
-                                >
-                                    <Plus size={18} className={`transition-transform duration-300 ${isAddMenuOpen ? 'rotate-45' : ''}`} />
-                                    Add Workflow Trigger
-                                </button>
+                    <div>
+                        <SectionTitle>Triggers</SectionTitle>
+                        <Card className="mt-4 bg-white border-slate-200 shadow-sm p-6">
+                            <div className="space-y-4">
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest px-1 mb-2">Automate actions when cards move or system events occur.</p>
 
-                                {isAddMenuOpen && (
-                                    <div className="absolute bottom-full left-0 right-0 mb-3 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 p-2 z-20 animate-in fade-in slide-in-from-bottom-2 duration-200 grid grid-cols-1 gap-1">
+                                {automations.map((rule: any) => {
+                                    if (rule.type === 'move_to') {
+                                        return (
+                                            <div key={rule.id} className="p-4 bg-indigo-50/40 rounded-2xl border border-indigo-100 flex flex-col gap-3 relative transition-all hover:bg-indigo-50/60">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-500 tracking-wider">
+                                                        <RotateCcw size={12} className="rotate-90" />
+                                                        Move Trigger
+                                                    </div>
+                                                    {isEditing && (
+                                                        <button onClick={() => removeAutomation(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
+                                                    <span className="shrink-0">When moved to</span>
+                                                    <Select
+                                                        disabled={!isEditing}
+                                                        value={rule.targetColumn}
+                                                        onChange={(e: any) => updateAutomation(rule.id, { targetColumn: e.target.value })}
+                                                        className="flex-1 h-9 bg-white"
+                                                    >
+                                                        {columns.map((c: any) => (
+                                                            <option key={c.id} value={c.id}>{c.title}</option>
+                                                        ))}
+                                                    </Select>
+                                                    <ArrowRight size={14} className="text-slate-300 shrink-0" />
+                                                    <Select
+                                                        disabled={!isEditing}
+                                                        value={rule.action}
+                                                        onChange={(e: any) => updateAutomation(rule.id, { action: e.target.value })}
+                                                        className="flex-1 h-9 bg-white"
+                                                    >
+                                                        <option value="generate_caption">Generate Caption</option>
+                                                        <option value="generate_image">Generate Image</option>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    if (rule.type === 'access_rule') {
+                                        return (
+                                            <div key={rule.id} className="p-4 bg-amber-50/40 rounded-2xl border border-amber-100 flex flex-col gap-3 relative transition-all hover:bg-amber-50/60">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-600 tracking-wider">
+                                                        <ShieldCheck size={12} />
+                                                        Lock Rule
+                                                    </div>
+                                                    {isEditing && (
+                                                        <button onClick={() => removeAutomation(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
+                                                    <span className="shrink-0">Lock</span>
+                                                    <Select
+                                                        disabled={!isEditing}
+                                                        value={rule.columnId}
+                                                        onChange={(e: any) => updateAutomation(rule.id, { columnId: e.target.value })}
+                                                        className="flex-1 h-9 bg-white"
+                                                    >
+                                                        {columns.map((c: any) => (
+                                                            <option key={c.id} value={c.id}>{c.title}</option>
+                                                        ))}
+                                                    </Select>
+                                                    <span className="shrink-0 text-[10px]">to</span>
+                                                    <Select
+                                                        disabled={!isEditing}
+                                                        value={rule.roleName}
+                                                        onChange={(e: any) => updateAutomation(rule.id, { roleName: e.target.value })}
+                                                        className="flex-1 h-9 bg-white"
+                                                    >
+                                                        <option value="">Select Role</option>
+                                                        {customRoles?.map((r: any) => (
+                                                            <option key={r.name} value={r.name}>{r.name}</option>
+                                                        ))}
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <div key={rule.id} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex flex-col gap-3 relative transition-all hover:bg-slate-100/50">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                                    <Wand2 size={12} className="text-blue-500" />
+                                                    Event Trigger
+                                                </div>
+                                                {isEditing && (
+                                                    <button onClick={() => removeAutomation(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <Select
+                                                    disabled={!isEditing}
+                                                    value={rule.event}
+                                                    onChange={(e: any) => updateAutomation(rule.id, { event: e.target.value })}
+                                                    className="flex-1 h-10 bg-white"
+                                                >
+                                                    <option value="caption_generated">AI Caption Generated</option>
+                                                    <option value="image_generated">AI Image Generated</option>
+                                                    <option value="comment_added">New Comment Added</option>
+                                                    <option value="revision_requested">Revision Requested</option>
+                                                    <option value="content_approved">Content Approved</option>
+                                                    <option value="content_scheduled">When a post is scheduled</option>
+                                                    <option value="content_posted">When a post is live</option>
+                                                    <option value="content_unscheduled">When a post is unscheduled</option>
+                                                </Select>
+                                                <ArrowRight size={16} className="text-slate-300 shrink-0" />
+                                                <Select
+                                                    disabled={!isEditing}
+                                                    value={rule.targetStatus}
+                                                    onChange={(e: any) => updateAutomation(rule.id, { targetStatus: e.target.value })}
+                                                    className="flex-1 h-10 bg-white"
+                                                >
+                                                    {columns.map((c: any) => (
+                                                        <option key={c.id} value={c.id}>{c.title}</option>
+                                                    ))}
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+
+
+                                {isEditing && (
+                                    <div className="relative pt-2">
                                         <button
-                                            onClick={() => { addMoveToAutomation(); setIsAddMenuOpen(false); }}
-                                            className="flex items-center gap-3 w-full p-3 hover:bg-indigo-50 rounded-xl transition-colors group text-left"
+                                            onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                                            className="w-full py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/30 transition-all flex items-center justify-center gap-2 text-sm font-bold shadow-sm"
                                         >
-                                            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                                                <RotateCcw size={16} />
-                                            </div>
-                                            <div>
-                                                <div className="text-xs font-black text-slate-800 uppercase tracking-tight">Move Trigger</div>
-                                                <div className="text-[10px] text-slate-500 font-medium leading-tight">When a card enters a specific column</div>
-                                            </div>
+                                            <Plus size={18} className={`transition-transform duration-300 ${isAddMenuOpen ? 'rotate-45' : ''}`} />
+                                            Add Trigger
                                         </button>
-                                        <button
-                                            onClick={() => { addEventAutomation(); setIsAddMenuOpen(false); }}
-                                            className="flex items-center gap-3 w-full p-3 hover:bg-blue-50 rounded-xl transition-colors group text-left"
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                                                <Wand2 size={16} />
+
+                                        {isAddMenuOpen && (
+                                            <div className="absolute bottom-full left-0 right-0 mb-3 bg-white rounded-2xl border border-slate-200 shadow-xl p-2 z-20 animate-in fade-in slide-in-from-bottom-2 duration-200 grid grid-cols-1 gap-1">
+                                                <button onClick={() => { addMoveToAutomation(); setIsAddMenuOpen(false); }} className="flex items-center gap-3 w-full p-3 hover:bg-slate-50 rounded-xl transition-colors text-left">
+                                                    <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><RotateCcw size={16} /></div>
+                                                    <div><div className="text-xs font-black uppercase">Move Trigger</div><div className="text-[9px] text-slate-400 font-bold uppercase underline decoration-indigo-200">On column change</div></div>
+                                                </button>
+                                                <button onClick={() => { addEventAutomation(); setIsAddMenuOpen(false); }} className="flex items-center gap-3 w-full p-3 hover:bg-slate-50 rounded-xl transition-colors text-left">
+                                                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><Wand2 size={16} /></div>
+                                                    <div><div className="text-xs font-black uppercase">Event Trigger</div><div className="text-[9px] text-slate-400 font-bold uppercase underline decoration-blue-200">On AI/User event</div></div>
+                                                </button>
+                                                <button onClick={() => { addAccessRule(); setIsAddMenuOpen(false); }} className="flex items-center gap-3 w-full p-3 hover:bg-slate-50 rounded-xl transition-colors text-left">
+                                                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><ShieldCheck size={16} /></div>
+                                                    <div><div className="text-xs font-black uppercase">Lock Rule</div><div className="text-[9px] text-slate-400 font-bold uppercase underline decoration-amber-200">Restrict access</div></div>
+                                                </button>
                                             </div>
-                                            <div>
-                                                <div className="text-xs font-black text-slate-800 uppercase tracking-tight">Event Trigger</div>
-                                                <div className="text-[10px] text-slate-500 font-medium leading-tight">By AI generation or user comments</div>
-                                            </div>
-                                        </button>
-                                        <button
-                                            onClick={() => { addAccessRule(); setIsAddMenuOpen(false); }}
-                                            className="flex items-center gap-3 w-full p-3 hover:bg-amber-50 rounded-xl transition-colors group text-left"
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center group-hover:bg-amber-200 transition-colors">
-                                                <ShieldCheck size={16} />
-                                            </div>
-                                            <div>
-                                                <div className="text-xs font-black text-slate-800 uppercase tracking-tight">Approval Rule</div>
-                                                <div className="text-[10px] text-slate-500 font-medium leading-tight">Lock a column to a specific member role</div>
-                                            </div>
-                                        </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    </Card>
+                        </Card>
 
-                    {/* Guide Card */}
-                    <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100/50 flex gap-4">
-                        <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-blue-500 shadow-sm border border-blue-100 shrink-0">
-                            <RotateCcw size={18} />
-                        </div>
-                        <div>
-                            <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider mb-1">Smart Workflow Automation</h4>
+                        <div className="mt-6 p-5 rounded-2xl bg-blue-50/40 border border-blue-100 flex gap-4">
+                            <Wand2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
                             <p className="text-[11px] text-blue-700/80 font-medium leading-relaxed">
-                                Automating card movement reduces manual status updates. For example, moving a card to "Approved" can automatically trigger its scheduled post to the social channels.
+                                <strong>Smart Automation:</strong> Triggers help keep your team in sync without manual updates. Move to "Review" to auto-notify or "Approved" to trigger scheduling.
                             </p>
                         </div>
                     </div>
+                </div>
+
+                {/* Studio Layout & System Mapping */}
+                <div className="space-y-6">
+                    <div>
+                        <SectionTitle>Studio Tabs (Dashboard)</SectionTitle>
+                        <Card className="mt-4 bg-white border-slate-200 shadow-sm overflow-visible p-6">
+                            <div className="space-y-4">
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-4 px-1">Define which statuses show in each dashboard section.</p>
+
+                                {studioSettings.studioTabs.map((tab: any, tIdx: number) => (
+                                    <div key={tab.id} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex flex-col gap-4 transition-all hover:bg-slate-50">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <Input
+                                                    disabled={!isEditing}
+                                                    value={tab.label}
+                                                    onChange={(e) => {
+                                                        const newTabs = [...studioSettings.studioTabs];
+                                                        newTabs[tIdx].label = e.target.value;
+                                                        setStudioSettings({ ...studioSettings, studioTabs: newTabs });
+                                                    }}
+                                                    className="h-8 font-black uppercase text-[10px] w-48 shadow-none border-slate-200"
+                                                />
+                                                <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg text-[8px] text-slate-400 font-black uppercase tracking-tighter">ID: {tab.id}</span>
+                                            </div>
+                                            {isEditing && (
+                                                <button onClick={() => {
+                                                    const newTabs = studioSettings.studioTabs.filter((_: any, i: number) => i !== tIdx);
+                                                    setStudioSettings({ ...studioSettings, studioTabs: newTabs });
+                                                }} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {columns.map(col => {
+                                                const isSelected = tab.statuses.includes(col.id);
+                                                return (
+                                                    <button
+                                                        key={col.id}
+                                                        disabled={!isEditing}
+                                                        onClick={() => {
+                                                            const newTabs = [...studioSettings.studioTabs];
+                                                            if (isSelected) newTabs[tIdx].statuses = tab.statuses.filter((s: string) => s !== col.id);
+                                                            else newTabs[tIdx].statuses = [...tab.statuses, col.id];
+                                                            setStudioSettings({ ...studioSettings, studioTabs: newTabs });
+                                                        }}
+                                                        className={`px-2.5 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${isSelected
+                                                            ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                                                            : `bg-white border-slate-200 text-slate-400 ${isEditing ? 'hover:border-slate-300 cursor-pointer' : 'cursor-default opacity-50'}`
+                                                            }`}
+                                                    >
+                                                        {col.title}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {isEditing && (
+                                    <button
+                                        onClick={() => {
+                                            setStudioSettings({
+                                                ...studioSettings,
+                                                studioTabs: [
+                                                    ...studioSettings.studioTabs,
+                                                    { id: `tab-${Date.now()}`, label: 'New Section', icon: 'Edit', statuses: [] }
+                                                ]
+                                            });
+                                        }}
+                                        className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all flex items-center justify-center gap-2 text-xs font-bold"
+                                    >
+                                        <Plus size={14} /> Add Dashboard Tab
+                                    </button>
+                                )}
+                            </div>
+                        </Card>
+                    </div>
+
                 </div>
             </div>
         </div>

@@ -321,50 +321,56 @@ export const updateContentCalendar = async (req, res) => {
             s.toLowerCase() === currentStatusStr.toLowerCase()
         );
 
-        // Only run event-based automation when NOT explicitly setting status, and existing is intermediate
-        if (!isUserExplicitlySettingStatus && (updateData.captionOutput || updateData.imageGenerated || updateData.supervisor_comments)) {
-            try {
-                let targetStatus = null;
+        // Run automation logic
+        try {
+            let targetStatus = null;
 
-                // Determine the event trigger
+            // 1. Event-based triggers (when data changes)
+            if (!isUserExplicitlySettingStatus) {
                 if (updateData.captionOutput && !existing.captionOutput) {
                     targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'caption_generated', null);
                 }
-
                 if (!targetStatus && updateData.imageGenerated && !existing.imageGenerated) {
                     targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'image_generated', null);
                 }
-
                 if (!targetStatus && updateData.supervisor_comments && !existing.supervisor_comments) {
                     targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'comment_added', null);
                 }
-
-                if (targetStatus) {
-                    updateData.status = targetStatus;
-                }
-            } catch (err) {
-                console.error('Failed to process kanban automations:', err);
-                // Non-blocking for the main update
             }
-        } else if (isUserExplicitlySettingStatus && (updateData.captionOutput || updateData.imageGenerated || updateData.supervisor_comments)) {
-            // User is setting status AND data is changing — run status-driven automation
-            try {
-                let targetStatus = null;
 
+            // 2. Lifecycle triggers (Scheduled / Unscheduled / Posted)
+            // Scheduled: date added
+            if (!targetStatus && updateData.scheduled_at && !existing.scheduled_at) {
+                targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'content_scheduled', null);
+            }
+            // Unscheduled: date removed
+            if (!targetStatus && updateData.scheduled_at === null && existing.scheduled_at) {
+                targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'content_unscheduled', null);
+            }
+            // Posted: status becoming published
+            if (!targetStatus && (statusStr.toUpperCase() === 'PUBLISHED') && currentStatusStr.toUpperCase() !== 'PUBLISHED') {
+                targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'content_posted', null);
+            }
+
+            // 3. User-Action triggers (Manual status moves)
+            if (!targetStatus && isUserExplicitlySettingStatus) {
                 if (updateData.supervisor_comments && !existing.supervisor_comments) {
                     targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'comment_added', null);
                 }
-
-                if (!targetStatus && updateData.status && (updateData.status === 'Revision' || (updateData.status?.state && updateData.status.state === 'Revision'))) {
+                if (!targetStatus && (statusStr === 'Revision' || statusStr === 'REVISION')) {
                     targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'revision_requested', null);
                 }
-
-                if (targetStatus) {
-                    updateData.status = targetStatus;
+                // Handle Content Approved event mapping
+                if (!targetStatus && (statusStr === 'Approved' || statusStr === 'APPROVED' || statusStr === 'Ready' || statusStr === 'READY')) {
+                    targetStatus = await getTargetStatusFromAutomation(existing.companyId, 'content_approved', null);
                 }
-            } catch (err) {
-                console.error('Failed to process kanban automations:', err);
             }
+
+            if (targetStatus) {
+                updateData.status = targetStatus;
+            }
+        } catch (err) {
+            console.error('Failed to process kanban automations:', err);
         }
 
         // Clear supervisor comments on approval/publish

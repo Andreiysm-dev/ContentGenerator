@@ -46,7 +46,7 @@ const TOUR_STEPS: TourStep[] = [
     },
     {
         target: '[data-tour="calendar"]',
-        title: '📅 Content Calendar',
+        title: '📅 Content Board',
         description: 'Plan, schedule, and manage your content pipeline. See all your posts at a glance.',
         placement: 'right',
     },
