@@ -23,8 +23,8 @@ export const initScheduler = () => {
 };
 
 export const initEmailScheduler = () => {
-    // Run every 10 minutes
-    cron.schedule('*/10 * * * *', async () => {
+    // Run every 30 minutes
+    cron.schedule('*/30 * * * *', async () => {
         try {
             await checkPendingEmailNotifications();
         } catch (err) {
