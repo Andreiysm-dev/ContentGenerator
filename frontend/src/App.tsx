@@ -352,6 +352,10 @@ function App() {
     setIsUploadingDesigns(true);
     try {
       const uploads = Array.from(files).map(async (file) => {
+        // Validate file size (max 50MB)
+        if (file.size > 50 * 1024 * 1024) {
+          throw new Error(`File "${file.name}" is too large (max 50MB)`);
+        }
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const path = `designs/${selectedRow.contentCalendarId}-${Date.now()}-${safeName}`;
         const { error } = await client.storage
@@ -386,21 +390,25 @@ function App() {
         ),
       );
       notify('Designs uploaded.', 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Design upload failed', err);
-      notify('Failed to upload designs.', 'error');
+      const errorMsg = err.message || 'Failed to upload designs';
+      notify(errorMsg, 'error');
+      if (errorMsg.toLowerCase().includes('size') || errorMsg.toLowerCase().includes('limit')) {
+        notify('Hint: Check your Supabase Storage bucket max file size settings.', 'info');
+      }
     } finally {
       setIsUploadingDesigns(false);
     }
   };
 
-  const handleDraftPublishIntent = async () => {
+  const handleDraftPublishIntent = async (overrideStatus?: string) => {
     if (!selectedRow) return;
 
     const studioSettings = activeCompany?.kanban_settings?.studio_settings;
-    const nextStatus = draftPublishIntent === 'ready'
+    const nextStatus = overrideStatus || (draftPublishIntent === 'ready'
       ? (studioSettings?.postedStatus || 'Ready')
-      : (selectedRow.status ?? '');
+      : (selectedRow.status ?? ''));
 
     const nextPostStatus = draftPublishIntent === 'ready' ? 'ready' : 'draft';
     const payload = {
@@ -3492,6 +3500,7 @@ function App() {
                   element={
                     <StudioEditorPage
                       activeCompanyId={activeCompanyId || ''}
+                      activeCompany={activeCompany}
                       backendBaseUrl={backendBaseUrl}
                       authedFetch={authedFetch}
                       notify={notify}

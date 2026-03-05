@@ -36,9 +36,9 @@ export function ProfilePage({ session, supabase, notify }: ProfilePageProps) {
       return;
     }
 
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      notify("Image size must be less than 2MB", "error");
+    // Validate file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      notify("Image size must be less than 50MB", "error");
       return;
     }
 

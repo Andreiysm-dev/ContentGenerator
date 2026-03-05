@@ -1255,6 +1255,10 @@ export function ImageHubPage({
                                                             src={`${getImageGeneratedUrl(selectedRow)}?v=${imagePreviewNonce}`}
                                                             alt="Preview"
                                                             className="max-w-full max-h-[600px] rounded-2xl shadow-premium-lg object-contain bg-white transition-all duration-500 relative z-10"
+                                                            onError={(e) => {
+                                                                console.warn("Visual Output failed to load (likely expired link):", getImageGeneratedUrl(selectedRow));
+                                                                // Handle visually if needed
+                                                            }}
                                                         />
                                                         <div className="absolute inset-x-0 bottom-4 flex justify-center gap-2 opacity-0 group-hover/preview:opacity-100 transition-opacity z-40">
                                                             <button

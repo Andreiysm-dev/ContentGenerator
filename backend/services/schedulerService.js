@@ -2,6 +2,7 @@
 import cron from 'node-cron';
 import { supabase } from '../database/db.js';
 import { postToLinkedIn, postToFacebookPage } from './socialService.js';
+import { sendNotificationSummary } from './emailService.js';
 
 let isChecking = false;
 
@@ -19,6 +20,89 @@ export const initScheduler = () => {
             isChecking = false;
         }
     });
+};
+
+export const initEmailScheduler = () => {
+    // Run every 10 minutes
+    cron.schedule('*/10 * * * *', async () => {
+        try {
+            await checkPendingEmailNotifications();
+        } catch (err) {
+            console.error('[EmailScheduler] Tick failed:', err);
+        }
+    });
+};
+
+const checkPendingEmailNotifications = async () => {
+    try {
+        // 1. Fetch notifications that haven't been emailed yet
+        // In notifications table, we assume 'email_notified' column exists (default false)
+        const { data: unsent, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('email_notified', false)
+            .order('created_at', { ascending: true });
+
+        if (error || !unsent || unsent.length === 0) return;
+
+        // 2. Group by user_id
+        const userGroups = {};
+        unsent.forEach(n => {
+            if (!userGroups[n.user_id]) userGroups[n.user_id] = [];
+            userGroups[n.user_id].push(n);
+        });
+
+        const userIds = Object.keys(userGroups);
+
+        // 3. Fetch user preference and email for each
+        const { data: { users }, error: authError } = await supabase.auth.admin.listUsers();
+        if (authError || !users) return;
+
+        for (const userId of userIds) {
+            const user = users.find(u => u.id === userId);
+            if (!user) continue;
+
+            const userNotifications = userGroups[userId];
+            // Group by companyId
+            const companyGroups = {};
+            userNotifications.forEach(n => {
+                const cid = n.link?.split('/company/')?.[1]?.split('/')?.[0] || 'unknown';
+                if (!companyGroups[cid]) companyGroups[cid] = [];
+                companyGroups[cid].push(n);
+            });
+
+            for (const companyId of Object.keys(companyGroups)) {
+                // Check if user has email notifications turned on for this specific company in metadata
+                const prefs = user.user_metadata?.notification_preferences?.[companyId] || {};
+                if (prefs.emailNotificationsEnabled !== true) continue;
+
+                const companyNotifications = companyGroups[companyId];
+                const companyName = companyNotifications[0].company_name || 'Company';
+
+                try {
+                    await sendNotificationSummary({
+                        userEmail: user.email,
+                        userName: user.user_metadata?.full_name || user.email,
+                        notifications: companyNotifications,
+                        companyName,
+                        companyId
+                    });
+
+                    // 4. Mark these as notified
+                    const notificationIds = companyNotifications.map(n => n.id);
+                    await supabase
+                        .from('notifications')
+                        .update({ email_notified: true })
+                        .in('id', notificationIds);
+
+                } catch (emailErr) {
+                    console.error(`[EmailScheduler] Failed for user ${userId}:`, emailErr);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[EmailScheduler] Check failed:', err);
+    }
 };
 
 const checkScheduledPosts = async () => {

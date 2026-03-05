@@ -7,7 +7,7 @@ interface DraftPublishModalProps {
     activeCompany: any;
     draftPublishIntent: 'draft' | 'ready';
     setDraftPublishIntent: (intent: 'draft' | 'ready') => void;
-    handleDraftPublishIntent: () => Promise<void>;
+    handleDraftPublishIntent: (status?: string) => Promise<void>;
     getAttachedDesignUrls: (row: any) => string[];
     getImageGeneratedUrl: (row: any | null) => string | null;
     imagePreviewNonce: number;
@@ -35,6 +35,17 @@ export function DraftPublishModal({
     isUploadingDesigns,
     isAiAssistantOpen
 }: DraftPublishModalProps) {
+    const [targetStatus, setTargetStatus] = React.useState<string>(() => {
+        if (selectedRow?.status) return selectedRow.status;
+        return activeCompany?.kanban_settings?.columns?.[0]?.id || '';
+    });
+
+    React.useEffect(() => {
+        if (selectedRow) {
+            setTargetStatus(selectedRow.status || activeCompany?.kanban_settings?.columns?.[0]?.id || '');
+        }
+    }, [selectedRow, activeCompany]);
+
     if (!isOpen || !selectedRow) return null;
 
     const channelsText =
@@ -233,55 +244,53 @@ export function DraftPublishModal({
                                     </div>
                                 </Section>
 
-                                <Section title="Publish intent">
-                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                        <label
-                                            className={[
-                                                'flex gap-3 rounded-2xl border p-4 cursor-pointer transition',
-                                                'bg-slate-50 border-slate-200/70 hover:bg-white',
-                                                draftPublishIntent === 'draft'
-                                                    ? 'border-[#3fa9f5]/60 bg-white shadow-sm ring-2 ring-[#3fa9f5]/10'
-                                                    : '',
-                                            ].join(' ')}
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="draftIntent"
-                                                checked={draftPublishIntent === 'draft'}
-                                                onChange={() => setDraftPublishIntent('draft')}
-                                                className="mt-1 h-4 w-4 accent-[#3fa9f5]"
-                                            />
-                                            <div>
-                                                <div className="text-sm font-bold text-brand-dark">Save as draft</div>
-                                                <div className="mt-1 text-sm text-brand-dark/60 leading-relaxed">
-                                                    Keep this content saved and editable. You can publish it later.
-                                                </div>
-                                            </div>
-                                        </label>
+                                <Section title="Workflow & Status">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Target Gallery Status</label>
+                                            <select
+                                                value={targetStatus}
+                                                onChange={(e) => setTargetStatus(e.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm outline-none transition focus:border-[#3fa9f5]/50 focus:ring-2 focus:ring-[#3fa9f5]/15"
+                                            >
+                                                {activeCompany?.kanban_settings?.columns ? (
+                                                    activeCompany.kanban_settings.columns.map((col: any) => (
+                                                        <option key={col.id} value={col.id}>{col.title}</option>
+                                                    ))
+                                                ) : (
+                                                    <>
+                                                        <option value="Drafts">Drafts</option>
+                                                        <option value="To Do">To Do</option>
+                                                        <option value="In Progress">In Progress</option>
+                                                        <option value="Ready">Ready</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                            <p className="text-[10px] text-slate-400 font-medium">Select which column this content should be visible in.</p>
+                                        </div>
 
-                                        <label
-                                            className={[
-                                                'flex gap-3 rounded-2xl border p-4 cursor-pointer transition',
-                                                'bg-slate-50 border-slate-200/70 hover:bg-white',
-                                                draftPublishIntent === 'ready'
-                                                    ? 'border-[#3fa9f5]/60 bg-white shadow-sm ring-2 ring-[#3fa9f5]/10'
-                                                    : '',
-                                            ].join(' ')}
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="draftIntent"
-                                                checked={draftPublishIntent === 'ready'}
-                                                onChange={() => setDraftPublishIntent('ready')}
-                                                className="mt-1 h-4 w-4 accent-[#3fa9f5]"
-                                            />
-                                            <div>
-                                                <div className="text-sm font-bold text-brand-dark">Mark as ready to publish</div>
-                                                <div className="mt-1 text-sm text-brand-dark/60 leading-relaxed">
-                                                    This content will be marked as approved and ready for publishing. Publishing can be scheduled later.
-                                                </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Publishing Intent</label>
+                                            <div className="flex p-1 bg-slate-100/80 rounded-xl gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDraftPublishIntent('draft')}
+                                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${draftPublishIntent === 'draft' ? 'bg-white text-brand-dark shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                                >
+                                                    Draft
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDraftPublishIntent('ready')}
+                                                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${draftPublishIntent === 'ready' ? 'bg-[#3fa9f5] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                                >
+                                                    Ready to Publish
+                                                </button>
                                             </div>
-                                        </label>
+                                            <p className="text-[10px] text-slate-400 font-medium">
+                                                {draftPublishIntent === 'ready' ? 'Marked as approved for final scheduling.' : 'Still being worked on/needs changes.'}
+                                            </p>
+                                        </div>
                                     </div>
                                 </Section>
                             </div>
@@ -303,10 +312,10 @@ export function DraftPublishModal({
 
                                     <button
                                         type="button"
-                                        onClick={handleDraftPublishIntent}
-                                        className="w-full inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2"
+                                        onClick={() => handleDraftPublishIntent(targetStatus)}
+                                        className="w-full inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 uppercase tracking-wide"
                                     >
-                                        {draftPublishIntent === 'ready' ? 'Mark as ready' : 'Save draft'}
+                                        Save
                                     </button>
 
                                     <div className="pt-2 text-xs text-brand-dark/50 leading-relaxed">
@@ -329,10 +338,10 @@ export function DraftPublishModal({
 
                         <button
                             type="button"
-                            onClick={handleDraftPublishIntent}
-                            className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2"
+                            onClick={() => handleDraftPublishIntent(targetStatus)}
+                            className="inline-flex items-center justify-center rounded-xl px-12 py-2.5 text-sm font-bold bg-[#3fa9f5] text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-[#2f97e6] active:bg-[#2b8bd3] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/35 focus-visible:ring-offset-2 uppercase tracking-wide"
                         >
-                            {draftPublishIntent === 'ready' ? 'Mark as ready' : 'Save draft'}
+                            Save
                         </button>
                     </div>
                 </div>

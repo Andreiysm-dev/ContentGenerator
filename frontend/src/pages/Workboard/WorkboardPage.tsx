@@ -23,7 +23,8 @@ import {
     Clock,
     CheckCircle2,
     XCircle,
-    Info
+    Info,
+    Bell
 } from 'lucide-react';
 import { SOKMED_COLUMNS } from './types';
 import type { KanbanColumn, Post, SokMedStatus } from './types';
@@ -70,6 +71,11 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     const [isSavingCol, setIsSavingCol] = useState(false);
 
     const PRESET_COLORS = ['#6366f1', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#64748b', '#1e293b'];
+
+    // Notification state
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [watchedColumns, setWatchedColumns] = useState<Record<string, boolean>>({});
+    const [isSavingNotifications, setIsSavingNotifications] = useState(false);
 
     // Fetch real data from backend
     const fetchPosts = async () => {
@@ -133,7 +139,50 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
 
     useEffect(() => {
         fetchPosts();
+        fetchNotificationSettings();
     }, [companyId]);
+
+    const fetchNotificationSettings = async () => {
+        if (!companyId) return;
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/profile/notifications/${companyId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setWatchedColumns(data.watchedColumns || {});
+            }
+        } catch (err) {
+            console.error('Failed to fetch notification settings:', err);
+        }
+    };
+
+    const saveNotificationSettings = async () => {
+        if (!companyId) return;
+        setIsSavingNotifications(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/profile/notifications/${companyId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ watchedColumns }),
+            });
+            if (res.ok) {
+                notify('Notification preferences saved!', 'success');
+                setShowNotifications(false);
+            } else {
+                throw new Error('Failed to save');
+            }
+        } catch (err) {
+            notify('Error saving preferences', 'error');
+        } finally {
+            setIsSavingNotifications(false);
+        }
+    };
+
+    const toggleWatchColumn = (columnId: string) => {
+        setWatchedColumns(prev => ({
+            ...prev,
+            [columnId]: !prev[columnId]
+        }));
+    };
 
     const executeStatusChange = async (postId: string, newStatus: string, skipAutomation = false) => {
         // Optimistic UI updates
@@ -461,6 +510,14 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                         <Settings2 size={20} />
                     </button>
 
+                    <button
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        className={`p-2.5 rounded-xl transition-all ${showNotifications ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                        title="Notification Settings"
+                    >
+                        <Bell size={20} />
+                    </button>
+
                     {showAddColumn && (
                         <div className="absolute right-0 top-full mt-4 z-50 w-72 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-6 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100">
                             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">New Column Context</h4>
@@ -501,6 +558,40 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                                     Cancel
                                 </button>
                             </div>
+                        </div>
+                    )}
+
+                    {showNotifications && (
+                        <div className="absolute right-0 top-full mt-4 z-50 w-80 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100">
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 mb-2">Notification Preferences</h4>
+                            <p className="text-[11px] text-slate-500 mb-8 font-medium leading-relaxed">
+                                Select columns you want to monitor. You'll be notified when new cards arrive.
+                            </p>
+
+                            <div className="space-y-3 max-h-64 overflow-y-auto pr-2 mb-8 custom-scrollbar">
+                                {columns.map(col => (
+                                    <label key={col.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer hover:bg-indigo-50/50 transition-all border border-transparent hover:border-indigo-100 group">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: col.color }} />
+                                            <span className="text-xs font-bold text-slate-700">{col.title}</span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={watchedColumns[col.id] || false}
+                                            onChange={() => toggleWatchColumn(col.id)}
+                                            className="w-5 h-5 rounded-lg border-slate-200 text-indigo-600 focus:ring-indigo-500 transition-all cursor-pointer"
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+
+                            <button
+                                onClick={saveNotificationSettings}
+                                disabled={isSavingNotifications}
+                                className="w-full py-4 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                {isSavingNotifications ? <Loader2 size={16} className="animate-spin" /> : 'Save Preferences'}
+                            </button>
                         </div>
                     )}
 

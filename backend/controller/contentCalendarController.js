@@ -94,6 +94,16 @@ export const createContentCalendar = async (req, res) => {
             }
         }
 
+        // Trigger notifications for watchers if status is set on creation
+        if (row && row.status) {
+            await notificationService.notifyWatchers({
+                companyId: row.companyId,
+                status: row.status,
+                contentTheme: row.theme,
+                triggeredByUserId: userId
+            });
+        }
+
         return res.status(201).json({ contentCalendar: row });
     } catch (err) {
         console.error('createContentCalendar error:', err);
@@ -442,6 +452,14 @@ export const updateContentCalendar = async (req, res) => {
                 status: updateData.status,
                 contentTheme: row.theme,
                 userId: userId
+            });
+
+            // Generic Watcher Notifications
+            await notificationService.notifyWatchers({
+                companyId: existing.companyId,
+                status: updateData.status,
+                contentTheme: row.theme,
+                triggeredByUserId: userId
             });
         }
 

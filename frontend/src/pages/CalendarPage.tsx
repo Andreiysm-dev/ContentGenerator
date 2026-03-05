@@ -34,6 +34,8 @@ import {
   Target,
   SearchX,
   Lock,
+  Bell,
+  Loader2
 } from "lucide-react";
 import { KanbanView } from "./Workboard/KanbanView";
 import type { Post, KanbanColumn } from "./Workboard/types";
@@ -223,7 +225,63 @@ export function CalendarPage(props: CalendarPageProps) {
   const [newColColor, setNewColColor] = useState('#6366f1');
   const [isSavingCol, setIsSavingCol] = useState(false);
 
+  // Notification state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [watchedColumns, setWatchedColumns] = useState<Record<string, boolean>>({});
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+
   const PRESET_COLORS = ['#6366f1', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
+
+  useEffect(() => {
+    fetchNotificationSettings();
+  }, [activeCompanyId]);
+
+  const fetchNotificationSettings = async () => {
+    if (!activeCompanyId) return;
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/profile/notifications/${activeCompanyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setWatchedColumns(data.watchedColumns || {});
+        setEmailNotificationsEnabled(data.emailNotificationsEnabled || false);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notification settings:', err);
+    }
+  };
+
+  const saveNotificationSettings = async () => {
+    if (!activeCompanyId) return;
+    setIsSavingNotifications(true);
+    try {
+      const res = await authedFetch(`${backendBaseUrl}/api/profile/notifications/${activeCompanyId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          watchedColumns,
+          emailNotificationsEnabled
+        }),
+      });
+      if (res.ok) {
+        notify('Notification preferences saved!', 'success');
+        setShowNotifications(false);
+      } else {
+        throw new Error('Failed to save');
+      }
+    } catch (err) {
+      notify('Error saving preferences', 'error');
+    } finally {
+      setIsSavingNotifications(false);
+    }
+  };
+
+  const toggleWatchColumn = (columnId: string) => {
+    setWatchedColumns(prev => ({
+      ...prev,
+      [columnId]: !prev[columnId]
+    }));
+  };
 
   const handleAddColumn = async () => {
     const name = newColName.trim();
@@ -415,7 +473,7 @@ export function CalendarPage(props: CalendarPageProps) {
         </header>
 
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 bg-white overflow-x-auto no-scrollbar">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 bg-white relative z-20">
             <div className="flex items-center min-w-fit">
               <div className="flex border-r border-slate-100">
                 <TabButton active={viewMode === 'drafts'} onClick={() => navigate(`/company/${companyId}/calendar`)} icon={Layout} label="Pipeline" count={calendarRows.filter(r => {
@@ -550,6 +608,69 @@ export function CalendarPage(props: CalendarPageProps) {
                   )}
                 </div>
 
+                <div className="relative">
+                  <button
+                    title="Notification settings"
+                    onClick={() => setShowNotifications(v => !v)}
+                    className={`p-2 rounded-xl transition-all border ${showNotifications
+                      ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+                      }`}
+                  >
+                    <Bell className="w-4 h-4" />
+                  </button>
+
+                  {showNotifications && (
+                    <div className="absolute right-0 top-full mt-2 z-50 w-80 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-2">Notification Preferences</h4>
+                      <p className="text-[11px] text-slate-500 mb-6 font-medium leading-relaxed">
+                        Select columns you want to monitor. You'll be notified when new cards arrive.
+                      </p>
+
+                      <div className="mb-6 p-5 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center justify-between group hover:bg-blue-50 transition-all">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-blue-700">Email Digest</span>
+                          <span className="text-[10px] text-slate-500 font-medium">Send summary email every minute</span>
+                        </div>
+                        <button
+                          onClick={() => setEmailNotificationsEnabled(!emailNotificationsEnabled)}
+                          className={`w-10 h-6 rounded-full transition-all relative ${emailNotificationsEnabled ? 'bg-blue-600' : 'bg-slate-200'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${emailNotificationsEnabled ? 'right-1' : 'left-1'}`} />
+                        </button>
+                      </div>
+
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Watch Columns</h4>
+                      <br />
+
+                      <div className="space-y-3 max-h-64 overflow-y-auto pr-2 mb-8 custom-scrollbar">
+                        {kanbanColumns.map(col => (
+                          <label key={col.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: col.color }} />
+                              <span className="text-xs font-bold text-slate-700">{col.title}</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={watchedColumns[col.id] || false}
+                              onChange={() => toggleWatchColumn(col.id)}
+                              className="w-5 h-5 rounded-lg border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+                            />
+                          </label>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={saveNotificationSettings}
+                        disabled={isSavingNotifications}
+                        className="w-full py-4 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        {isSavingNotifications ? <Loader2 size={16} className="animate-spin" /> : 'Save Preferences'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <button title="Configure workflow" onClick={() => navigate(`/company/${companyId}/settings/workflow`)} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:border-slate-300 hover:text-slate-600 transition-all"><SettingsIcon className="w-4 h-4" /></button>
               </div>
             </div>
@@ -558,7 +679,6 @@ export function CalendarPage(props: CalendarPageProps) {
           <div className="flex-1 overflow-hidden relative bg-white">
             {isLoadingCalendar ? <div className="p-10"><CalendarTableSkeleton /></div> : filteredCalendarRows.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full p-12 text-center">
-                <SearchX className="w-12 h-12 text-slate-200 mb-4" />
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight">No results found</h3>
               </div>
             ) : viewMode === 'published' ? (

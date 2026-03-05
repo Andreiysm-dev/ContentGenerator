@@ -99,6 +99,18 @@ export function ViewContentModal({
     const [isEditingName, setIsEditingName] = useState(false);
     const [tempName, setTempName] = useState('');
     const [isSavingName, setIsSavingName] = useState(false);
+    const hasCaptionContent = !!(
+        selectedRow?.finalCaption ||
+        selectedRow?.captionOutput ||
+        selectedRow?.final_caption ||
+        selectedRow?.caption_output ||
+        selectedRow?.caption ||
+        selectedRow?.description ||
+        selectedRow?.finalDescription ||
+        selectedRow?.final_description ||
+        selectedRow?.caption_draft ||
+        selectedRow?.draft_caption
+    );
 
     const currentStatusInModal = getStatusValue(selectedRow?.status);
     const lockRuleInModal = automations?.find(a => a.type === 'access_rule' && a.columnId === currentStatusInModal);
@@ -1304,16 +1316,13 @@ export function ViewContentModal({
 
                         <button
                             type="button"
-                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${['approved', 'design completed', 'design-complete', 'design-completed', 'ready'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
+                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${hasCaptionContent
                                 ? 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-700'
                                 : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
                                 }`}
-                            disabled={
-                                !['approved', 'design completed', 'design-complete', 'design-completed', 'ready'].includes(getStatusValue(selectedRow.status).trim().toLowerCase())
-                            }
+                            disabled={!hasCaptionContent}
                             onClick={() => {
-                                const status = getStatusValue(selectedRow.status).trim().toLowerCase();
-                                if (!['approved', 'design completed', 'design-complete', 'design-completed', 'ready'].includes(status)) return;
+                                if (!hasCaptionContent) return;
 
                                 const companyId = selectedRow?.companyId ?? activeCompanyId;
                                 if (companyId) {

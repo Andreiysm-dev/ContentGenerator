@@ -23,6 +23,7 @@
     "node-fetch": "^3.3.2",
     "nodemon": "^3.1.11",
     "replicate": "^1.4.0",
+    "sib-api-v3-sdk": "^8.5.0",
     "supabase": "^2.72.9"
   }
 }

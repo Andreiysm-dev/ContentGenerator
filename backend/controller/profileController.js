@@ -96,3 +96,67 @@ export const updateProfile = async (req, res) => {
         return res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+// GET - Fetch user notification settings for a company
+export const getNotificationSettings = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { companyId } = req.params;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        // Using auth user metadata for persistent settings without schema changes
+        const { data: { user }, error: authError } = await db.auth.admin.getUserById(userId);
+        if (authError || !user) return res.status(404).json({ error: 'User not found' });
+
+        const settings = user.user_metadata?.notification_preferences?.[companyId] || {};
+        return res.status(200).json({
+            watchedColumns: settings.watchedColumns || {},
+            emailNotificationsEnabled: settings.emailNotificationsEnabled || false
+        });
+    } catch (error) {
+        console.error('getNotificationSettings error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// PUT - Update user notification settings for a company
+export const updateNotificationSettings = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { companyId } = req.params;
+        const { watchedColumns, emailNotificationsEnabled } = req.body;
+
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        // Get current user metadata
+        const { data: { user }, error: fetchError } = await db.auth.admin.getUserById(userId);
+        if (fetchError || !user) return res.status(404).json({ error: 'User not found' });
+
+        const currentPrefs = user.user_metadata?.notification_preferences || {};
+        const updatedPrefs = {
+            ...currentPrefs,
+            [companyId]: {
+                ...currentPrefs[companyId],
+                watchedColumns,
+                emailNotificationsEnabled
+            }
+        };
+
+        const { error: updateError } = await db.auth.admin.updateUserById(userId, {
+            user_metadata: {
+                ...user.user_metadata,
+                notification_preferences: updatedPrefs
+            }
+        });
+
+        if (updateError) {
+            console.error('Error updating notification preferences:', updateError);
+            return res.status(500).json({ error: 'Failed to update preferences' });
+        }
+
+        return res.status(200).json({ message: 'Settings saved successfully' });
+    } catch (error) {
+        console.error('updateNotificationSettings error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};

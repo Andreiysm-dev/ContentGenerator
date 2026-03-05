@@ -25,13 +25,14 @@ import { DateTimePicker } from '../components/DateTimePicker';
 
 interface StudioEditorPageProps {
     activeCompanyId?: string;
+    activeCompany?: any;
     backendBaseUrl: string;
     authedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
     notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
     getImageGeneratedUrl?: (row: any) => string | null;
 }
 
-export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch, notify, getImageGeneratedUrl }: StudioEditorPageProps) {
+export function StudioEditorPage({ activeCompanyId, activeCompany, backendBaseUrl, authedFetch, notify, getImageGeneratedUrl }: StudioEditorPageProps) {
     const { companyId, contentId } = useParams();
     const navigate = useNavigate();
 
@@ -45,7 +46,8 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
     const [platform, setPlatform] = useState<'linkedin' | 'twitter'>('linkedin');
     const [scheduleDate, setScheduleDate] = useState('');
     const [isScheduleEnabled, setIsScheduleEnabled] = useState(false);
-    const [status, setStatus] = useState<'DRAFT' | 'READY' | 'SCHEDULED' | 'PUBLISHED' | 'For Approval'>('DRAFT');
+    const [status, setStatus] = useState<string>('DRAFT');
+    const [targetStatus, setTargetStatus] = useState<string>('DRAFT');
     const [isUploading, setIsUploading] = useState(false);
     const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
     const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
@@ -119,6 +121,7 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                 setScheduleDate(fallbackDate);
                 setIsScheduleEnabled(!!row.scheduled_at);
                 setStatus(row.status || 'DRAFT');
+                setTargetStatus(row.status || 'DRAFT');
 
                 // Load selected accounts from channels
                 if (row.channels) {
@@ -348,13 +351,13 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
             }
         }
 
-        if (newStatus === 'DRAFT' || newStatus === 'REVIEWED') {
-            notify(contentId ? 'Saved changes' : 'Created new post', 'success');
-        } else if (newStatus === 'For Approval') {
+        if (newStatus === 'For Approval') {
             notify('Post sent for supervisor review', 'info');
             navigate(`/company/${encodeURIComponent(activeCompanyId || '')}/studio`, { state: { activeTab: 'approvals' } });
         } else if (newStatus === 'SCHEDULED') {
             navigate(`/company/${encodeURIComponent(activeCompanyId || '')}/studio`, { state: { activeTab: 'scheduled' } });
+        } else {
+            notify(contentId ? 'Saved changes' : 'Created new post', 'success');
         }
 
         return savedId;
@@ -377,9 +380,9 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
         const file = e.target.files?.[0];
         if (!file || !activeCompanyId) return;
 
-        // Limit file size to 5MB
-        if (file.size > 5 * 1024 * 1024) {
-            notify('File is too large. Maximum size is 5MB.', 'error');
+        // Limit file size to 50MB
+        if (file.size > 50 * 1024 * 1024) {
+            notify('File is too large. Maximum size is 50MB.', 'error');
             return;
         }
 
@@ -406,7 +409,12 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
             notify('Image uploaded successfully', 'success');
         } catch (error: any) {
             console.error('Upload error:', error);
-            notify(error.message || 'Failed to upload image', 'error');
+            const errorMsg = error.message || 'Failed to upload image';
+            notify(errorMsg, 'error');
+
+            if (errorMsg.toLowerCase().includes('size') || errorMsg.toLowerCase().includes('limit')) {
+                notify('Hint: Check your Supabase Storage bucket max file size settings.', 'info');
+            }
         } finally {
             setIsUploading(false);
         }
@@ -562,14 +570,37 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => handleSave('DRAFT')}
-                            disabled={isSaving}
-                            className="px-4 py-1.5 text-xs font-bold text-white/70 hover:text-white transition-all disabled:opacity-50"
-                        >
-                            <Save className="h-3.5 w-3.5 inline mr-1.5" />
-                            Save Draft
-                        </button>
+                        <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-[#3fa9f5]">Save To:</span>
+                            <select
+                                value={targetStatus}
+                                onChange={(e) => setTargetStatus(e.target.value)}
+                                className="bg-transparent border-none text-[11px] font-bold text-white/90 focus:ring-0 outline-none cursor-pointer"
+                            >
+                                {activeCompany?.kanban_settings?.columns ? (
+                                    activeCompany.kanban_settings.columns.map((col: any) => (
+                                        <option key={col.id} value={col.id} className="bg-slate-900">{col.title}</option>
+                                    ))
+                                ) : (
+                                    <>
+                                        <option value="DRAFT" className="bg-slate-900">Draft</option>
+                                        <option value="For Approval" className="bg-slate-900">For Approval</option>
+                                        <option value="READY" className="bg-slate-900">Ready</option>
+                                    </>
+                                )}
+                            </select>
+
+                            <div className="w-px h-4 bg-white/10 mx-1" />
+
+                            <button
+                                onClick={() => handleSave(targetStatus as any)}
+                                disabled={isSaving}
+                                className="px-3 py-0.5 text-xs font-bold text-white hover:text-[#3fa9f5] transition-all disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                                <Save className="h-3.5 w-3.5" />
+                                Save
+                            </button>
+                        </div>
 
 
                         <div className="relative">
@@ -808,7 +839,15 @@ export function StudioEditorPage({ activeCompanyId, backendBaseUrl, authedFetch,
                                 />
                                 {mediaUrl ? (
                                     <div className="relative group rounded-3xl overflow-hidden border-2 border-slate-100 shadow-sm">
-                                        <img src={mediaUrl} alt="Post asset" className="w-full h-72 object-cover" />
+                                        <img
+                                            src={mediaUrl}
+                                            alt="Post asset"
+                                            className="w-full h-72 object-cover"
+                                            onError={(e) => {
+                                                console.warn("Media failed to load, clearing URL:", mediaUrl);
+                                                setMediaUrl(null);
+                                            }}
+                                        />
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
                                             <button
                                                 onClick={() => fileInputRef.current?.click()}

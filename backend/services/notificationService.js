@@ -189,3 +189,75 @@ export const checkAndNotifyApproval = async ({ companyId, status, contentTheme, 
         console.error('[Notification] Error in checkAndNotifyApproval:', err);
     }
 };
+
+/**
+ * Notifies users who have specifically opted-in to watch a column.
+ */
+export const notifyWatchers = async ({ companyId, status, contentTheme, triggeredByUserId }) => {
+    if (!companyId || !status) return;
+
+    try {
+        const { data: company, error: companyError } = await db
+            .from('company')
+            .select('user_id, collaborator_ids, companyName, kanban_settings')
+            .eq('companyId', companyId)
+            .single();
+
+        if (companyError || !company) return;
+
+        const allPotentialUserIds = [company.user_id, ...(company.collaborator_ids || [])];
+        const stateStr = (typeof status === 'object' ? status.state || status : status).toString();
+
+        // 1. Fetch user metadata for all team members using admin client
+        // Note: For large teams, this might need optimization/batching
+        const { data: { users }, error: authError } = await db.auth.admin.listUsers();
+        if (authError || !users) return;
+
+        const teamAuthUsers = users.filter(u => allPotentialUserIds.includes(u.id));
+        const notificationPayloads = [];
+
+        // 2. Fetch triggering user's name
+        let triggeredByName = 'A team member';
+        if (triggeredByUserId) {
+            const triggeringUser = users.find(u => u.id === triggeredByUserId);
+            triggeredByName = triggeringUser?.user_metadata?.full_name || triggeringUser?.email || triggeredByName;
+        }
+
+        for (const user of teamAuthUsers) {
+            // Don't notify the person who made the change
+            if (user.id === triggeredByUserId) continue;
+
+            const prefs = user.user_metadata?.notification_preferences?.[companyId]?.watchedColumns || {};
+
+            // Find the readable title for the current status inside company settings for better matching
+            let columnTitle = stateStr;
+            const columns = company.kanban_settings?.columns || [];
+            const colDef = columns.find(c => c.id === stateStr || c.title === stateStr);
+            if (colDef) {
+                columnTitle = colDef.title;
+            }
+
+            // Match by ID OR by Title (just in case)
+            const isWatching = (prefs[stateStr] === true) || (colDef && prefs[colDef.id] === true) || (prefs[columnTitle] === true);
+
+            if (isWatching) {
+                notificationPayloads.push({
+                    user_id: user.id,
+                    title: 'Column Update',
+                    message: `"${contentTheme || 'Untitled'}" moved to ${columnTitle}.`,
+                    type: 'info',
+                    link: `/company/${companyId}/calendar`,
+                    triggered_by_name: triggeredByName,
+                    company_name: company.companyName || 'Company',
+                    read: false
+                });
+            }
+        }
+
+        if (notificationPayloads.length > 0) {
+            await db.from('notifications').insert(notificationPayloads);
+        }
+    } catch (err) {
+        console.error('[Notification] Error in notifyWatchers:', err);
+    }
+};

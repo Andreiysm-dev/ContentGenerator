@@ -57,8 +57,8 @@ export function AIAssistant({
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (file.size > 5 * 1024 * 1024) {
-            notify("File too large (max 5MB)", "error");
+        if (file.size > 50 * 1024 * 1024) {
+            notify("File too large (max 50MB)", "error");
             return;
         }
 

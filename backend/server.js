@@ -21,9 +21,10 @@ import authMiddleware from "./middleware/auth.js";
 dotenv.config();
 
 // Image generation is hardcoded to Imagen 4.0 in imageGenerationService.js for stability
-import { initScheduler } from './services/schedulerService.js';
+import { initScheduler, initEmailScheduler } from './services/schedulerService.js';
 
 initScheduler();
+initEmailScheduler();
 
 
 const app = express();
