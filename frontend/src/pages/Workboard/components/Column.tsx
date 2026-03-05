@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { KanbanColumn, Post } from '../types';
 import { TaskCard } from './TaskCard';
-import { GripVertical, Lock } from 'lucide-react';
+import { GripVertical, Lock, ChevronLeft } from 'lucide-react';
 
 interface ColumnProps {
     column: KanbanColumn;
@@ -17,9 +17,11 @@ interface ColumnProps {
     onDeletePost?: (postId: string, e: React.MouseEvent) => void;
     onCardDelete?: (postId: string, e: React.MouseEvent) => void;
     isLocked?: boolean;
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
 }
 
-export function Column({ column, posts, onCardClick, generatingPostIds, onRename, onColorChange, onDeletePost, onCardDelete, isLocked }: ColumnProps) {
+export function Column({ column, posts, onCardClick, generatingPostIds, onRename, onColorChange, onDeletePost, onCardDelete, isLocked, isCollapsed, onToggleCollapse }: ColumnProps) {
     const [isEditing, setIsEditing] = React.useState(false);
     const [isEditingColor, setIsEditingColor] = React.useState(false);
     const [title, setTitle] = React.useState(column.title);
@@ -54,7 +56,7 @@ export function Column({ column, posts, onCardClick, generatingPostIds, onRename
         <div
             ref={setSortableRef}
             style={columnStyle}
-            className="w-[280px] min-w-[280px] max-w-[280px] flex flex-col shrink-0 h-full max-h-full"
+            className={`flex flex-col shrink-0 h-full max-h-full transition-all duration-300 ${isCollapsed ? "w-[60px] min-w-[60px]" : "w-[280px] min-w-[280px] max-w-[280px]"}`}
         >
             {/* Column Header — drag handle for column reordering */}
             <div className="flex items-center justify-between px-2 pb-3 shrink-0 group/header">
@@ -123,34 +125,52 @@ export function Column({ column, posts, onCardClick, generatingPostIds, onRename
                     <span className="bg-slate-200 text-slate-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0">
                         {posts.length}
                     </span>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onToggleCollapse?.(); }}
+                        className="p-1 hover:bg-slate-100 rounded text-slate-400 transition-all ml-auto"
+                    >
+                        <ChevronLeft size={14} className={`transition-transform duration-300 ${isCollapsed ? "rotate-180" : ""}`} />
+                    </button>
                 </div>
             </div>
 
-            {/* Column Content — scrollable droppable area */}
-            <div
-                ref={setDropRef}
-                className="flex-1 min-h-[600px] overflow-y-auto bg-slate-100/50 rounded-2xl p-2 border-2 border-dashed border-transparent hover:border-slate-200 transition-all"
-            >
-                <SortableContext items={posts.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                    <div className="flex flex-col gap-3">
-                        {posts.map((post) => (
-                            <TaskCard
-                                key={post.id}
-                                post={post}
-                                onClick={onCardClick}
-                                onDelete={onDeletePost || onCardDelete}
-                                isGenerating={generatingPostIds?.has(post.id)}
-                                statusColor={column.color}
-                            />
-                        ))}
-                        {posts.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-40 text-center px-4">
-                                <p className="text-xs font-semibold text-slate-400">No posts in {column.title}</p>
-                            </div>
-                        )}
-                    </div>
-                </SortableContext>
-            </div>
+            {isCollapsed ? (
+                <div className="flex-1 flex flex-col items-center justify-start relative cursor-pointer group/collapsed pt-4 gap-4" onClick={onToggleCollapse}>
+                    <div className="absolute inset-0 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 group-hover/collapsed:bg-blue-50/30 group-hover/collapsed:border-blue-200 transition-all" />
+                    <span className="relative z-10 bg-slate-200 text-slate-500 text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full uppercase shrink-0 group-hover/collapsed:bg-blue-600 group-hover/collapsed:text-white transition-all shadow-sm">
+                        {posts.length}
+                    </span>
+                    <h2 className="relative z-10 [writing-mode:vertical-lr] font-black text-slate-400 uppercase tracking-widest text-[10px] rotate-180 opacity-60 group-hover/collapsed:opacity-100 group-hover/collapsed:text-blue-700 transition-all py-4">
+                        {column.title}
+                    </h2>
+                </div>
+            ) : (
+                /* Column Content — scrollable droppable area */
+                <div
+                    ref={setDropRef}
+                    className="flex-1 min-h-[600px] overflow-y-auto bg-slate-100/50 rounded-2xl p-2 border-2 border-dashed border-transparent hover:border-slate-200 transition-all"
+                >
+                    <SortableContext items={posts.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                        <div className="flex flex-col gap-3">
+                            {posts.map((post) => (
+                                <TaskCard
+                                    key={post.id}
+                                    post={post}
+                                    onClick={onCardClick}
+                                    onDelete={onDeletePost || onCardDelete}
+                                    isGenerating={generatingPostIds?.has(post.id)}
+                                    statusColor={column.color}
+                                />
+                            ))}
+                            {posts.length === 0 && (
+                                <div className="flex flex-col items-center justify-center h-40 text-center px-4">
+                                    <p className="text-xs font-semibold text-slate-400">No posts in {column.title}</p>
+                                </div>
+                            )}
+                        </div>
+                    </SortableContext>
+                </div>
+            )}
         </div>
     );
 }

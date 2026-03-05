@@ -194,18 +194,30 @@ export function TaskCard({ post, onClick, onDelete, isGenerating, statusColor }:
                         {post.collaborators && post.collaborators.length > 0 && (
                             <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg">
                                 <Users size={10} className="text-slate-400" />
-                                <div className="flex -space-x-1.5 overflow-hidden">
+                                <div className="flex -space-x-3 overflow-hidden ml-1">
                                     {post.collaborators.slice(0, 3).map((c) => (
                                         <div
                                             key={c.id}
-                                            className="inline-block h-5 w-5 rounded-full ring-2 ring-white bg-indigo-500 flex items-center justify-center text-[8px] font-black text-white uppercase shadow-sm"
+                                            className="relative inline-block h-6 w-6 rounded-full ring-2 ring-white bg-indigo-500 shadow-sm overflow-hidden"
                                             title={c.email}
                                         >
-                                            {c.email?.substring(0, 1) || '?'}
+                                            <div className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-white uppercase">
+                                                {c.email?.substring(0, 2) || '?'}
+                                            </div>
+                                            {c.avatar_url && (
+                                                <img
+                                                    src={c.avatar_url}
+                                                    alt=""
+                                                    className="absolute inset-0 w-full h-full object-cover z-10"
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.opacity = '0';
+                                                    }}
+                                                />
+                                            )}
                                         </div>
                                     ))}
                                     {post.collaborators.length > 3 && (
-                                        <div className="flex items-center justify-center h-5 w-5 rounded-full ring-2 ring-white bg-slate-100 text-[8px] font-bold text-slate-500 shadow-sm">
+                                        <div className="flex items-center justify-center h-6 w-6 rounded-full ring-2 ring-white bg-slate-100 text-[9px] font-black text-slate-500 shadow-sm">
                                             +{post.collaborators.length - 3}
                                         </div>
                                     )}

@@ -49,6 +49,16 @@ export function KanbanView({
     const [posts, setPosts] = useState<Post[]>(initialPosts);
     const [activePost, setActivePost] = useState<Post | null>(null);
     const [activeColumn, setActiveColumn] = useState<KanbanColumn | null>(null);
+    const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set());
+
+    const toggleColumnCollapse = (columnId: string) => {
+        setCollapsedColumns(prev => {
+            const next = new Set(prev);
+            if (next.has(columnId)) next.delete(columnId);
+            else next.add(columnId);
+            return next;
+        });
+    };
 
     useEffect(() => {
         setPosts(initialPosts);
@@ -200,6 +210,8 @@ export function KanbanView({
                                 onColorChange={onColumnColorChange}
                                 onCardDelete={onCardDelete}
                                 isLocked={automations?.some(a => a.type === 'access_rule' && a.columnId === column.id)}
+                                isCollapsed={collapsedColumns.has(column.id)}
+                                onToggleCollapse={() => toggleColumnCollapse(column.id)}
                             />
                         ))}
                     </div>

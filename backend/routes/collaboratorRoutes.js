@@ -54,7 +54,12 @@ export const getCollaboratorsByCompanyId = async (req, res) => {
     // Owner
     const owner = users.find(u => u.id === companyRow.user_id);
     if (owner) {
-      result.push({ id: owner.id, email: owner.email, role: 'owner' });
+      result.push({
+        id: owner.id,
+        email: owner.email,
+        role: 'owner',
+        avatar_url: owner.user_metadata?.avatar_url
+      });
     }
     // Collaborators
     if (companyRow.collaborator_ids?.length) {
@@ -64,7 +69,8 @@ export const getCollaboratorsByCompanyId = async (req, res) => {
           result.push({
             id: u.id,
             email: u.email,
-            role: collaboratorRoles[u.id] || 'collaborator'
+            role: collaboratorRoles[u.id] || 'collaborator',
+            avatar_url: u.user_metadata?.avatar_url
           });
         }
       });

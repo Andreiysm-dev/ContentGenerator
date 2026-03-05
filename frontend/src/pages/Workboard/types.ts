@@ -10,6 +10,7 @@ export interface Collaborator {
     id: string;
     email: string;
     role: string;
+    avatar_url?: string;
 }
 
 export interface Post {
