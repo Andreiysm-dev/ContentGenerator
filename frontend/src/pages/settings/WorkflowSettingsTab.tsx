@@ -1,6 +1,99 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Plus, Trash2, ArrowRight, Save, Wand2, ImageIcon, CheckCircle2, RotateCcw, GripVertical, ShieldCheck, Pencil, Calendar } from 'lucide-react';
+import { Layout, Plus, Trash2, ArrowRight, Save, Wand2, ImageIcon, CheckCircle2, RotateCcw, GripVertical, ShieldCheck, Pencil, Calendar, Loader2 } from 'lucide-react';
 import { Card, SectionTitle, Input, Select } from '../SettingsPage';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+const SortableColumnItem = ({ col, isEditing, updateColumn, removeColumn, setEditingColorId, editingColorId, PRESET_COLORS }: any) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: col.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 1,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className="flex items-center gap-3 p-3 bg-slate-50/50 rounded-2xl border border-slate-100 group transition-all hover:border-blue-200"
+        >
+            {isEditing && (
+                <div
+                    {...attributes}
+                    {...listeners}
+                    className="cursor-grab text-slate-300 group-hover:text-slate-400 transition-colors p-1"
+                >
+                    <GripVertical size={18} />
+                </div>
+            )}
+            <div className="relative">
+                <button
+                    onClick={() => isEditing && setEditingColorId(editingColorId === col.id ? null : col.id)}
+                    disabled={!isEditing}
+                    className={`w-4 h-4 rounded-full border shadow-sm shrink-0 transition-transform ${isEditing ? 'hover:scale-110 cursor-pointer' : 'cursor-default'}`}
+                    style={{ backgroundColor: col.color }}
+                />
+                {isEditing && editingColorId === col.id && (
+                    <div className="absolute left-0 top-full mt-2 z-50 p-2 bg-white border border-slate-200 shadow-xl rounded-xl flex gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+                        {PRESET_COLORS.map((c: string) => (
+                            <button
+                                key={c}
+                                onClick={() => {
+                                    updateColumn(col.id, { color: c });
+                                    setEditingColorId(null);
+                                }}
+                                className={`w-4 h-4 rounded-full border ${col.color === c ? 'border-slate-900 border-2' : 'border-transparent'}`}
+                                style={{ backgroundColor: c }}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+            <div className="flex-1">
+                <input
+                    value={col.title}
+                    disabled={!isEditing}
+                    onChange={(e) => updateColumn(col.id, { title: e.target.value })}
+                    placeholder="Column Title"
+                    className={`w-full bg-transparent border-none text-sm font-bold text-slate-800 focus:ring-0 p-0 ${!isEditing ? 'cursor-default' : ''}`}
+                />
+            </div>
+            {isEditing && (
+                <button
+                    onClick={() => removeColumn(col.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                >
+                    <Trash2 size={14} />
+                </button>
+            )}
+        </div>
+    );
+};
 
 export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, notify, customRoles, userPermissions }: any) => {
     const [columns, setColumns] = useState([
@@ -38,6 +131,30 @@ export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, no
     const [newStatusColor, setNewStatusColor] = useState('#6366f1');
 
     const PRESET_COLORS = ['#6366f1', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#64748b', '#1e293b'];
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (active.id !== over?.id) {
+            setColumns((items) => {
+                const oldIndex = items.findIndex(i => i.id === active.id);
+                const newIndex = items.findIndex(i => i.id === over?.id);
+
+                return arrayMove(items, oldIndex, newIndex);
+            });
+        }
+    };
 
     const fetchSettings = async () => {
         if (!companyId) return;
@@ -194,55 +311,32 @@ export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, no
                         <Card className="mt-4 bg-white border-slate-200 shadow-sm overflow-visible p-6">
                             <div className="space-y-3">
                                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-4 px-1">Configure columns for the board and universal lifecycle states.</p>
-                                {columns.map((col, index) => (
-                                    <div key={col.id} className="flex items-center gap-3 p-3 bg-slate-50/50 rounded-2xl border border-slate-100 group transition-all hover:border-blue-200">
-                                        {isEditing && (
-                                            <div className="cursor-grab text-slate-300 group-hover:text-slate-400 transition-colors">
-                                                <GripVertical size={18} />
-                                            </div>
-                                        )}
-                                        <div className="relative">
-                                            <button
-                                                onClick={() => isEditing && setEditingColorId(editingColorId === col.id ? null : col.id)}
-                                                disabled={!isEditing}
-                                                className={`w-4 h-4 rounded-full border shadow-sm shrink-0 transition-transform ${isEditing ? 'hover:scale-110 cursor-pointer' : 'cursor-default'}`}
-                                                style={{ backgroundColor: col.color }}
-                                            />
-                                            {isEditing && editingColorId === col.id && (
-                                                <div className="absolute left-0 top-full mt-2 z-50 p-2 bg-white border border-slate-200 shadow-xl rounded-xl flex gap-1.5 animate-in fade-in zoom-in-95 duration-150">
-                                                    {PRESET_COLORS.map(c => (
-                                                        <button
-                                                            key={c}
-                                                            onClick={() => {
-                                                                updateColumn(col.id, { color: c });
-                                                                setEditingColorId(null);
-                                                            }}
-                                                            className={`w-4 h-4 rounded-full border ${col.color === c ? 'border-slate-900 border-2' : 'border-transparent'}`}
-                                                            style={{ backgroundColor: c }}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            )}
+
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    <SortableContext
+                                        items={columns.map(c => c.id)}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <div className="space-y-3">
+                                            {columns.map((col) => (
+                                                <SortableColumnItem
+                                                    key={col.id}
+                                                    col={col}
+                                                    isEditing={isEditing}
+                                                    updateColumn={updateColumn}
+                                                    removeColumn={removeColumn}
+                                                    setEditingColorId={setEditingColorId}
+                                                    editingColorId={editingColorId}
+                                                    PRESET_COLORS={PRESET_COLORS}
+                                                />
+                                            ))}
                                         </div>
-                                        <div className="flex-1">
-                                            <input
-                                                value={col.title}
-                                                disabled={!isEditing}
-                                                onChange={(e) => updateColumn(col.id, { title: e.target.value })}
-                                                placeholder="Column Title"
-                                                className={`w-full bg-transparent border-none text-sm font-bold text-slate-800 focus:ring-0 p-0 ${!isEditing ? 'cursor-default' : ''}`}
-                                            />
-                                        </div>
-                                        {isEditing && (
-                                            <button
-                                                onClick={() => removeColumn(col.id)}
-                                                className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
+                                    </SortableContext>
+                                </DndContext>
                                 {isEditing && (
                                     isAddingStatus ? (
                                         <div className="p-4 bg-slate-50 rounded-2xl border border-blue-100 animate-in zoom-in-95 duration-200 mt-4">
@@ -552,7 +646,7 @@ export const WorkflowSettingsTab = ({ companyId, backendBaseUrl, authedFetch, no
                     </div>
 
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
