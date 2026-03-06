@@ -59,7 +59,10 @@ interface ImageHubPageProps {
         description: string;
         confirmLabel: string;
         cancelLabel: string;
-    }) => Promise<boolean>;
+        thirdLabel?: string;
+        confirmVariant?: 'primary' | 'danger';
+        thirdVariant?: 'primary' | 'danger' | 'ghost';
+    }) => Promise<boolean | 'third'>;
     setSelectedRow: React.Dispatch<React.SetStateAction<any | null>>;
     userPermissions?: {
         canApprove: boolean;

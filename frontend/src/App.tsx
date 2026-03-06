@@ -3297,6 +3297,7 @@ function App() {
                         recentStatusMoves.current.set(postId, { status, originalStatus, ts: Date.now() });
                       }}
                       userPermissions={userPermissions}
+                      requestConfirm={requestConfirm}
                     />
                   }
                 />
@@ -3318,6 +3319,7 @@ function App() {
                       authedFetch={authedFetch}
                       backendBaseUrl={backendBaseUrl}
                       userPermissions={userPermissions}
+                      requestConfirm={requestConfirm}
                     />
                   }
                 />

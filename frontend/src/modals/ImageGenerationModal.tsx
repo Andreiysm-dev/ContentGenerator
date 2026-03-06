@@ -28,7 +28,10 @@ interface ImageGenerationModalProps {
         description: string;
         confirmLabel: string;
         cancelLabel: string;
-    }) => Promise<boolean>;
+        thirdLabel?: string;
+        confirmVariant?: 'primary' | 'danger';
+        thirdVariant?: 'primary' | 'danger' | 'ghost';
+    }) => Promise<boolean | 'third'>;
     reopenImageModalOnImageReadyRef: React.MutableRefObject<boolean>;
     imageModalReopenTimeoutRef: React.MutableRefObject<number | null>;
     getImageGeneratedSignature: (row: any | null) => string | null;

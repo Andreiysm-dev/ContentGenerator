@@ -58,6 +58,15 @@ interface DraftsPageProps {
     canDelete: boolean;
     isOwner: boolean;
   };
+  requestConfirm: (config: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    thirdLabel?: string;
+    confirmVariant?: 'primary' | 'danger';
+    thirdVariant?: 'primary' | 'danger' | 'ghost';
+  }) => Promise<boolean | 'third'>;
 }
 
 type TabType = 'drafts' | 'scheduled' | 'published';
@@ -75,6 +84,7 @@ export function StudioPage({
   connectedAccounts,
   authedFetch,
   backendBaseUrl,
+  requestConfirm,
   userPermissions = {
     canApprove: false,
     canGenerate: false,
@@ -196,7 +206,7 @@ export function StudioPage({
     // Normalize and SANITIZE tab statuses: Only match against current columns or known core IDs
     const tabStatuses = (tab.statuses || [])
       .map((s: string) => s.toLowerCase())
-      .filter(s => colIds.includes(s) || colTitles.includes(s) || s === 'scheduled' || s === 'published' || s === 'idea');
+      .filter((s: string) => colIds.includes(s) || colTitles.includes(s) || s === 'scheduled' || s === 'published' || s === 'idea');
 
     return allRows.filter(r => {
       const title = String(r.statusTitle || '').toLowerCase();

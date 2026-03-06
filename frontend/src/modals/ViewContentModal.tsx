@@ -21,7 +21,10 @@ interface ViewContentModalProps {
         description: string;
         confirmLabel: string;
         cancelLabel: string;
-    }) => Promise<boolean>;
+        thirdLabel?: string;
+        confirmVariant?: 'primary' | 'danger';
+        thirdVariant?: 'primary' | 'danger' | 'ghost';
+    }) => Promise<boolean | 'third'>;
     isGeneratingCaption: boolean;
     setIsGeneratingCaption: (generating: boolean) => void;
     authedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
