@@ -24,7 +24,8 @@ import {
     CheckCircle2,
     XCircle,
     Info,
-    Bell
+    Bell,
+    Lock
 } from 'lucide-react';
 import { SOKMED_COLUMNS } from './types';
 import type { KanbanColumn, Post, SokMedStatus } from './types';
