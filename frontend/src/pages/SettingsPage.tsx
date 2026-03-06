@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
-import { Settings as SettingsIcon, Trash2, Plus, Pencil, Save, X, ShieldCheck, Zap, UserPlus, Users, Check, Info, Activity } from "lucide-react";
+import { Settings as SettingsIcon, Trash2, Plus, Pencil, Save, X, ShieldCheck, Zap, UserPlus, Users, Check, Info, Activity, Layout, Link2, GitBranch } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { BrandCoreTab } from "./settings/BrandCoreTab";
 import { WorkflowSettingsTab } from "./settings/WorkflowSettingsTab";
@@ -139,23 +139,30 @@ export type CompanySettingsShellProps = {
   onRefreshAccounts?: () => Promise<void>;
   backendBaseUrl: string;
 };
-
-const TabLink = ({ to, id, children, pressedTab, onClick }: { to: string; id: CompanySettingsTab; children: React.ReactNode; pressedTab: string | null; onClick: () => void }) => (
+const TabLink = ({ to, id, icon: Icon, children, pressedTab, onClick }: {
+  to: string;
+  id: CompanySettingsTab;
+  icon: any;
+  children: React.ReactNode;
+  pressedTab: string | null;
+  onClick: () => void
+}) => (
   <NavLink
     to={to}
     onClick={onClick}
     className={({ isActive }) => {
-      const base = "inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-bold transition " + "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/25 focus-visible:ring-offset-2";
-      const active = "bg-[#3fa9f5]/10 text-[#3fa9f5] border border-[#3fa9f5]/20";
-      const inactive = "bg-transparent text-slate-800/80 border border-transparent hover:text-[#3fa9f5] hover:-translate-y-[1px]";
-      const pressed = pressedTab === id ? " scale-[0.99]" : "";
+      const base = "group relative inline-flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-black transition-all duration-150 ease-out transform-gpu " +
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3fa9f5]/20";
+      const active = "bg-[#3fa9f5] !text-white shadow-md shadow-[#3fa9f5]/20 -translate-y-0.5";
+      const inactive = "bg-transparent !text-slate-500 hover:!text-[#3fa9f5] hover:bg-[#3fa9f5]/5";
+      const pressed = pressedTab === id ? " scale-95" : "";
       return `${base} ${isActive ? active : inactive}${pressed}`;
     }}
   >
-    {children}
+    <Icon size={16} className="transition-transform duration-300 group-hover:scale-110 shrink-0" />
+    <span className="relative z-10 uppercase tracking-widest text-[10px] whitespace-nowrap">{children}</span>
   </NavLink>
 );
-
 export const Card = ({ title, subtitle, action, children, className = "" }: { title?: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) => (
   <div className={"rounded-2xl border border-slate-200/70 bg-white shadow-[0_10px_22px_rgba(11,38,65,0.08)] " + "p-4 sm:p-5 " + className}>
     {(title || subtitle || action) && (
@@ -510,33 +517,31 @@ export function SettingsPage(props: CompanySettingsShellProps) {
           </div>
 
           {/* Tabs Navigation */}
-          <div className="z-30 bg-white px-4 md:px-6 pt-3 pb-2 shadow-sm border-b border-slate-100">
-            <div className="relative flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-white p-1 shadow-sm">
-              <TabLink to={`${companyUrlBase}/overview`} id="overview" pressedTab={pressedTab} onClick={() => setPressedTab("overview")}>
+          <div className="z-30 bg-white px-4 md:px-8 py-4 border-b border-slate-100">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <TabLink to={`${companyUrlBase}/overview`} id="overview" icon={Layout} pressedTab={pressedTab} onClick={() => setPressedTab("overview")}>
                 Overview
               </TabLink>
-              <TabLink to={`${companyUrlBase}/brand-intelligence`} id="brand-intelligence" pressedTab={pressedTab} onClick={() => setPressedTab("brand-intelligence")}>
+              <TabLink to={`${companyUrlBase}/brand-intelligence`} id="brand-intelligence" icon={Zap} pressedTab={pressedTab} onClick={() => setPressedTab("brand-intelligence")}>
                 Brand Core
               </TabLink>
-              <TabLink to={`${companyUrlBase}/workflow`} id="workflow" pressedTab={pressedTab} onClick={() => setPressedTab("workflow")}>
+              <TabLink to={`${companyUrlBase}/workflow`} id="workflow" icon={GitBranch} pressedTab={pressedTab} onClick={() => setPressedTab("workflow")}>
                 Workflow
               </TabLink>
-              <TabLink to={`${companyUrlBase}/team`} id="team" pressedTab={pressedTab} onClick={() => setPressedTab("team")}>
+              <TabLink to={`${companyUrlBase}/team`} id="team" icon={Users} pressedTab={pressedTab} onClick={() => setPressedTab("team")}>
                 Team
               </TabLink>
-              <TabLink to={`${companyUrlBase}/integrations`} id="integrations" pressedTab={pressedTab} onClick={() => setPressedTab("integrations")}>
+              <TabLink to={`${companyUrlBase}/integrations`} id="integrations" icon={Link2} pressedTab={pressedTab} onClick={() => setPressedTab("integrations")}>
                 Integrations
               </TabLink>
-              <TabLink to={`${companyUrlBase}/audit`} id="audit" pressedTab={pressedTab} onClick={() => setPressedTab("audit")}>
+              <TabLink to={`${companyUrlBase}/audit`} id="audit" icon={Activity} pressedTab={pressedTab} onClick={() => setPressedTab("audit")}>
                 Audit
               </TabLink>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-slate-900/5" />
             </div>
           </div>
 
-          {/* Panel */}
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <div key={tab} className="pt-2 animate-[panelFade_160ms_ease-out] px-4 md:p-6">
+          <div className="flex-1 overflow-y-auto min-h-0 bg-slate-50/50">
+            <div key={tab} className="pt-2 animate-[page-fade-in_200ms_ease-out] px-4 md:p-6 transform-gpu">
               {tab === "overview" && (
                 <div className="rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white/90 to-[#eef4fa]/95 p-4 sm:p-5 shadow-[0_10px_22px_rgba(11,38,65,0.08)]">
                   <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">

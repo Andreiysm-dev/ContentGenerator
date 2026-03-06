@@ -54,6 +54,7 @@ import { ImageHubPage } from '@/pages/ImageHubPage';
 import { SOKMED_COLUMNS } from './pages/Workboard/types';
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { MaintenancePage } from '@/pages/MaintenancePage';
+import { SchedulerPage } from '@/pages/SchedulerPage';
 
 
 
@@ -3246,6 +3247,41 @@ function App() {
                       }}
                       requestConfirm={requestConfirm}
                       userPermissions={userPermissions}
+                    />
+                  }
+                />
+
+                <Route
+                  path="/company/:companyId/scheduler"
+                  element={
+                    <SchedulerPage
+                      calendarRows={calendarRows}
+                      setCalendarRows={setCalendarRows}
+                      activeCompanyId={activeCompanyId || undefined}
+                      activeCompany={activeCompany}
+                      getStatusValue={getStatusValue}
+                      getImageGeneratedUrl={getImageGeneratedUrl}
+                      setSelectedRow={setSelectedRow}
+                      setIsViewModalOpen={setIsViewModalOpen}
+                      isViewModalOpen={isViewModalOpen}
+                      selectedRow={selectedRow}
+                      notify={notify}
+                      navigate={navigate}
+                      userPermissions={userPermissions}
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      imagePreviewNonce={imagePreviewNonce}
+                      handleCopy={handleCopy}
+                      copiedField={copiedField}
+                      setIsDraftModalOpen={setIsDraftModalOpen}
+                      setDraftPublishIntent={setDraftPublishIntent}
+                      requestConfirm={requestConfirm}
+                      isGeneratingCaption={isGeneratingCaption}
+                      setIsGeneratingCaption={setIsGeneratingCaption}
+                      refreshCalendarRow={refreshCalendarRow}
+                      setIsImageModalOpen={setIsImageModalOpen}
+                      setBrandKbId={setBrandKbId}
+                      setSystemInstruction={setSystemInstruction}
                     />
                   }
                 />

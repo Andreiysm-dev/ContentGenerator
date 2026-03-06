@@ -1,4 +1,4 @@
-import { Archive, BarChart3, Boxes, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, Image, LayoutDashboard, Magnet, Plus, Settings, Wand2, Target, ShieldCheck, Users } from "lucide-react";
+import { Archive, BarChart3, Boxes, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, Image, LayoutDashboard, Magnet, Plus, Settings, Wand2, Target, ShieldCheck, Users, Layout } from "lucide-react";
 import type { NavigateFunction } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -150,7 +150,8 @@ export function Sidebar({
                 <div className="text-[10px] tracking-[0.2em] uppercase text-white/20 font-black px-3 mb-1">Main Workspace</div>
                 {[
                   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "dashboard" },
-                  { key: "calendar", label: "Content Board", icon: CalendarDays, path: "calendar" },
+                  { key: "calendar", label: "Content Board", icon: Layout, path: "calendar" },
+                  { key: "scheduler", label: "Calendar", icon: CalendarDays, path: "scheduler" },
                   { key: "settings", tourKey: "company-settings", label: "Company Settings", icon: Settings, path: "settings/overview" },
                 ].map((item: any) => {
                   const Icon = item.icon;
