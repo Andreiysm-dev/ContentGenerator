@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Loader2, Users, Clock, AlertCircle, Trash2, CheckSquare } from 'lucide-react';
+import { Calendar, Loader2, Users, Clock, AlertCircle, Archive, CheckSquare } from 'lucide-react';
 import type { Post } from '../types';
 
 interface TaskCardProps {
@@ -106,10 +106,10 @@ export function TaskCard({ post, onClick, onDelete, isGenerating, statusColor }:
                         e.preventDefault();
                         onDelete(post.id, e);
                     }}
-                    className="absolute top-2 right-2 z-[60] p-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-lg ring-1 ring-black/5"
-                    title="Delete Card"
+                    className="absolute top-2 right-2 z-[60] p-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl text-slate-400 hover:text-blue-500 hover:border-blue-200 hover:bg-blue-50 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-lg ring-1 ring-black/5"
+                    title="Archive or Delete"
                 >
-                    <Trash2 size={14} className="shrink-0" />
+                    <Archive size={14} className="shrink-0" />
                 </button>
             )}
 

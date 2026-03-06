@@ -1,4 +1,4 @@
-import { BarChart3, Boxes, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, Image, LayoutDashboard, Magnet, Plus, Settings, Wand2, Target, ShieldCheck, Users } from "lucide-react";
+import { Archive, BarChart3, Boxes, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, FileText, Headphones, HelpCircle, Image, LayoutDashboard, Magnet, Plus, Settings, Wand2, Target, ShieldCheck, Users } from "lucide-react";
 import type { NavigateFunction } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -179,9 +179,8 @@ export function Sidebar({
                 <div className="text-[10px] tracking-[0.2em] uppercase text-white/20 font-black px-3 mb-1">Creative Suite</div>
                 {[
                   { key: "planner", label: "Content Planner", icon: Target, path: "plan" },
-                  { key: "generate", label: "AI Creator", tourKey: "create", icon: Wand2, path: "generate" },
-                  { key: "image-hub", label: "Visual Assets", icon: Image, path: "image-hub" },
-                  { key: "studio", label: "Studio Explorer", icon: FileText, path: "studio" },
+                  { key: "generate", label: "Create", tourKey: "create", icon: Wand2, path: "generate" },
+                  { key: "studio", label: "Content Studio", icon: FileText, path: "studio" },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isActive = activeNavKey === item.key;
@@ -210,7 +209,7 @@ export function Sidebar({
                 {[
                   { key: "leads", label: "Lead Generation", icon: Magnet, path: "leads" },
                   { key: "toolbox", label: "Marketing AI", icon: Boxes, path: "toolbox" },
-                  { key: "published", label: "Published Posts", icon: CalendarCheck, path: "calendar/published" },
+                  { key: "published", label: "Archives", icon: Archive, path: "calendar/published" },
                   { key: "insights", label: "Analytics", icon: BarChart3, path: "insights" },
                 ].map((item) => {
                   const Icon = item.icon;

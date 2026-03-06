@@ -88,7 +88,7 @@ export function StudioPage({
 
   const studioSettings = activeCompany?.kanban_settings?.studio_settings;
   const studioTabs = studioSettings?.studioTabs || [
-    { id: 'drafts', label: 'Post Drafts', icon: 'Edit', statuses: ['Draft', 'Drafts', 'To Do', 'Caption Generated', 'Design Generated', 'Revision', 'For Approval'] },
+    { id: 'drafts', label: 'Post Drafts', icon: 'Edit', statuses: ['To Do', 'Drafts', 'Caption Generated', 'Design Generated'] },
     { id: 'scheduled', label: 'Scheduled', icon: 'Clock', statuses: ['Approved', 'Scheduled'] },
     { id: 'published', label: 'Published', icon: 'CheckCircle2', statuses: ['Published'] }
   ];
@@ -148,14 +148,24 @@ export function StudioPage({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Filtering Logic
-  const allRows = calendarRows.map(row => ({
-    ...row,
-    normalizedStatus: getStatusValue(row.status).toLowerCase(),
-    displayStatus: getStatusValue(row.status)
-  }));
+  const allRows = calendarRows.map(row => {
+    const rawValue = getStatusValue(row.status);
+    return {
+      ...row,
+      statusTitle: rawValue
+    };
+  });
+
+  // Simple label map for common fallbacks
+  const labelMap: Record<string, string> = {
+    'idea': 'Idea',
+    'scheduled': 'Scheduled',
+    'published': 'Published'
+  };
 
   const iconMap: Record<string, any> = {
     'Edit': Edit,
@@ -179,41 +189,61 @@ export function StudioPage({
     const tab = studioTabs.find((t: any) => t.id === tabId);
     if (!tab) return [];
 
-    // Normalize tab statuses for comparison
-    const tabStatuses = (tab.statuses || []).map((s: string) => s.toLowerCase());
+    const companyCols = activeCompany?.kanban_settings?.columns || [];
+    const colIds = companyCols.map((c: any) => c.id.toLowerCase());
+    const colTitles = companyCols.map((c: any) => c.title.toLowerCase());
+
+    // Normalize and SANITIZE tab statuses: Only match against current columns or known core IDs
+    const tabStatuses = (tab.statuses || [])
+      .map((s: string) => s.toLowerCase())
+      .filter(s => colIds.includes(s) || colTitles.includes(s) || s === 'scheduled' || s === 'published' || s === 'idea');
 
     return allRows.filter(r => {
-      const s = r.normalizedStatus;
-      // Basic fallback: if it's the 'drafts' tab and status isn't idea/scheduled/published
-      if (tab.id === 'drafts' && !tabStatuses.length) {
-        return s !== "idea" && s !== "scheduled" && s !== "published";
+      const title = String(r.statusTitle || '').toLowerCase();
+      const originalStatus = String(r.status || '').toLowerCase();
+
+      // STRICT MATCHING: Only show if the status is explicitly in the sanitized list
+      if (tabStatuses.length > 0) {
+        return tabStatuses.includes(title) || tabStatuses.includes(originalStatus);
       }
-      return tabStatuses.includes(s);
+
+      // Safe fallback if tab configuration is empty (rare)
+      if (tab.id === 'drafts') {
+        return !["idea", "scheduled", "published"].includes(title) && !["idea", "scheduled", "published"].includes(originalStatus);
+      }
+
+      return false;
     });
   };
 
   const currentTabRows = getRowsForTab(activeTab);
 
   const getStatusLabel = (row: any) => {
-    const s = row.normalizedStatus;
-
-    // Check custom columns first
+    const s = String(row.status || '').toLowerCase();
+    const st = String(row.statusTitle || '').toLowerCase();
     const companyCols = activeCompany?.kanban_settings?.columns || [];
     const match = companyCols.find((c: any) =>
       c.id.toLowerCase() === s ||
-      c.title.toLowerCase() === s
+      c.title.toLowerCase() === s ||
+      c.id.toLowerCase() === st ||
+      c.title.toLowerCase() === st
     );
-    if (match) return match.title;
 
-    if (s === 'for approval') return 'For Approval';
-    if (s === 'ready' || s === 'approved') return 'Ready';
-    if (s === 'reviewed' || s === 'design completed') return 'Reviewed';
-    if (s === 'draft' && (row.finalCaption || row.captionOutput)) return 'Drafting';
-    return s;
+    if (st === 'for approval') return 'For Approval';
+    if (st === 'ready' || st === 'approved') return 'Ready';
+    if (st === 'reviewed' || st === 'design completed') return 'Reviewed';
+    return match ? match.title : (labelMap[st] || row.statusTitle || st.replace(/\b\w/g, (l: string) => l.toUpperCase()));
   };
 
   const getActiveRows = () => {
     let rows = currentTabRows;
+
+    if (selectedStatusFilter !== 'all') {
+      rows = rows.filter(r =>
+        String(r.status || '').toLowerCase() === selectedStatusFilter.toLowerCase() ||
+        String(r.statusTitle || '').toLowerCase() === selectedStatusFilter.toLowerCase()
+      );
+    }
 
     // Channel Filtering
     if (selectedChannelId) {
@@ -221,6 +251,11 @@ export function StudioPage({
       const provider = selectedAccount?.provider?.toLowerCase();
 
       rows = rows.filter(r => {
+        // Precise matching for published posts
+        if (r.social_account_id) {
+          return r.social_account_id === selectedChannelId;
+        }
+
         let raw = r.channels || r.platform || [];
         let rowChans: string[] = [];
 
@@ -238,21 +273,15 @@ export function StudioPage({
           rowChans = raw.split(',').map(c => c.trim().toLowerCase());
         }
 
-        // Precise matching for published posts
-        if (activeTab === 'published' && r.social_account_id) {
-          return r.social_account_id === selectedChannelId;
-        }
-
         return rowChans.some(c => {
           if (!c) return false;
           // Match by UUID/ID
           if (c === selectedChannelId?.toLowerCase()) return true;
 
-          // Fuzzy match by provider name - ONLY if there's no specific social_account_id
-          // or if the account provider matches and the post is NOT yet published to a specific ID
-          if (provider && (c.includes(provider) || provider.includes(c))) {
-            // If it's a published post but has a DIFFERENT account ID, don't match
-            if (r.social_account_id && r.social_account_id !== selectedChannelId) return false;
+          // Fuzzy match by provider name only if there are no UUIDs in the list
+          // and we don't have a specific record for another account on same provider
+          const hasUuids = rowChans.some(rc => rc.match(/^[0-9a-f-]{36}$/));
+          if (!hasUuids && provider && (c.includes(provider) || provider.includes(c))) {
             return true;
           }
           return false;
@@ -326,12 +355,26 @@ export function StudioPage({
     return <Globe className="w-5 h-5" />;
   };
 
-  const tabConfigs = studioTabs.map((t: any) => ({
-    id: t.id,
-    label: t.label,
-    icon: iconMap[t.icon] || Edit,
-    count: getRowsForTab(t.id).length
-  }));
+  const tabConfigs = studioTabs.map((t: any) => {
+    const tabRows = getRowsForTab(t.id);
+    let count = tabRows.length;
+
+    // If a channel is selected, show the count for that channel within the tab
+    if (selectedChannelId) {
+      count = tabRows.filter(r => {
+        if (r.social_account_id) return r.social_account_id === selectedChannelId;
+        const rowChans = Array.isArray(r.channels) ? r.channels : (r.channels ? [r.channels] : []);
+        return rowChans.some((c: any) => String(c).toLowerCase() === selectedChannelId.toLowerCase());
+      }).length;
+    }
+
+    return {
+      id: t.id,
+      label: t.label,
+      icon: iconMap[t.icon] || Edit,
+      count
+    };
+  });
 
 
 
@@ -480,6 +523,23 @@ export function StudioPage({
                   </button>
                 </div>
 
+                <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 backdrop-blur-sm">
+                  <select
+                    value={selectedStatusFilter}
+                    onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                    className="bg-transparent text-white text-xs font-bold outline-none px-2 py-1 cursor-pointer"
+                  >
+                    <option value="all" className="bg-slate-900">All Statuses</option>
+                    {(() => {
+                      const tab = studioTabs.find((t: any) => t.id === activeTab);
+                      const tStatuses = tab?.statuses || [];
+                      return tStatuses.map((s: string) => (
+                        <option key={s} value={s} className="bg-slate-900">{s}</option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+
                 <div className="relative group w-full sm:w-64">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                   <input
@@ -513,7 +573,10 @@ export function StudioPage({
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id as TabType)}
+                      onClick={() => {
+                        setActiveTab(tab.id as TabType);
+                        setSelectedStatusFilter('all');
+                      }}
                       className={`relative flex items-center gap-3 px-6 py-3 rounded-[1.5rem] text-sm font-black transition-all duration-300 ${isActive
                         ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/10'
                         : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
@@ -585,12 +648,15 @@ export function StudioPage({
                           className="group bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-slate-200/50 hover:-translate-y-1 transition-all duration-500"
                         >
                           {/* Visual Preview */}
-                          <div className="relative aspect-square overflow-hidden bg-slate-100 group/img">
+                          <div
+                            className="relative aspect-square overflow-hidden bg-slate-100 group/img cursor-pointer"
+                            onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
+                          >
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
                                 alt=""
-                                className="w-full h-full object-cover transition-all duration-700 group-hover/img:scale-[1.2] cursor-zoom-in"
+                                className="w-full h-full object-cover transition-all duration-700 group-hover/img:scale-[1.2]"
                               />
                             ) : (
                               <div className={`w-full h-full flex items-center justify-center text-slate-200 bg-slate-100`}>
@@ -600,16 +666,9 @@ export function StudioPage({
 
                             {/* Hover Actions */}
                             <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm flex items-center justify-center gap-3">
-                              <button
-                                onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}
-                                className="p-4 bg-white rounded-2xl text-slate-900 hover:bg-blue-50 hover:text-blue-600 transition-all transform translate-y-4 group-hover:translate-y-0 duration-300"
-                                title="Quick View"
-                              >
-                                <Eye className="w-5 h-5" />
-                              </button>
                               {imageUrl && (
                                 <button
-                                  onClick={() => window.open(imageUrl, '_blank')}
+                                  onClick={(e) => { e.stopPropagation(); window.open(imageUrl, '_blank'); }}
                                   className="p-4 bg-white rounded-2xl text-slate-900 hover:bg-blue-50 hover:text-blue-600 transition-all transform translate-y-4 group-hover:translate-y-0 duration-300 delay-[50ms]"
                                   title="Download Asset"
                                 >
@@ -735,7 +794,10 @@ export function StudioPage({
                                   key={row.contentCalendarId}
                                   className="group flex flex-col md:flex-row gap-6 bg-white border border-slate-200 p-6 rounded-2xl hover:shadow-xl hover:border-blue-100 transition-all duration-300"
                                 >
-                                  <div className="w-full md:w-32 h-32 rounded-xl bg-slate-50 overflow-hidden flex-shrink-0 relative group/thumb">
+                                  <div
+                                    className="w-full md:w-32 h-32 rounded-xl bg-slate-50 overflow-hidden flex-shrink-0 relative group/thumb cursor-pointer"
+                                    onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
+                                  >
                                     {imageUrl ? (
                                       <img src={imageUrl} alt="" className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-500" />
                                     ) : (
@@ -773,12 +835,6 @@ export function StudioPage({
                                         )}
                                       </div>
                                       <div className="flex gap-2 shrink-0">
-                                        <button
-                                          onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}
-                                          className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                        >
-                                          <Eye className="w-4 h-4" />
-                                        </button>
                                         <button
                                           onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
                                           className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -931,10 +987,19 @@ export function StudioPage({
                                   key={c.id}
                                   onClick={() => {
                                     const nt = [...localStudioSettings.studioTabs];
+                                    const currentStatuses = tab.statuses || [];
+                                    const colId = c.id;
+                                    const colTitle = c.title;
+
                                     if (isSel) {
-                                      nt[tIdx].statuses = tab.statuses.filter((s: string) => s !== c.id);
+                                      // Remove ALL instances of ID and Title to purge duplicates/legacy names
+                                      nt[tIdx].statuses = currentStatuses.filter((s: string) =>
+                                        s.toLowerCase() !== colId.toLowerCase() &&
+                                        s.toLowerCase() !== colTitle.toLowerCase()
+                                      );
                                     } else {
-                                      nt[tIdx].statuses = [...tab.statuses, c.id];
+                                      // Add ID and Title for maximum match compatibility
+                                      nt[tIdx].statuses = [...currentStatuses, colId];
                                     }
                                     setLocalStudioSettings({ ...localStudioSettings, studioTabs: nt });
                                   }}

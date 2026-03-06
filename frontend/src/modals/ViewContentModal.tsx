@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Wand2, Check, Copy, Clock, Target, Layout, MessageSquare, Calendar, Zap, ClipboardList, PenLine, X, Eye, FileText, MousePointer2, Tag as TagIcon, Share2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Info, ShieldCheck, BarChart3, ArrowRight, Send, Trash2, MessageCircle, Plus, X as XIcon, Hash, Loader2, Edit3, Maximize2 } from 'lucide-react';
+import { ExternalLink, Wand2, Image as ImageIcon, Check, Copy, Clock, Target, Layout, MessageSquare, Calendar, Zap, ClipboardList, PenLine, X, Eye, FileText, MousePointer2, Tag as TagIcon, Share2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Info, ShieldCheck, BarChart3, ArrowRight, Send, Trash2, MessageCircle, Plus, X as XIcon, Hash, Loader2, Edit3, Maximize2 } from 'lucide-react';
 import type { Tag } from '../pages/Workboard/types';
 import { useNavigate } from 'react-router-dom';
 
@@ -111,18 +111,7 @@ export function ViewContentModal({
     const [editingListTitle, setEditingListTitle] = useState('');
     const [isFullscreenImage, setIsFullscreenImage] = useState(false);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-    const hasCaptionContent = !!(
-        selectedRow?.finalCaption ||
-        selectedRow?.captionOutput ||
-        selectedRow?.final_caption ||
-        selectedRow?.caption_output ||
-        selectedRow?.caption ||
-        selectedRow?.description ||
-        selectedRow?.finalDescription ||
-        selectedRow?.final_description ||
-        selectedRow?.caption_draft ||
-        selectedRow?.draft_caption
-    );
+
 
     const currentStatusInModal = getStatusValue(selectedRow?.status);
     const lockRuleInModal = automations?.find(a => a.type === 'access_rule' && a.columnId === currentStatusInModal);
@@ -682,16 +671,6 @@ export function ViewContentModal({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => {
-                                    onClose();
-                                    navigate(`/company/${activeCompanyId}/studio/${selectedRow.contentCalendarId}`);
-                                }}
-                                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
-                            >
-                                <Edit3 size={16} />
-                                Edit in Studio
-                            </button>
                             <button
                                 type="button"
                                 onClick={onClose}
@@ -1650,23 +1629,14 @@ export function ViewContentModal({
 
                         <button
                             type="button"
-                            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed ${hasCaptionContent
-                                ? 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-700'
-                                : 'bg-white text-brand-dark border border-slate-200/70 opacity-40'
-                                }`}
-                            disabled={!hasCaptionContent}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold bg-blue-600 text-white shadow-sm ring-1 ring-inset ring-black/5 transition hover:bg-blue-700 active:bg-blue-800 active:translate-y-[1px] focus-visible:outline-none"
                             onClick={() => {
-                                if (!hasCaptionContent) return;
-
-                                const companyId = selectedRow?.companyId ?? activeCompanyId;
-                                if (companyId) {
-                                    onClose();
-                                    navigate(`/company/${encodeURIComponent(companyId)}/image-hub?id=${selectedRow.contentCalendarId}`);
-                                }
+                                onClose();
+                                navigate(`/company/${activeCompanyId}/studio/${selectedRow.contentCalendarId}`);
                             }}
                         >
-                            <Wand2 size={16} />
-                            Open in Image Hub
+                            <Edit3 size={16} />
+                            Edit in Studio
                         </button>
 
                         <button

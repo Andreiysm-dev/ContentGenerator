@@ -34,6 +34,7 @@ import {
   Target,
   SearchX,
   Lock,
+  Archive,
   Bell,
   Loader2,
   XCircle,
@@ -100,6 +101,15 @@ export type CalendarPageProps = {
     canDelete: boolean;
     isOwner: boolean;
   };
+  requestConfirm: (config: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    thirdLabel?: string;
+    confirmVariant?: 'primary' | 'danger';
+    thirdVariant?: 'primary' | 'danger' | 'ghost';
+  }) => Promise<boolean | 'third'>;
 };
 
 function statusKey(status: string) {
@@ -125,6 +135,8 @@ function statusBadgeClasses(key: string) {
       return "bg-violet-400/10 text-violet-700 border-violet-400/20";
     case "published":
       return "bg-[#3fa9f5]/10 text-[#3fa9f5] border-[#3fa9f5]/20";
+    case "archived":
+      return "bg-slate-400/10 text-slate-500 border-slate-400/20";
     case "draft":
     default:
       return "bg-slate-300/20 text-slate-600 border-slate-300/30";
@@ -306,6 +318,55 @@ export function CalendarPage(props: CalendarPageProps) {
     }
   };
 
+  const handleArchiveOrDelete = async (postId: string, e: any) => {
+    if (e?.stopPropagation) e.stopPropagation();
+    const row = calendarRows.find(r => r.contentCalendarId === postId);
+    const currentStatus = row?.status;
+
+    const result = await props.requestConfirm({
+      title: 'Archive or Delete?',
+      description: 'Do you want to archive this post or permanently delete it? Archived items can be restored from the Archives tab.',
+      confirmLabel: 'Permanently Delete',
+      cancelLabel: 'Keep Post',
+      thirdLabel: 'Archive Post',
+      confirmVariant: 'danger',
+      thirdVariant: 'primary'
+    });
+
+    if (result === 'third') {
+      // Archive
+      try {
+        const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${postId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: {
+              state: 'Archived',
+              last_state: getStatusValue(currentStatus)
+            }
+          }),
+        });
+        if (!res.ok) throw new Error('Archive failed');
+        setCalendarRows(prev => prev.map(r => r.contentCalendarId === postId ? { ...r, status: 'Archived' } : r));
+        notify('Post archived', 'success');
+      } catch (err: any) {
+        notify(err.message, 'error');
+      }
+    } else if (result === true) {
+      // Delete
+      try {
+        const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${postId}`, {
+          method: 'DELETE'
+        });
+        if (!res.ok) throw new Error('Delete failed');
+        setCalendarRows(prev => prev.filter(r => r.contentCalendarId !== postId));
+        notify('Post deleted', 'success');
+      } catch (err: any) {
+        notify(err.message, 'error');
+      }
+    }
+  };
+
   const toggleWatchColumn = (columnId: string) => {
     setWatchedColumns(prev => ({
       ...prev,
@@ -461,6 +522,7 @@ export function CalendarPage(props: CalendarPageProps) {
     if (lower === 'draft' || lower === 'drafts') return { title: 'Drafts' };
     if (lower === 'for review' || lower === 'review') return { title: 'For Review' };
     if (lower === 'approved') return { title: 'Approved' };
+    if (lower === 'archived') return { title: 'Archived', color: '#94a3b8' };
     if (lower === 'error') return { title: 'Error', color: '#ef4444' };
     return { title: s || 'Drafts' };
   };
@@ -505,11 +567,13 @@ export function CalendarPage(props: CalendarPageProps) {
               <div className="flex border-r border-slate-100">
                 <TabButton active={viewMode === 'drafts'} onClick={() => navigate(`/company/${companyId}/calendar`)} icon={Layout} label="Pipeline" count={calendarRows.filter(r => {
                   const s = typeof r.status === 'string' ? r.status.toLowerCase() : (r.status?.state?.toLowerCase() || r.status?.value?.toLowerCase() || "");
-                  return s !== 'published' && getStatusValue(r.status).toLowerCase() !== 'published';
+                  const val = getStatusValue(r.status).toLowerCase();
+                  return s !== 'archived' && val !== 'archived';
                 }).length} />
                 <TabButton active={viewMode === 'published'} onClick={() => navigate(`/company/${companyId}/calendar/published`)} icon={CheckCircle2} label="Archives" count={calendarRows.filter(r => {
                   const s = typeof r.status === 'string' ? r.status.toLowerCase() : (r.status?.state?.toLowerCase() || r.status?.value?.toLowerCase() || "");
-                  return s === 'published' || getStatusValue(r.status).toLowerCase() === 'published';
+                  const val = getStatusValue(r.status).toLowerCase();
+                  return s === 'archived' || val === 'archived';
                 }).length} />
               </div>
 
@@ -832,14 +896,38 @@ export function CalendarPage(props: CalendarPageProps) {
             ) : viewMode === 'published' ? (
               <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50/30">
                 {currentPageRows.map(row => (
-                  <div key={row.contentCalendarId} onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }} className="group bg-white border border-slate-200 rounded-3xl overflow-hidden hover:shadow-xl transition-all cursor-pointer flex flex-col shadow-sm">
-                    <div className="aspect-square bg-slate-100 relative">
+                  <div key={row.contentCalendarId} className="group bg-white border border-slate-200 rounded-3xl overflow-hidden hover:shadow-xl transition-all cursor-pointer flex flex-col shadow-sm relative">
+                    <div className="aspect-square bg-slate-100 relative" onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}>
                       {getImageGeneratedUrl(row) ? <img src={getImageGeneratedUrl(row)!} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt="" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><ImageIcon className="w-10 h-10" /></div>}
-                      <div className="absolute top-3 right-3 px-2 py-1 bg-white/90 backdrop-blur rounded-full text-[9px] font-black flex items-center gap-1.5 shadow-sm"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Published</div>
+                      <div className="absolute top-3 right-3 px-2 py-1 bg-white/90 backdrop-blur rounded-full text-[9px] font-black flex items-center gap-1.5 shadow-sm text-slate-500 border border-slate-200"><CheckCircle2 className="w-3 h-3 text-slate-400" /> Archived</div>
                     </div>
-                    <div className="p-5 flex-1 flex flex-col">
+                    <div className="p-5 flex-1 flex flex-col" onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}>
                       <div className="flex items-center gap-2 mb-3">{renderChannelIcons(row.channels)} <span className="text-[10px] text-slate-400 font-bold">{row.date}</span></div>
-                      <p className="text-xs font-semibold text-slate-700 line-clamp-2 leading-relaxed">{row.finalCaption || row.captionOutput || 'No caption'}</p>
+                      <p className="text-xs font-semibold text-slate-700 line-clamp-2 leading-relaxed mb-4">{row.finalCaption || row.captionOutput || 'No caption'}</p>
+                    </div>
+                    <div className="px-5 pb-5 mt-auto">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const lastStatus = (typeof row.status === 'object' ? row.status?.last_state : null) || row.last_status || 'Drafts';
+                          try {
+                            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${row.contentCalendarId}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: lastStatus }),
+                            });
+                            if (!res.ok) throw new Error('Unarchive failed');
+                            setCalendarRows(prev => prev.map(r => r.contentCalendarId === row.contentCalendarId ? { ...r, status: lastStatus } : r));
+                            notify('Post unarchived!', 'success');
+                          } catch (err: any) {
+                            notify(err.message, 'error');
+                          }
+                        }}
+                        className="w-full py-2.5 bg-slate-100 hover:bg-white border border-slate-200 hover:border-blue-500 rounded-xl text-[10px] font-black uppercase text-slate-600 hover:text-blue-600 transition-all flex items-center justify-center gap-2 group/btn"
+                      >
+                        <Rocket className="w-3 h-3 group-hover/btn:animate-bounce" />
+                        Unarchive
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -864,20 +952,7 @@ export function CalendarPage(props: CalendarPageProps) {
                 }))}
                 automations={automations}
                 userPermissions={userPermissions}
-                onCardDelete={async (postId, e) => {
-                  e.stopPropagation();
-                  if (!window.confirm('Delete this post?')) return;
-                  try {
-                    const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${postId}`, {
-                      method: 'DELETE'
-                    });
-                    if (!res.ok) throw new Error('Delete failed');
-                    setCalendarRows(prev => prev.filter(r => r.contentCalendarId !== postId));
-                    notify('Post deleted', 'success');
-                  } catch (err: any) {
-                    notify(err.message, 'error');
-                  }
-                }}
+                onCardDelete={handleArchiveOrDelete}
                 onStatusChange={async (postId, status) => {
                   const matchingRules = automations.filter(rule => rule.type === 'move_to' && rule.targetColumn === status);
                   const lockRule = automations.find(rule => rule.type === 'access_rule' && rule.columnId === status);
@@ -1011,7 +1086,18 @@ export function CalendarPage(props: CalendarPageProps) {
                               );
                             })()}
                           </td>
-                          <td className="px-6 py-5 text-right"><button onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><ExternalLink className="w-4 h-4" /></button></td>
+                          <td className="px-6 py-5 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleArchiveOrDelete(row.contentCalendarId, { stopPropagation: () => { } })}
+                                className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                                title="Archive or Delete"
+                              >
+                                <Archive className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><ExternalLink className="w-4 h-4" /></button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}

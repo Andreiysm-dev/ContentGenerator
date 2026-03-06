@@ -39,7 +39,7 @@ import {
     Info,
     XCircle
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 interface ImageHubPageProps {
     calendarRows: any[];
@@ -114,6 +114,7 @@ export function ImageHubPage({
     const [showTechnicalPrompt, setShowTechnicalPrompt] = useState(false);
     const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
     const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
     const columns = (activeCompany?.kanban_settings?.columns || []) as any[];
 
     // Visual Onboarding States
@@ -129,6 +130,12 @@ export function ImageHubPage({
         imageryMood: 'Clean & Professional',
         customImageryMood: '',
         compositionStyle: 'Minimalist',
+        lightingStyle: 'Natural Daylight',
+        perspective: 'Eye-level',
+        visualComplexity: 'Balanced',
+        graphicStyle: 'Realistic Photo',
+        targetDemographic: 'Professional & Corporate',
+        contentFocus: 'Balanced Mix',
         vibeDescription: '',
         forbiddenElements: ''
     });
@@ -143,6 +150,9 @@ export function ImageHubPage({
     const [imageMood, setImageMood] = useState('Brand Default');
     const [imageLighting, setImageLighting] = useState('Brand Default');
     const [isAdvancedOptionsOpen, setIsAdvancedOptionsOpen] = useState(false);
+    const [proposals, setProposals] = useState<string[]>([]);
+    const [isProposing, setIsProposing] = useState(false);
+    const [isProposalsModalOpen, setIsProposalsModalOpen] = useState(false);
 
     // Persist dismissed IDs in localStorage
     const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
@@ -263,6 +273,37 @@ export function ImageHubPage({
         } finally {
             setIsGeneratingImage(false);
         }
+    };
+
+    const handleMagicPropose = async () => {
+        if (!selectedRow) return;
+        setIsProposing(true);
+        try {
+            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}/propose-image-ideas`, {
+                method: 'POST',
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setProposals(data.ideas || []);
+                setIsProposalsModalOpen(true);
+            } else {
+                notify('Failed to suggest visual ideas.', 'error');
+            }
+        } catch (err) {
+            console.error('Propose error:', err);
+            notify('Error suggesting ideas.', 'error');
+        } finally {
+            setIsProposing(false);
+        }
+    };
+
+    const handleInheritFromBrand = () => {
+        if (!systemInstruction) return;
+        // Extract some keywords from system instruction or just append a summary
+        // For simplicity, let's just append the brand mission if available or some key traits
+        const traits = systemInstruction.slice(0, 100) + (systemInstruction.length > 100 ? '...' : '');
+        setImageContext(prev => prev ? `${prev}\n\n[Brand Context]: ${traits}` : `[Brand Context]: ${traits}`);
+        notify('Brand traits inherited!', 'success');
     };
 
     const handleAnalyzeWebsiteForVisuals = async () => {
@@ -607,7 +648,12 @@ export function ImageHubPage({
             }
             setSystemInstruction(finalRules);
             setIsEditingBrandRules(false);
-            notify('Visual Identity updated!', 'success');
+            notify('Step 1 Complete: Visual Identity updated! Proceed to Step 2.', 'success');
+
+            // Auto-trigger Step 2 if possible and needed
+            if (selectedRow && !selectedRow.dmp) {
+                handleGenerateStyleGuide(true);
+            }
         } catch (err) {
             notify('Error saving brand rules.', 'error');
         } finally {
@@ -656,596 +702,610 @@ export function ImageHubPage({
                 <header className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden flex-shrink-0">
                     <Sparkles className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
                     <div className="relative z-10">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
-                            Aesthetics & Visuals
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => navigate(-1)}
+                                className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-all active:scale-95 border border-white/10"
+                                title="Go Back"
+                            >
+                                <ArrowLeft size={20} />
+                            </button>
+                            <div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">
+                                    Aesthetics & Visuals
+                                </div>
+                                <h2 className="text-2xl font-black text-white tracking-tight">Image Hub</h2>
+                            </div>
                         </div>
-                        <h2 className="text-2xl font-black text-white tracking-tight">Image Hub</h2>
                         <p className="mt-1 text-sm font-medium text-slate-400">Refine your design prompts and generate stunning AI visuals for approved content.</p>
                     </div>
 
                     <div className="hidden lg:flex items-center gap-6 relative z-10">
                         <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-end">
-                                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Workflow</span>
-                                <span className="text-xs font-bold text-white uppercase">2-Step Process</span>
-                            </div>
-                            <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-1.5 gap-1">
-                                <div className={`px-3 py-1.5 ${!selectedRow?.dmp ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/40'} text-[10px] font-black rounded-xl transition-all duration-300`}>1. PROMPT</div>
-                                <ArrowRight size={14} className="text-white/20" />
-                                <div className={`px-3 py-1.5 ${selectedRow?.dmp ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/40'} text-[10px] font-black rounded-xl transition-all duration-300`}>2. GENERATE</div>
+
+                            <div className="w-px h-8 bg-white/10 mx-2" />
+
+                            <div className="flex items-center gap-3">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Workflow</span>
+                                    <span className="text-xs font-bold text-white uppercase">3-Step Process</span>
+                                </div>
+                                <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-1.5 gap-1">
+                                    <div className="px-3 py-1.5 bg-blue-500/10 text-blue-400 text-[10px] font-black rounded-xl border border-blue-400/20">1. BRAND RULES</div>
+                                    <ArrowRight size={14} className="text-white/20" />
+                                    <div className={`px-3 py-1.5 ${imageContext ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/40'} text-[10px] font-black rounded-xl transition-all duration-300`}>2. IMAGE DESCRIPTION</div>
+                                    <ArrowRight size={14} className="text-white/20" />
+                                    <div className={`px-3 py-1.5 ${dmpDraft ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/40'} text-[10px] font-black rounded-xl transition-all duration-300`}>3. GENERATE</div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </header>
 
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Left Sidebar: Queue */}
-                    <aside className="w-80 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col">
-                        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                            <button
-                                onClick={() => !systemInstruction ? setIsVisualOnboardingOpen(true) : setIsEditingBrandRules(true)}
-                                disabled={!userPermissions?.canApprove}
-                                className="w-full flex items-center justify-center gap-2 p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200 group disabled:opacity-50 disabled:hover:bg-slate-900"
-                            >
-                                {!systemInstruction ? (
-                                    <>
-                                        <Palette size={16} className="text-blue-400 animate-pulse" />
-                                        <span>Setup Brand Identity</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Settings2 size={16} className="text-blue-400" />
-                                        <span>Visual & Image rules</span>
-                                    </>
-                                )}
-                            </button>
-                        </div>
-
-                        <div className="p-4 border-b border-slate-50 space-y-4">
-                            <div className="space-y-2">
-                                <div className="relative">
-                                    <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <select
-                                        value={selectedStatusFilter}
-                                        onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                                        className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-wider outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/50 transition-all appearance-none cursor-pointer shadow-sm"
-                                    >
-                                        <option value="all">View All Statuses</option>
-                                        {columns.map((c: any) => (
-                                            <option key={c.id} value={c.id}>{c.title}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                                </div>
-
-                                <div className="relative">
-                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search queue..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-4 focus:ring-blue-500/5 transition-all font-bold placeholder:text-slate-400"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                            <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                                <span>Content that is ready for design ({filteredRows.length})</span>
-                                {dismissedIds.length > 0 && (
-                                    <button
-                                        onClick={() => setDismissedIds([])}
-                                        className="text-[9px] text-blue-500 hover:text-blue-700 font-bold underline transition-colors"
-                                    >
-                                        Restore all
-                                    </button>
-                                )}
-                            </div>
-                            {filteredRows.length === 0 ? (
-                                <div className="p-8 text-center flex flex-col items-center justify-center gap-3">
-                                    <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 border border-slate-100">
-                                        <Filter size={20} />
-                                    </div>
-                                    <p className="text-xs text-slate-400 italic">No content is ready yet.</p>
-                                </div>
-                            ) : (
-                                filteredRows.map(row => {
-                                    const isActive = row.contentCalendarId === selectedRowId;
-                                    const status = getStatusValue(row.status).toLowerCase();
-                                    const isDone = status === 'design completed' || status === 'design-completed' || status === 'design-complete';
-
-                                    return (
+                <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50 p-6 md:p-8">
+                    {selectedRow ? (
+                        <div className="max-w-[1700px] mx-auto space-y-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                {/* Step 1: Define Rules (Now a Card) */}
+                                <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col h-fit">
+                                    <header className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white relative z-10">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl relative">
+                                                <Palette size={18} />
+                                                <div className="absolute -top-1 -left-1 flex items-center justify-center w-4 h-4 bg-emerald-600 text-[10px] font-black text-white rounded-full">1</div>
+                                            </div>
+                                            <div>
+                                                <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Step 1: Company Rules</h2>
+                                                <p className="text-[10px] font-bold text-blue-600 -mt-0.5 uppercase tracking-widest bg-blue-50 px-2 rounded-md inline-block">Global Settings (Applies to all)</p>
+                                            </div>
+                                        </div>
                                         <button
-                                            key={row.contentCalendarId}
-                                            onClick={() => setSelectedRowId(row.contentCalendarId)}
-                                            className={`w-full text-left p-3 rounded-2xl transition-all group relative ${isActive
-                                                ? 'bg-blue-600 text-white shadow-blue-200 shadow-lg scale-[1.02] z-10'
-                                                : 'hover:bg-slate-50 text-slate-700'
-                                                }`}
+                                            onClick={() => setIsVisualOnboardingOpen(true)}
+                                            className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 border border-transparent hover:border-slate-100 transition-all"
                                         >
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className={`text-[10px] font-bold uppercase tracking-tight ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>
-                                                    {row.date ? new Date(row.date).toLocaleDateString() : 'No date'}
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    {isDone && <CheckCircle2 size={12} className={isActive ? 'text-white' : 'text-emerald-500'} />}
-                                                    <div
-                                                        onClick={(e) => handleDismissItem(row.contentCalendarId, e)}
-                                                        className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10`}
-                                                        title="Dismiss from Hub"
-                                                    >
-                                                        <X size={12} className={isActive ? 'text-white' : 'text-slate-400'} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className={`text-sm font-bold truncate ${isActive ? 'text-white' : 'text-slate-900'}`}>
-                                                    {row.theme || 'Untiteld Theme'}
-                                                </div>
-                                            </div>
-                                            <div className={`text-[10px] truncate opacity-70 ${isActive ? 'text-blue-50' : 'text-slate-500'}`}>
-                                                {row.contentType} • {row.channels ? (Array.isArray(row.channels) ? row.channels[0] : row.channels) : 'N/A'}
-                                            </div>
-                                            {isActive && (
-                                                <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-white/40 rounded-full blur-[2px]" />
-                                            )}
+                                            <Wand2 size={16} />
                                         </button>
-                                    );
-                                })
-                            )}
-                        </div>
-                        <div className="p-4 border-t border-slate-50 bg-slate-50/20 text-center">
-                            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">End of Queue</p>
-                        </div>
-                    </aside>
+                                    </header>
 
-                    {/* Main Content: Editor */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50 p-6 md:p-8">
-                        {selectedRow ? (
-                            <div className="max-w-6xl mx-auto space-y-6">
-
-
-                                {/* Minimalist Context Bar (Top) */}
-                                <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-xl flex items-center justify-between border border-white/5 overflow-hidden">
-                                    <div className="flex items-center gap-4 flex-1 truncate">
-                                        <div className="p-1.5 bg-white/10 rounded-lg text-blue-400">
-                                            <Layout size={14} />
-                                        </div>
-                                        <div className="truncate">
-                                            <span className="text-[8px] font-black uppercase text-blue-400 block tracking-widest leading-none mb-1">Theme</span>
-                                            <span className="text-[10px] font-bold truncate block italic opacity-90">"{selectedRow.theme}"</span>
-                                        </div>
-                                    </div>
-                                    <div className="w-px h-6 bg-white/10 mx-4 hidden sm:block" />
-                                    <div className="hidden sm:flex gap-6">
-                                        <div>
-                                            <span className="text-[8px] font-black uppercase text-slate-500 block tracking-widest leading-none mb-1">Audience</span>
-                                            <span className="text-[10px] font-bold text-slate-200 block">{selectedRow.targetAudience?.split(' ')[0] || 'General'}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[8px] font-black uppercase text-slate-500 block tracking-widest leading-none mb-1">Goal</span>
-                                            <span className="text-[10px] font-bold text-slate-200 block">{selectedRow.primaryGoal?.split(' ')[0] || 'Engage'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                                    {/* Left Col: Prompting */}
-                                    <div className="space-y-6">
-                                        <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col h-fit relative">
-                                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white relative z-10">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-xl relative">
-                                                        <Wand2 size={18} />
-                                                        <div className="absolute -top-1 -left-1 flex items-center justify-center w-4 h-4 bg-blue-600 text-[10px] font-black text-white rounded-full">1</div>
-                                                    </div>
-                                                    <div>
-                                                        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                                                            Visual Style Guide
-                                                        </h2>
-                                                        <p className="text-[10px] font-medium text-slate-400 -mt-0.5 uppercase tracking-tight">Step 1: Refine the vision</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => handleGenerateStyleGuide()}
-                                                        disabled={isGeneratingImage || !selectedRow?.finalCaption}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                                                        title={!selectedRow?.finalCaption ? "Final caption is required" : "Regenerate Style Guide"}
-                                                    >
-                                                        <RefreshCw size={16} className={isGeneratingImage ? 'animate-spin' : ''} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(dmpDraft);
-                                                            notify('Style instructions copied!', 'success');
-                                                        }}
-                                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-transparent hover:border-slate-200"
-                                                        title="Copy Prompt"
-                                                    >
-                                                        <Copy size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setIsEditingDmp(!isEditingDmp)}
-                                                        className={`p-1.5 rounded-lg transition-colors border ${isEditingDmp ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 border-transparent hover:border-slate-200'}`}
-                                                        title="Edit Mode"
-                                                    >
-                                                        <Pencil size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setShowTechnicalPrompt(!showTechnicalPrompt)}
-                                                        className={`p-1.5 rounded-lg transition-colors border ${showTechnicalPrompt ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 border-transparent hover:border-slate-200'}`}
-                                                        title={showTechnicalPrompt ? "Hide Technical Prompt" : "Show Technical Prompt"}
-                                                    >
-                                                        {showTechnicalPrompt ? <EyeOff size={16} /> : <Eye size={16} />}
-                                                    </button>
-                                                    <div className="w-px h-4 bg-slate-100 mx-1" />
-                                                    <button
-                                                        onClick={() => setIsRefinerOpen(!isRefinerOpen)}
-                                                        className={`p-1.5 rounded-lg transition-colors border flex items-center gap-1.5 px-3 ${isRefinerOpen ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'}`}
-                                                        title="AI Style Refiner"
-                                                    >
-                                                        <Sparkles size={14} className={isRefining ? 'animate-pulse' : ''} />
-                                                        <span className="text-[10px] font-black uppercase tracking-wider">Refine</span>
-                                                    </button>
-                                                </div>
+                                    <div className="p-6 space-y-8 bg-white overflow-y-auto max-h-[700px] custom-scrollbar">
+                                        {/* Intelligence Tools */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                                <Zap size={12} className="text-amber-400" />
+                                                <span>Quick Setup Tools</span>
                                             </div>
-
-                                            <div className="p-6">
-                                                {/* Aspect Ratio Presets */}
-                                                <div className="mb-6">
-                                                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Aspect Ratio Preset</label>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {[
-                                                            { id: '1:1', label: 'Square (1:1)', icon: <Layout size={14} /> },
-                                                            { id: '4:5', label: 'Portrait (4:5)', icon: <Monitor size={14} className="rotate-90" /> },
-                                                            { id: '16:9', label: 'Landscape (16:9)', icon: <Monitor size={14} /> },
-                                                            { id: '9:16', label: 'Story (9:16)', icon: <Maximize2 size={14} /> }
-                                                        ].map((ratio) => (
-                                                            <button
-                                                                key={ratio.id}
-                                                                onClick={() => setSelectedAspectRatio(ratio.id)}
-                                                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold transition-all border-2 ${selectedAspectRatio === ratio.id
-                                                                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
-                                                                    : 'bg-slate-50 border-slate-100 text-slate-500 hover:border-blue-200 hover:text-blue-600'
-                                                                    }`}
-                                                            >
-                                                                {ratio.icon}
-                                                                {ratio.label}
-                                                            </button>
-                                                        ))}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => {
+                                                        setIsVisualOnboardingOpen(true);
+                                                        setVisualOnboardingStep(1);
+                                                    }}
+                                                    className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col items-center gap-2 hover:bg-white hover:border-blue-200 transition-all group"
+                                                >
+                                                    <div className="p-2 bg-white rounded-lg shadow-sm text-blue-500 group-hover:scale-110 transition-transform">
+                                                        <ImagePlus size={16} />
                                                     </div>
-                                                </div>
-
-                                                {/* AI Refiner Assistant (Lightened) */}
-                                                {isRefinerOpen && (
-                                                    <div className="mb-8 p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100 shadow-xl animate-in slide-in-from-top-4 duration-500 relative overflow-hidden">
-                                                        {/* Abstract background pattern */}
-                                                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
-
-                                                        <div className="flex items-center justify-between mb-4 relative z-10">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="p-2 bg-white text-indigo-600 rounded-xl border border-indigo-100 shadow-sm">
-                                                                    <Sparkles size={16} />
-                                                                </div>
-                                                                <div>
-                                                                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">AI Assistant</h3>
-                                                                    <p className="text-[8px] font-bold text-indigo-600 uppercase tracking-[0.2em]">Live Style Tuning</p>
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => setIsRefinerOpen(false)}
-                                                                className="text-slate-400 hover:text-slate-600 transition-colors"
-                                                            >
-                                                                <X size={16} />
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="relative group z-10">
-                                                            <textarea
-                                                                value={aiRefinementMessage}
-                                                                onChange={(e) => setAiRefinementMessage(e.target.value)}
-                                                                placeholder="e.g. 'Make it more professional', 'Add a neon blue color palette'..."
-                                                                className="w-full bg-white border border-indigo-100 rounded-2xl p-5 pr-14 text-sm font-medium text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500/50 transition-all resize-none h-24 placeholder:text-slate-400 shadow-sm"
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                                                        e.preventDefault();
-                                                                        handleRefineDmp();
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <button
-                                                                onClick={handleRefineDmp}
-                                                                disabled={isRefining || !aiRefinementMessage.trim()}
-                                                                className="absolute right-3 bottom-3 p-3 bg-indigo-600 text-white rounded-xl shadow-lg hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
-                                                                title="Send to AI Assistant"
-                                                            >
-                                                                {isRefining ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
-                                                            </button>
-                                                        </div>
-                                                        <p className="mt-3 text-[9px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                                            <Info size={10} className="text-indigo-400" />
-                                                            Tip: Press Enter to apply changes immediately
-                                                        </p>
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Analyze Images</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const url = prompt("Enter website URL:");
+                                                        if (url) {
+                                                            setWebsiteUrl(url);
+                                                            handleAnalyzeWebsiteForVisuals();
+                                                        }
+                                                    }}
+                                                    className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col items-center gap-2 hover:bg-white hover:border-indigo-200 transition-all group"
+                                                >
+                                                    <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-500 group-hover:scale-110 transition-transform">
+                                                        <Monitor size={16} />
                                                     </div>
-                                                )}
-
-                                                <div className="relative group min-h-[400px]">
-                                                    {!showTechnicalPrompt && !isEditingDmp && dmpDraft ? (
-                                                        <div className="bg-gradient-to-br from-slate-50 to-white rounded-3xl p-8 border border-slate-100 flex flex-col items-center justify-center text-center space-y-6 min-h-[400px] animate-in fade-in zoom-in-95 duration-500 shadow-inner group/persona relative overflow-hidden">
-                                                            {/* Background decorative element */}
-                                                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50 group-hover/persona:bg-indigo-100 transition-colors duration-700" />
-
-                                                            <div className="w-24 h-24 bg-white text-indigo-500 rounded-[2.5rem] flex items-center justify-center shadow-xl border border-indigo-50/50 group-hover/persona:scale-110 transition-transform duration-500 relative z-10">
-                                                                <ShieldCheck size={48} strokeWidth={1.5} />
-                                                                <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-white flex items-center justify-center">
-                                                                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="space-y-2 relative z-10">
-                                                                <h3 className="text-xl font-black text-slate-900 tracking-tight">Style Identity Active</h3>
-                                                                <p className="text-sm font-medium text-slate-500 max-w-sm mx-auto leading-relaxed">
-                                                                    Our AI has successfully translated your brand kit into a high-precision visual persona.
-                                                                    Use the <span className="text-indigo-600 font-bold">AI Assistant</span> above to surgically tune this style.
-                                                                </p>
-                                                            </div>
-
-                                                            <div className="flex flex-wrap justify-center gap-2 pt-2 relative z-10">
-                                                                <div className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100 shadow-sm">Brand Kit Aligned</div>
-                                                                <div className="px-4 py-1.5 bg-purple-50 text-purple-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-purple-100 shadow-sm">Premium Persona</div>
-                                                                <div className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100 shadow-sm">AI Optimized</div>
-                                                            </div>
-
-                                                            <button
-                                                                onClick={() => setShowTechnicalPrompt(true)}
-                                                                className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] hover:text-indigo-600 transition-colors pt-12 relative z-10 flex items-center gap-2"
-                                                            >
-                                                                <Eye size={12} />
-                                                                Technical System Prompt
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <textarea
-                                                                value={dmpDraft}
-                                                                onChange={(e) => setDmpDraft(e.target.value)}
-                                                                readOnly={!isEditingDmp}
-                                                                className={`w-full min-h-[400px] p-5 rounded-2xl font-mono text-sm border-2 outline-none transition-all resize-none shadow-inner ${isEditingDmp
-                                                                    ? 'border-blue-500/30 bg-white ring-8 ring-blue-500/[0.03]'
-                                                                    : 'border-slate-100 bg-slate-50/50 text-slate-600'
-                                                                    }`}
-                                                            />
-                                                            {!isEditingDmp && dmpDraft && (
-                                                                <div className="absolute inset-0 w-full h-full bg-slate-900/0 hover:bg-slate-900/[0.02] flex items-center justify-center opacity-0 hover:opacity-100 transition-all rounded-2xl group-hover:scale-[0.99] pointer-events-none">
-                                                                    <button
-                                                                        onClick={() => setIsEditingDmp(true)}
-                                                                        className="bg-white px-4 py-2 rounded-full shadow-lg border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-600 pointer-events-auto"
-                                                                    >
-                                                                        <Pencil size={14} />
-                                                                        Click to Edit
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    )}
-
-
-                                                    {!dmpDraft && !isGeneratingImage && (
-                                                        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-slate-50/40 rounded-2xl border border-dashed border-slate-200 animate-in fade-in duration-500 overflow-y-auto custom-scrollbar text-center">
-                                                            <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 text-blue-500 border border-slate-100">
-                                                                <Wand2 size={24} />
-                                                            </div>
-                                                            <h4 className="text-sm font-bold text-slate-900 mb-1">Missing Style Guide</h4>
-                                                            <p className="text-[11px] text-slate-500 max-w-xs mb-6 font-medium">
-                                                                You haven't defined the visual style for this content yet. Let our AI handle the translation of your brand kit into a design prompt.
-                                                            </p>
-
-                                                            <div className="flex flex-col items-center gap-3 w-full max-w-md">
-                                                                <button
-                                                                    onClick={() => handleGenerateStyleGuide()}
-                                                                    disabled={isGeneratingImage || !selectedRow?.finalCaption}
-                                                                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                >
-                                                                    {!selectedRow?.finalCaption ? (
-                                                                        <>
-                                                                            <XCircle size={16} />
-                                                                            Caption Required
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <RefreshCw size={16} className={isGeneratingImage ? 'animate-spin' : ''} />
-                                                                            Generate Style Guide
-                                                                        </>
-                                                                    )}
-                                                                </button>
-
-                                                                <button
-                                                                    onClick={() => setIsAdvancedOptionsOpen(!isAdvancedOptionsOpen)}
-                                                                    className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-blue-500 transition-colors flex items-center gap-1.5 py-2"
-                                                                >
-                                                                    {isAdvancedOptionsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                                                                    {isAdvancedOptionsOpen ? 'Hide Constraints' : 'Add Context & Constraints'}
-                                                                </button>
-
-                                                                {isAdvancedOptionsOpen && (
-                                                                    <div className="w-full bg-white border border-slate-200 rounded-2xl p-4 shadow-sm animate-in slide-in-from-top-2 duration-300 text-left space-y-5 mt-2">
-                                                                        <div className="space-y-2">
-                                                                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block">Scene Description</label>
-                                                                            <textarea
-                                                                                value={imageContext}
-                                                                                onChange={(e) => setImageContext(e.target.value)}
-                                                                                placeholder="e.g. A laptop on a wooden desk with coffee..."
-                                                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 transition-all resize-none h-16 placeholder:text-slate-300"
-                                                                            />
-                                                                        </div>
-
-                                                                        <div className="space-y-2">
-                                                                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block">Mood / Vibe</label>
-                                                                            <div className="flex flex-wrap gap-1.5">
-                                                                                {MOOD_OPTIONS.map((mood) => (
-                                                                                    <button
-                                                                                        key={mood}
-                                                                                        onClick={() => setImageMood(mood)}
-                                                                                        className={`px-2.5 py-1.5 rounded-lg text-[9px] font-bold transition-all border ${imageMood === mood
-                                                                                            ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-sm'
-                                                                                            : 'bg-white text-slate-500 border-slate-100 hover:border-blue-200 hover:text-blue-500'
-                                                                                            }`}
-                                                                                    >
-                                                                                        {mood}
-                                                                                    </button>
-                                                                                ))}
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="space-y-2">
-                                                                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block">Lighting</label>
-                                                                            <div className="flex flex-wrap gap-1.5">
-                                                                                {LIGHTING_OPTIONS.map((lighting) => (
-                                                                                    <button
-                                                                                        key={lighting}
-                                                                                        onClick={() => setImageLighting(lighting)}
-                                                                                        className={`px-2.5 py-1.5 rounded-lg text-[9px] font-bold transition-all border ${imageLighting === lighting
-                                                                                            ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-sm'
-                                                                                            : 'bg-white text-slate-500 border-slate-100 hover:border-amber-200 hover:text-amber-500'
-                                                                                            }`}
-                                                                                    >
-                                                                                        {lighting}
-                                                                                    </button>
-                                                                                ))}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {isEditingDmp && (
-                                                    <div className="mt-4 flex items-center justify-end gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsEditingDmp(false);
-                                                                setDmpDraft(selectedRow.dmp || '');
-                                                            }}
-                                                            className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 underline underline-offset-4"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                        <button
-                                                            onClick={handleSaveDmp}
-                                                            disabled={isGeneratingImage}
-                                                            className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50"
-                                                        >
-                                                            {isGeneratingImage ? 'Saving...' : 'Save'}
-                                                        </button>
-                                                    </div>
-                                                )}
-
-                                                {/* Integrated Design References (Collapsible) */}
-                                                <div className="mt-8 pt-6 border-t border-slate-100">
-                                                    <button
-                                                        onClick={() => setIsDesignReferencesOpen(!isDesignReferencesOpen)}
-                                                        className="w-full flex items-center justify-between mb-2 group/ref hover:bg-slate-50 p-2 -mx-2 rounded-xl transition-all"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover/ref:text-blue-500 transition-colors">Design References</h3>
-                                                            {designReferences.length > 0 && (
-                                                                <div className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-[8px] font-bold">{designReferences.length}</div>
-                                                            )}
-                                                        </div>
-                                                        <div className={`text-slate-300 transition-transform duration-300 ${isDesignReferencesOpen ? 'rotate-180' : ''}`}>
-                                                            <ChevronDown size={14} />
-                                                        </div>
-                                                    </button>
-
-                                                    {isDesignReferencesOpen && (
-                                                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                                            <p className="text-[10px] font-medium text-slate-400 mb-4 italic px-1">Upload inspiration images to guide the AI's creative direction.</p>
-                                                            <div className="grid grid-cols-3 gap-3">
-                                                                {[0, 1, 2].map((idx) => (
-                                                                    <div key={idx} className="aspect-video rounded-xl border-2 border-dashed border-slate-100 bg-slate-50/30 flex flex-col items-center justify-center relative group overflow-hidden hover:border-blue-200 transition-all cursor-pointer">
-                                                                        {designReferences[idx] ? (
-                                                                            <>
-                                                                                <img src={designReferences[idx]} className="w-full h-full object-cover" />
-                                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                                                    <button
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            setDesignReferences(prev => prev.filter((_, i) => i !== idx));
-                                                                                        }}
-                                                                                        className="p-1.5 bg-white rounded-full text-slate-900 shadow-xl"
-                                                                                    >
-                                                                                        <X size={12} />
-                                                                                    </button>
-                                                                                </div>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <ImagePlus size={14} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-                                                                                <input
-                                                                                    type="file"
-                                                                                    accept="image/*"
-                                                                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                                                                    onChange={(e) => {
-                                                                                        const file = e.target.files?.[0];
-                                                                                        if (file) {
-                                                                                            const url = URL.createObjectURL(file);
-                                                                                            setDesignReferences(p => [...p, url].slice(0, 3));
-                                                                                        }
-                                                                                    }}
-                                                                                />
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Scan Site</span>
+                                                </button>
                                             </div>
                                         </div>
 
+                                        {/* Core Identity */}
+                                        <div className="space-y-6 pt-4 border-t border-slate-50">
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Brand Vibe & Personality</label>
+                                                <textarea
+                                                    value={visualOnboardingState.vibeDescription}
+                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, vibeDescription: e.target.value }))}
+                                                    placeholder="e.g. Modern, high-tech, minimalist with premium textures..."
+                                                    className="w-full h-20 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium outline-none focus:ring-4 focus:ring-blue-500/5 focus:bg-white transition-all shadow-inner resize-none"
+                                                />
+                                            </div>
 
-                                    </div>
-
-                                    {/* Right Col: Preview & Actions */}
-                                    <div className="space-y-6">
-                                        <div className="bg-white rounded-3xl border border-slate-200/60 shadow-xl overflow-hidden flex flex-col h-fit">
-                                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white relative z-10">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2 bg-purple-50 text-purple-600 rounded-xl relative">
-                                                        <Image size={18} />
-                                                        <div className="absolute -top-1 -left-1 flex items-center justify-center w-4 h-4 bg-purple-600 text-[10px] font-black text-white rounded-full">2</div>
-                                                    </div>
-                                                    <div>
-                                                        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                                                            Visual Output
-                                                        </h2>
-                                                        <p className="text-[10px] font-medium text-slate-400 -mt-1 uppercase tracking-tight">Step 2: Generate Vision</p>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Primary Color</label>
+                                                    <div className="flex items-center gap-3 p-2 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                                                        <input
+                                                            type="color"
+                                                            value={visualOnboardingState.primaryColor}
+                                                            onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, primaryColor: e.target.value }))}
+                                                            className="w-8 h-8 rounded-lg cursor-pointer border-none p-0 bg-transparent"
+                                                        />
+                                                        <span className="text-[10px] font-black uppercase text-slate-600 font-mono tracking-tighter">{visualOnboardingState.primaryColor}</span>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Secondary Color</label>
+                                                    <div className="flex items-center gap-3 p-2 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                                                        <input
+                                                            type="color"
+                                                            value={visualOnboardingState.secondaryColor}
+                                                            onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                                                            className="w-8 h-8 rounded-lg cursor-pointer border-none p-0 bg-transparent"
+                                                        />
+                                                        <span className="text-[10px] font-black uppercase text-slate-600 font-mono tracking-tighter">{visualOnboardingState.secondaryColor}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Imagery Mood</label>
                                                     <select
-                                                        value={selectedModel}
-                                                        onChange={(e) => {
-                                                            const m = ALL_MODELS.find(x => x.id === e.target.value);
-                                                            if (m) {
-                                                                setSelectedModel(m.id);
-                                                                setProvider(m.provider as any);
-                                                            }
-                                                        }}
-                                                        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-bold focus:ring-2 focus:ring-blue-500/10 outline-none cursor-pointer hover:bg-white transition-all shadow-sm"
+                                                        value={visualOnboardingState.imageryMood}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, imageryMood: e.target.value }))}
+                                                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
                                                     >
-                                                        {ALL_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                                        {['Clean & Bright', 'Dark & Moody', 'Vibrant & Pop', 'Soft Pastels', 'Vintage / Retro', 'Scientific / Technical', 'High Luxury', 'Street / Candid', 'Other'].map(mood => (
+                                                            <option key={mood} value={mood}>{mood}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Typography</label>
+                                                    <select
+                                                        value={visualOnboardingState.fontStyle}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, fontStyle: e.target.value }))}
+                                                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        {['Modern Sans-Serif', 'Elegant Serif', 'Bold & Industrial', 'Playful & Rounded', 'Minimalist Mono', 'Other'].map(f => (
+                                                            <option key={f} value={f}>{f}</option>
+                                                        ))}
                                                     </select>
                                                 </div>
                                             </div>
 
-                                            <div className="p-6 flex flex-col items-center justify-center bg-slate-100/30 min-h-[400px] relative overflow-hidden rounded-2xl">
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Composition Style</label>
+                                                <select
+                                                    value={visualOnboardingState.compositionStyle}
+                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, compositionStyle: e.target.value }))}
+                                                    className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
+                                                >
+                                                    {['Minimalist', 'Full Page Photo', 'Split Screen', 'Dynamic Motion'].map(style => (
+                                                        <option key={style} value={style}>{style}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lighting & Atmosphere</label>
+                                                    <select
+                                                        value={visualOnboardingState.lightingStyle}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, lightingStyle: e.target.value }))}
+                                                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        {['Natural Daylight', 'Studio Softbox', 'Cinematic / Dramatic', 'Golden Hour', 'Neon / Cyberpunk', 'High-Key / Bright', 'Low-Key / Moody'].map(light => (
+                                                            <option key={light} value={light}>{light}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Camera Perspective</label>
+                                                    <select
+                                                        value={visualOnboardingState.perspective}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, perspective: e.target.value }))}
+                                                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        {['Eye-level', 'Flat Lay / Top-down', 'Birds Eye View', 'Low Angle / Heroic', 'Macro / Extreme Close-up', 'Wide / Panoramic'].map(p => (
+                                                            <option key={p} value={p}>{p}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Graphic Medium</label>
+                                                    <select
+                                                        value={visualOnboardingState.graphicStyle}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, graphicStyle: e.target.value }))}
+                                                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        {['Realistic Photo', '3D Render', 'Minimalist Illustration', 'Vector / Flat Art', 'Mixed Media', 'Digital Painting'].map(style => (
+                                                            <option key={style} value={style}>{style}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Visual Weight</label>
+                                                    <select
+                                                        value={visualOnboardingState.visualComplexity}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, visualComplexity: e.target.value }))}
+                                                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        {['Ultra-Minimal', 'Clean & Balanced', 'Rich Detail', 'Dizzying Maximalist'].map(v => (
+                                                            <option key={v} value={v}>{v}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Target Demographic</label>
+                                                    <select
+                                                        value={visualOnboardingState.targetDemographic}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, targetDemographic: e.target.value }))}
+                                                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        {['Professional & Corporate', 'Gen-Z / Trendsetters', 'Families & Parents', 'High-Net-Worth / Luxury', 'Tech Enthusiasts', 'Eco-Conscious', 'General Public'].map(d => (
+                                                            <option key={d} value={d}>{d}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Primary Content Focus</label>
+                                                    <select
+                                                        value={visualOnboardingState.contentFocus}
+                                                        onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, contentFocus: e.target.value }))}
+                                                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none focus:bg-white transition-all appearance-none cursor-pointer"
+                                                    >
+                                                        {['Product Centric', 'People & Lifestyle', 'Conceptual / Abstract', 'Interior / Architecture', 'Natural Landscapes', 'Balanced Mix'].map(f => (
+                                                            <option key={f} value={f}>{f}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Visual Guardrails (Never use)</label>
+                                                <textarea
+                                                    value={visualOnboardingState.forbiddenElements}
+                                                    onChange={(e) => setVisualOnboardingState(prev => ({ ...prev, forbiddenElements: e.target.value }))}
+                                                    placeholder="e.g. No stock photos, no generic suits..."
+                                                    className="w-full h-20 p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium outline-none focus:ring-4 focus:ring-rose-500/5 focus:bg-white transition-all shadow-inner resize-none"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-4 pt-6 border-t border-slate-100">
+                                                <div className="flex items-center justify-between px-1">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Master Style Instructions</label>
+                                                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[8px] font-black uppercase border border-emerald-100">
+                                                        <Check size={8} /> Active
+                                                    </div>
+                                                </div>
+                                                <textarea
+                                                    value={brandRulesDraft}
+                                                    onChange={(e) => setBrandRulesDraft(e.target.value)}
+                                                    className="w-full h-64 p-5 bg-slate-900 text-slate-300 rounded-[2rem] text-[11px] font-mono leading-relaxed outline-none border border-slate-800 focus:border-blue-500/30 transition-all custom-scrollbar resize-none"
+                                                    placeholder="The master design rules generated for the AI..."
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <footer className="p-6 border-t border-slate-100 bg-white space-y-3 mt-auto">
+                                        <button
+                                            onClick={handleGenerateVisualIdentity}
+                                            disabled={isGeneratingImage}
+                                            className="w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            <RefreshCw size={14} className={`text-amber-400 ${isGeneratingImage ? 'animate-spin' : ''}`} />
+                                            AI Assistant Update
+                                        </button>
+                                        <button
+                                            onClick={() => handleSaveBrandRules()}
+                                            disabled={isGeneratingImage}
+                                            className="w-full py-4 bg-blue-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            <CheckCircle2 size={14} />
+                                            {isGeneratingImage ? 'Saving...' : 'Save & Continue'}
+                                        </button>
+                                    </footer>
+                                </div>
+                                {/* Left Col: Prompting */}
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col h-fit relative">
+                                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white relative z-10">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl relative">
+                                                    <PenTool size={18} />
+                                                    <div className="absolute -top-1 -left-1 flex items-center justify-center w-4 h-4 bg-blue-600 text-[10px] font-black text-white rounded-full">2</div>
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                                                        Step 2: Specific Image
+                                                    </h2>
+                                                    <p className="text-[10px] font-bold text-slate-400 -mt-0.5 uppercase tracking-widest">Description for this post</p>
+                                                </div>
+                                            </div>
+                                            {/* Style controls moved to Step 3 */}
+                                        </div>
+
+                                        <div className="p-6 space-y-6">
+                                            {/* Step 2: Main Description Box */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between px-1">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Image Instructions & Subject</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={handleInheritFromBrand}
+                                                            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-wider border border-slate-100 hover:bg-white hover:text-blue-600 hover:border-blue-200 transition-all group"
+                                                            title="Pull keywords from Step 1"
+                                                        >
+                                                            <Palette size={10} className="group-hover:scale-110 transition-transform" />
+                                                            Inherit
+                                                        </button>
+                                                        <button
+                                                            onClick={handleMagicPropose}
+                                                            disabled={isProposing}
+                                                            className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-wider border border-blue-100 hover:bg-blue-600 hover:text-white transition-all group disabled:opacity-50"
+                                                            title="AI proposes 3 visual ideas"
+                                                        >
+                                                            {isProposing ? (
+                                                                <RefreshCw size={10} className="animate-spin" />
+                                                            ) : (
+                                                                <Wand2 size={10} className="group-hover:scale-110 transition-transform" />
+                                                            )}
+                                                            Magic Propose
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <textarea
+                                                    value={imageContext}
+                                                    onChange={(e) => setImageContext(e.target.value)}
+                                                    placeholder="The Director's Chair: Describe exactly what we are making. Priority #1 in generation."
+                                                    className="w-full h-40 p-5 bg-slate-50 border border-slate-200 rounded-[2rem] text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white transition-all shadow-inner resize-none leading-relaxed"
+                                                />
+
+                                                {/* Proposals Selection (Inline when open) */}
+                                                {isProposalsModalOpen && proposals.length > 0 && (
+                                                    <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-3xl animate-in fade-in slide-in-from-top-4 duration-300">
+                                                        <div className="flex items-center justify-between mb-4 px-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <Sparkles size={14} className="text-blue-600" />
+                                                                <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">Pick a Creative Direction</span>
+                                                            </div>
+                                                            <button onClick={() => setIsProposalsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                                                <X size={14} />
+                                                            </button>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            {proposals.map((p, i) => (
+                                                                <button
+                                                                    key={i}
+                                                                    onClick={() => {
+                                                                        setImageContext(p);
+                                                                        setIsProposalsModalOpen(false);
+                                                                    }}
+                                                                    className="w-full text-left p-4 bg-white border border-blue-100 rounded-2xl text-xs font-medium hover:border-blue-500 hover:shadow-md transition-all group flex gap-3"
+                                                                >
+                                                                    <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-[10px] font-black">{i + 1}</div>
+                                                                    <span className="text-slate-600 line-clamp-3 group-hover:text-slate-900 leading-relaxed">{p}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {/* Aspect Ratio Presets */}
+                                            <div className="mb-6">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Aspect Ratio Preset</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {[
+                                                        { id: '1:1', label: 'Square (1:1)', icon: <Layout size={14} /> },
+                                                        { id: '4:5', label: 'Portrait (4:5)', icon: <Monitor size={14} className="rotate-90" /> },
+                                                        { id: '16:9', label: 'Landscape (16:9)', icon: <Monitor size={14} /> },
+                                                        { id: '9:16', label: 'Story (9:16)', icon: <Maximize2 size={14} /> }
+                                                    ].map((ratio) => (
+                                                        <button
+                                                            key={ratio.id}
+                                                            onClick={() => setSelectedAspectRatio(ratio.id)}
+                                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold transition-all border-2 ${selectedAspectRatio === ratio.id
+                                                                ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
+                                                                : 'bg-slate-50 border-slate-100 text-slate-500 hover:border-blue-200 hover:text-blue-600'
+                                                                }`}
+                                                        >
+                                                            {ratio.icon}
+                                                            {ratio.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Integrated Design References (Collapsible) */}
+                                            <div className="mt-8 pt-8 border-t border-slate-100">
+                                                <button
+                                                    onClick={() => setIsDesignReferencesOpen(!isDesignReferencesOpen)}
+                                                    className="w-full flex items-center justify-between mb-2 group/ref hover:bg-slate-50 p-3 rounded-xl transition-all"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover/ref:text-blue-500 transition-colors">Design Reference Studio</h3>
+                                                        {designReferences.length > 0 && (
+                                                            <div className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-[8px] font-bold">{designReferences.length}</div>
+                                                        )}
+                                                    </div>
+                                                    <div className={`text-slate-300 transition-all duration-300 ${isDesignReferencesOpen ? 'rotate-180 text-blue-500' : ''}`}>
+                                                        <ChevronDown size={14} />
+                                                    </div>
+                                                </button>
+
+                                                {isDesignReferencesOpen && (
+                                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                                        <p className="text-[10px] font-medium text-slate-400 mb-4 italic">Upload inspiration images to guide the AI's creative direction.</p>
+                                                        <div className="grid grid-cols-3 gap-3">
+                                                            {[0, 1, 2].map((idx) => (
+                                                                <div key={idx} className="aspect-video rounded-xl border-2 border-dashed border-slate-100 bg-slate-50/30 flex flex-col items-center justify-center relative group overflow-hidden hover:border-blue-200 transition-all cursor-pointer">
+                                                                    {designReferences[idx] ? (
+                                                                        <>
+                                                                            <img src={designReferences[idx]} className="w-full h-full object-cover" />
+                                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        setDesignReferences(prev => prev.filter((_, i) => i !== idx));
+                                                                                    }}
+                                                                                    className="p-1.5 bg-white rounded-full text-slate-900 shadow-xl"
+                                                                                >
+                                                                                    <X size={12} />
+                                                                                </button>
+                                                                            </div>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <ImagePlus size={14} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                                                                            <input
+                                                                                type="file"
+                                                                                accept="image/*"
+                                                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                                                                onChange={(e) => {
+                                                                                    const file = e.target.files?.[0];
+                                                                                    if (file) {
+                                                                                        const url = URL.createObjectURL(file);
+                                                                                        setDesignReferences(p => [...p, url].slice(0, 3));
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Generation Action Button (Centerpiece) */}
+                                            <div className="mt-8">
+                                                <button
+                                                    onClick={() => handleGenerateStyleGuide()}
+                                                    disabled={isGeneratingImage || !selectedRow}
+                                                    className="w-full flex items-center justify-center gap-3 py-5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-blue-200 hover:scale-[1.02] hover:shadow-blue-300 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+                                                >
+                                                    {isGeneratingImage ? (
+                                                        <RefreshCw size={18} className="animate-spin" />
+                                                    ) : (
+                                                        <Sparkles size={18} />
+                                                    )}
+                                                    Generate Vision
+                                                </button>
+                                                <p className="text-center mt-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">Constructs Technical Style Guide</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Col: Preview & Actions (Step 3) */}
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-3xl border border-slate-200/60 shadow-xl overflow-hidden flex flex-col h-fit">
+                                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white relative z-10">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-purple-50 text-purple-600 rounded-xl relative">
+                                                    <Sparkles size={18} />
+                                                    <div className="absolute -top-1 -left-1 flex items-center justify-center w-4 h-4 bg-purple-600 text-[10px] font-black text-white rounded-full">3</div>
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                                                        Step 3: Final Output
+                                                    </h2>
+                                                    <p className="text-[10px] font-bold text-slate-400 -mt-0.5 uppercase tracking-widest bg-slate-50 px-2 rounded-md inline-block">Creation Phase</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {/* Style Specs Controls (Moved from Step 2) */}
+                                                {dmpDraft && (
+                                                    <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200 mr-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(dmpDraft);
+                                                                notify('Style instructions copied!', 'success');
+                                                            }}
+                                                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-colors"
+                                                            title="Copy Prompt"
+                                                        >
+                                                            <Copy size={12} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsEditingDmp(!isEditingDmp)}
+                                                            className={`p-1.5 rounded-lg transition-colors ${isEditingDmp ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-white'}`}
+                                                            title="Edit Mode"
+                                                        >
+                                                            <Pencil size={12} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsRefinerOpen(!isRefinerOpen)}
+                                                            className={`p-1.5 rounded-lg transition-all flex items-center gap-1.5 px-2.5 ${isRefinerOpen ? 'bg-indigo-600 text-white' : 'text-indigo-600 hover:bg-indigo-50'}`}
+                                                            title="AI Style Refiner"
+                                                        >
+                                                            <Sparkles size={10} className={isRefining ? 'animate-pulse' : ''} />
+                                                            <span className="text-[8px] font-black uppercase tracking-wider">Refine Style</span>
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                <select
+                                                    value={selectedModel}
+                                                    onChange={(e) => {
+                                                        const m = ALL_MODELS.find(x => x.id === e.target.value);
+                                                        if (m) {
+                                                            setSelectedModel(m.id);
+                                                            setProvider(m.provider as any);
+                                                        }
+                                                    }}
+                                                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-bold focus:ring-2 focus:ring-blue-500/10 outline-none cursor-pointer hover:bg-white transition-all shadow-sm"
+                                                >
+                                                    {ALL_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-6 flex flex-col items-center bg-slate-100/30 overflow-y-auto custom-scrollbar h-full min-h-[500px] relative">
+                                            {/* AI Refiner Assistant (Lightened) - Mapped to Output Column */}
+                                            {isRefinerOpen && (
+                                                <div className="w-full mb-6 p-5 bg-indigo-50 rounded-2xl border border-indigo-100 shadow-xl animate-in slide-in-from-top-4 duration-500 relative overflow-hidden z-[20]">
+                                                    <div className="flex items-center justify-between mb-4 relative z-10">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="p-1.5 bg-white text-indigo-600 rounded-lg">
+                                                                <Sparkles size={14} />
+                                                            </div>
+                                                            <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-wider">Style Tuner</h3>
+                                                        </div>
+                                                        <button onClick={() => setIsRefinerOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
+                                                    </div>
+                                                    <div className="relative group z-10">
+                                                        <textarea
+                                                            value={aiRefinementMessage}
+                                                            onChange={(e) => setAiRefinementMessage(e.target.value)}
+                                                            placeholder="e.g. 'Make it more professional'..."
+                                                            className="w-full bg-white border border-indigo-100 rounded-xl p-4 pr-12 text-xs font-medium text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all resize-none h-20 shadow-sm"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                                    e.preventDefault();
+                                                                    handleRefineDmp();
+                                                                }
+                                                            }}
+                                                        />
+                                                        <button
+                                                            onClick={handleRefineDmp}
+                                                            disabled={isRefining || !aiRefinementMessage.trim()}
+                                                            className="absolute right-2 bottom-2 p-2 bg-indigo-600 text-white rounded-lg shadow-lg hover:bg-indigo-700 transition-all disabled:opacity-50"
+                                                        >
+                                                            {isRefining ? <RefreshCw size={12} className="animate-spin" /> : <ArrowRight size={12} />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Preview Image */}
+                                            <div className="w-full flex flex-col items-center justify-center relative z-10 mb-8">
                                                 {/* Design Pattern Grid (Subtle) */}
                                                 <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 0)', backgroundSize: '16px 16px' }} />
 
@@ -1300,8 +1360,8 @@ export function ImageHubPage({
                                                 )}
                                             </div>
 
-                                            <div className="p-8 border-t border-slate-100 bg-white">
-                                                <div className="flex gap-3 mb-4">
+                                            <div className="p-8 border-t border-slate-100 bg-white space-y-6">
+                                                <div className="flex gap-3">
                                                     <button
                                                         onClick={handleGenerate}
                                                         disabled={isGeneratingImage || isEditingDmp || !dmpDraft.trim() || !userPermissions?.canGenerate}
@@ -1315,22 +1375,84 @@ export function ImageHubPage({
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <Wand2 size={20} />
-                                                                Generate Visual
+                                                                <Zap size={20} className="text-amber-300" />
+                                                                Step 3: Generate Image
                                                             </>
                                                         )}
                                                     </button>
                                                     {getImageGeneratedUrl(selectedRow) && (
                                                         <button
                                                             onClick={() => handleDismissItem(selectedRow.contentCalendarId)}
-                                                            className="px-6 py-4 bg-emerald-50 text-emerald-600 rounded-2xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                                                            className="px-6 py-4 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
                                                             title="Satisfied? Dismiss from queue"
                                                         >
                                                             <CheckCircle2 size={16} />
-                                                            Finish
+                                                            Ready to Post
                                                         </button>
                                                     )}
                                                 </div>
+
+                                                {/* Technical Spec / Technical Persona (Moved from Step 2) */}
+                                                {dmpDraft && (
+                                                    <div className="pt-6 border-t border-slate-50 w-full animate-in fade-in slide-in-from-top-4 duration-700">
+                                                        <button
+                                                            onClick={() => setShowTechnicalPrompt(!showTechnicalPrompt)}
+                                                            className="w-full flex items-center justify-between group/persona mb-4"
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                                                                    <ShieldCheck size={14} />
+                                                                </div>
+                                                                <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Active Visual Persona</h3>
+                                                            </div>
+                                                            <div className={`text-slate-300 group-hover/persona:text-indigo-600 transition-all ${showTechnicalPrompt ? 'rotate-180' : ''}`}>
+                                                                <ChevronDown size={14} />
+                                                            </div>
+                                                        </button>
+
+                                                        {showTechnicalPrompt ? (
+                                                            <div className="relative group">
+                                                                <textarea
+                                                                    value={dmpDraft}
+                                                                    onChange={(e) => setDmpDraft(e.target.value)}
+                                                                    readOnly={!isEditingDmp}
+                                                                    className={`w-full min-h-[300px] p-5 rounded-2xl font-mono text-[10px] border-2 outline-none transition-all resize-none shadow-inner ${isEditingDmp
+                                                                        ? 'border-blue-500/30 bg-white ring-8 ring-blue-500/[0.03]'
+                                                                        : 'border-slate-100 bg-slate-50/50 text-slate-600'
+                                                                        }`}
+                                                                />
+                                                                {!isEditingDmp && (
+                                                                    <div className="absolute inset-0 bg-transparent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all pointer-events-none">
+                                                                        <button
+                                                                            onClick={() => setIsEditingDmp(true)}
+                                                                            className="bg-white/90 backdrop-blur shadow-xl border border-slate-200 px-4 py-2 rounded-full text-[10px] font-black uppercase text-slate-600 pointer-events-auto"
+                                                                        >
+                                                                            Edit Spec
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                                {isEditingDmp && (
+                                                                    <div className="mt-4 flex items-center justify-end gap-2">
+                                                                        <button onClick={() => setIsEditingDmp(false)} className="text-[10px] font-bold text-slate-400">Cancel</button>
+                                                                        <button onClick={handleSaveDmp} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] font-bold">Save Spec</button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100 flex items-center gap-4 group/mini hover:bg-slate-100 transition-all cursor-pointer" onClick={() => setShowTechnicalPrompt(true)}>
+                                                                <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-indigo-50 flex items-center justify-center text-indigo-500">
+                                                                    <Eye size={18} />
+                                                                </div>
+                                                                <div className="flex-1 text-left">
+                                                                    <p className="text-[10px] font-black text-slate-700 uppercase">Persona Locked</p>
+                                                                    <p className="text-[8px] font-bold text-slate-400 mt-0.5">Click to view/edit technical style guide</p>
+                                                                </div>
+                                                                <ArrowRight size={14} className="text-slate-300 group-hover/mini:translate-x-1 transition-transform" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
                                                 <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 py-2 rounded-lg border border-slate-100">
                                                     <div className="p-1 bg-white rounded-md border shadow-sm">
                                                         <Layout size={10} className="text-blue-500" />
@@ -1339,92 +1461,43 @@ export function ImageHubPage({
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* Advanced Settings */}
-                                        <div className="bg-slate-50/50 rounded-3xl border border-slate-200/30 overflow-hidden">
-                                            <button
-                                                onClick={() => setShowAdvanced(!showAdvanced)}
-                                                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Settings2 size={16} className="text-slate-400" />
-                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Advanced Settings</span>
-                                                </div>
-                                                {showAdvanced ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                                            </button>
-
-                                            {showAdvanced && (
-                                                <div className="px-6 pb-6 pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in slide-in-from-top-2 duration-300">
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Engine Provider</label>
-                                                        <div className="flex bg-white p-1 rounded-xl border border-slate-200/50">
-                                                            {['fal', 'google'].map(p => (
-                                                                <button
-                                                                    key={p}
-                                                                    onClick={() => setProvider(p as any)}
-                                                                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${provider === p ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                                                                        }`}
-                                                                >
-                                                                    {p}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-end">
-                                                        <button
-                                                            onClick={async () => {
-                                                                const proceed = await requestConfirm({
-                                                                    title: 'Reset Visual Style?',
-                                                                    description: 'This will replace the current visual instructions with fresh ones from our AI. You will lose manual edits.',
-                                                                    confirmLabel: 'Reset',
-                                                                    cancelLabel: 'Keep Current'
-                                                                });
-                                                                if (!proceed) return;
-                                                                handleGenerateStyleGuide();
-                                                            }}
-                                                            disabled={!userPermissions?.canGenerate}
-                                                            className="w-full py-2.5 rounded-xl border border-rose-200 text-[10px] font-bold uppercase text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
-                                                        >
-                                                            Force Style Reset
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center p-12 text-center bg-white rounded-3xl border border-slate-200/60 shadow-sm max-w-4xl mx-auto relative overflow-hidden">
-                                <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] text-blue-50 opacity-[0.4] pointer-events-none" />
-                                <div className="relative z-10 flex flex-col items-center">
-                                    <div className="w-32 h-32 bg-slate-50 rounded-full flex items-center justify-center mb-8 border border-slate-100 shadow-sm">
-                                        <MousePointer2 size={48} className="text-blue-500/30 animate-pulse" />
-                                    </div>
-                                    <h2 className="text-2xl font-black text-slate-900 mb-2">Ready to Start Designing?</h2>
-                                    <p className="text-slate-500 max-w-sm font-medium mb-8">
-                                        Select an approved content item from the sidebar to begin generating stunning visuals.
-                                    </p>
-                                    <div className="flex items-center gap-4 bg-blue-50 p-4 rounded-3xl border border-blue-100">
-                                        <ArrowLeft className="text-blue-500 animate-bounce-x" />
-                                        <span className="text-xs font-black text-blue-700 uppercase tracking-widest">Select an item to begin</span>
-                                    </div>
-
-                                    {dismissedIds.length > 0 && (
-                                        <button
-                                            onClick={() => setDismissedIds([])}
-                                            className="mt-12 inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-slate-800 transition-all"
-                                        >
-                                            <History size={16} />
-                                            Restore finished items
-                                        </button>
-                                    )}
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center p-12 text-center bg-white rounded-3xl border border-slate-200/60 shadow-sm max-w-4xl mx-auto relative overflow-hidden">
+                            <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] text-blue-50 opacity-[0.4] pointer-events-none" />
+                            <div className="relative z-10 flex flex-col items-center">
+                                <div className="w-32 h-32 bg-slate-50 rounded-full flex items-center justify-center mb-8 border border-slate-100 shadow-sm">
+                                    <MousePointer2 size={48} className="text-blue-500/30 animate-pulse" />
                                 </div>
+                                <h2 className="text-2xl font-black text-slate-900 mb-2">No Visual Selected</h2>
+                                <p className="text-slate-500 max-w-sm font-medium mb-8">
+                                    Please select an approved content item from the Content Studio to begin generating visuals.
+                                </p>
+                                <button
+                                    onClick={() => navigate(-1)}
+                                    className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all"
+                                >
+                                    <ArrowLeft size={16} />
+                                    Back to Studio
+                                </button>
+
+                                {dismissedIds.length > 0 && (
+                                    <button
+                                        onClick={() => setDismissedIds([])}
+                                        className="mt-12 inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-slate-800 transition-all"
+                                    >
+                                        <History size={16} />
+                                        Restore finished items
+                                    </button>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
-            </section >
+            </section>
 
             {/* Lightbox / Zoom Modal */}
             {
@@ -1465,90 +1538,6 @@ export function ImageHubPage({
                                     <Download size={14} />
                                     Download High-Res
                                 </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-            {/* Visual & Image rules Modal */}
-            {
-                isEditingBrandRules && (
-                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsEditingBrandRules(false)} />
-
-                        <div className="relative z-10 w-full max-w-3xl bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
-                            <header className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
-                                        <Settings2 size={24} />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-black text-slate-900 tracking-tight">Visual & Image rules</h3>
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Visual Identity & Aesthetic Standards</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setIsEditingBrandRules(false)}
-                                    className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"
-                                >
-                                    <X size={24} />
-                                </button>
-                            </header>
-
-                            <div className="p-8 space-y-6">
-                                <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100/50 flex gap-4 items-start">
-                                    <HelpCircle className="text-blue-500 mt-1 flex-shrink-0" size={18} />
-                                    <p className="text-xs font-medium text-slate-600 leading-relaxed">
-                                        These rules act as the **foundation** for every design prompt generated. Define your brand's color palette, logo placement preferences, photography style (e.g., "minimalist", "vibrant", "high-contrast"), and any forbidden elements.
-                                    </p>
-                                </div>
-
-                                <div className="relative overflow-hidden rounded-3xl border-2 border-slate-100 focus-within:border-blue-500/30 transition-all shadow-inner bg-slate-50/30">
-                                    <div className="absolute top-4 left-4 p-2 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200 flex items-center gap-2 z-10">
-                                        <Sparkles size={14} className="text-blue-500" />
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Main Rules Engine</span>
-                                    </div>
-                                    <textarea
-                                        value={brandRulesDraft}
-                                        onChange={(e) => setBrandRulesDraft(e.target.value)}
-                                        className="w-full h-[400px] p-8 pt-16 text-sm font-medium text-slate-700 bg-transparent outline-none resize-none leading-relaxed"
-                                        placeholder="e.g. Always use centered typography. Logo should be in top-right corner. Use a soft pastel color palette with high-key lighting..."
-                                    />
-                                </div>
-
-                                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                                    <button
-                                        onClick={() => setIsEditingBrandRules(false)}
-                                        className="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 transition-colors"
-                                    >
-                                        Discard Changes
-                                    </button>
-                                    <div className="flex gap-4">
-                                        <button
-                                            onClick={() => {
-                                                setIsEditingBrandRules(false);
-                                                setIsVisualOnboardingOpen(true);
-                                                setVisualOnboardingStep(1);
-                                            }}
-                                            className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
-                                        >
-                                            <Palette size={14} />
-                                            Open Wizard
-                                        </button>
-                                        <button
-                                            onClick={() => handleSaveBrandRules()}
-                                            disabled={isGeneratingImage}
-                                            className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
-                                        >
-                                            {isGeneratingImage ? 'Saving...' : (
-                                                <>
-                                                    <CheckCircle2 size={18} />
-                                                    Save Visual Identity
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1952,6 +1941,6 @@ export function ImageHubPage({
                     </div>
                 )
             }
-        </main >
+        </main>
     );
 }

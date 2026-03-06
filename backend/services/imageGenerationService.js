@@ -267,33 +267,50 @@ export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
       : (brandKB?.systemInstruction ?? '');
 
   const openAiSystem = IMAGE_GENERATION_SYSTEM_PROMPT;
-  let openAiUser = IMAGE_GENERATION_USER_PROMPT;
+
+  // Refined Logic: Triple-Threat Merger
+  // Priority 1: User Instructions (Direct Subject)
+  // Priority 2: Post Metadata (Contextual Alignment)
+  // Priority 3: Global Brand Rules (Aesthetic Constraint)
+
+  const userInstructions = opts.imageContext || ''; // Now treated as the primary Director's Chair instruction
+  const caption = String(row.finalCaption || row.captionOutput || 'No caption provided.');
+
+  let openAiUser = `### TRIPLE-THREAT DESIGN DIRECTIVE ###
+
+1. PRIMARY DIRECTIVE (Subject & Actions):
+${userInstructions ? userInstructions : "Propose a unique, high-end visual that represents the essence of the caption provided below."}
+
+2. CONTEXTUAL ALIGNMENT (Marketing Message):
+Ensure the visual composition and elements reflect the core message and tone of this content:
+"${caption}"
+
+3. AESTHETIC CONSTRAINT (Brand Soul):
+The final output MUST strictly adhere to these global brand visual rules:
+"${systemInstruction}"
+
+### INSTRUCTION SUMMARY ###
+Strictly follow the Priority 1 (Subject) while layering on Priority 2 (Context) and constraining everything within Priority 3 (Style). If specific subject instructions are missing, use your creative expertise to propose a visually stunning concept based on the caption and brand rules.`;
 
   if (opts.designReferences && opts.designReferences.length > 0) {
-    openAiUser += '\n\nIMPORTANT: Use the attached reference images as a visual anchor and stylistic inspiration for the Style Guide. Adapt the mood, composition, and artistic details to suit the brand rules while remaining faithful to the references provided.';
-  }
-
-  if (opts.imageContext && opts.imageContext.trim()) {
-    openAiUser += `\n\nSCENE CONTEXT: The user has specified the following scene description: "${opts.imageContext}". Use this as the core subject matter.`;
+    openAiUser += '\n\n4. VISUAL ANCHORS: Use the attached reference images as inspiration for composition and quality.';
   }
 
   if (opts.imageMood && opts.imageMood !== 'Brand Default') {
-    openAiUser += `\n\nMOOD OVERRIDE: The user requested a "${opts.imageMood}" mood. Adapt the visual style to reflect this while maintaining brand consistency where possible.`;
+    openAiUser += `\n\nMOOD OVERRIDE: Adapt the visual style to a "${opts.imageMood}" mood.`;
   }
 
   if (opts.imageLighting && opts.imageLighting !== 'Brand Default') {
-    openAiUser += `\n\nLIGHTING OVERRIDE: The user requested "${opts.imageLighting}" lighting. Ensure the scene is lit according to this specification.`;
+    openAiUser += `\n\nLIGHTING OVERRIDE: Apply "${opts.imageLighting}" lighting.`;
   }
 
   if (opts.aspectRatio) {
-    openAiUser += `\n\nASPECT RATIO: The design should be optimized for a ${opts.aspectRatio} aspect ratio. Ensure the composition and focal points are balanced for this specific framing.`;
+    openAiUser += `\n\nASPECT RATIO: Optimize for ${opts.aspectRatio}.`;
   }
 
   const openAiRes = await callOpenAIText({
     systemPrompt: openAiSystem.replaceAll('{{brandKB.systemInstruction}}', systemInstruction || ''),
-    userPrompt: openAiUser
-      .replaceAll('{{contentCalendar.finalCaption}}', String(row.finalCaption || row.captionOutput || ''))
-      .replaceAll('{{contentCalendar.finalCTA}}', String(row.finalCTA || row.cta || '')),
+    userPrompt: openAiUser,
     images: opts.designReferences || [],
     temperature: 1,
     companyId: row.companyId,
@@ -651,4 +668,56 @@ VIBE: <Detailed 2-sentence description of the aesthetic rules>`;
 
 
   return { ok: true, analysis: res.content };
+}
+
+export async function proposeImageIdeas(contentCalendarId, { userId }) {
+  if (!userId) return { ok: false, status: 401, error: 'Unauthorized' };
+
+  const loaded = await loadContentCalendarRow({ contentCalendarId, userId });
+  if (!loaded.ok) return loaded;
+
+  const row = loaded.row;
+  const { data: brandKB } = await db
+    .from('brandKB')
+    .select('systemInstruction')
+    .eq('companyId', row.companyId)
+    .limit(1)
+    .maybeSingle();
+
+  const systemInstruction = brandKB?.systemInstruction || 'Professional, high-quality visuals.';
+  const caption = row.finalCaption || row.captionOutput || 'No caption provided.';
+
+  const systemPrompt = `You are a Visual Creative Director. 
+Your goal is to propose 3 distinct, stunning visual concepts for an AI image generator based on a caption and brand rules.
+Each proposal should be a single, descriptive paragraph that acts as a prompt.
+
+Output format:
+CONCEPT 1: <description>
+CONCEPT 2: <description>
+CONCEPT 3: <description>
+
+Do not include any other text.`;
+
+  const userPrompt = `### BRAND RULES ###
+${systemInstruction}
+
+### CAPTION ###
+"${caption}"
+
+Propose 3 distinct visual directions.`;
+
+  const res = await callOpenAIText({
+    systemPrompt,
+    userPrompt,
+    temperature: 0.8,
+    companyId: row.companyId,
+    userId
+  });
+
+  if (!res.ok) return res;
+
+  const content = res.content || '';
+  const ideas = content.split(/CONCEPT \d+:/i).filter(s => s.trim().length > 0).map(s => s.trim());
+
+  return { ok: true, ideas: ideas.slice(0, 3) };
 }

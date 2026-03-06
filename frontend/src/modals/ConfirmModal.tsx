@@ -7,9 +7,11 @@ interface ConfirmModalProps {
         description: string;
         confirmLabel: string;
         cancelLabel: string;
+        thirdLabel?: string;
         confirmVariant?: 'primary' | 'danger';
+        thirdVariant?: 'primary' | 'danger' | 'ghost';
     } | null;
-    onResolve: (value: boolean) => void;
+    onResolve: (value: boolean | 'third') => void;
     isAiAssistantOpen?: boolean;
 }
 
@@ -41,24 +43,40 @@ export function ConfirmModal({
                     </p>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 border-t border-slate-200/60 p-4 bg-slate-50/30">
-                    <button
-                        type="button"
-                        className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px]"
-                        onClick={() => onResolve(false)}
-                    >
-                        {config.cancelLabel}
-                    </button>
-                    <button
-                        type="button"
-                        className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-bold shadow-sm ring-1 ring-inset ring-black/5 transition active:translate-y-[1px] ${config.confirmVariant === 'danger'
-                            ? 'bg-red-500 text-white hover:bg-red-600'
-                            : 'bg-[#3fa9f5] text-white hover:bg-[#2f97e6]'
-                            }`}
-                        onClick={() => onResolve(true)}
-                    >
-                        {config.confirmLabel}
-                    </button>
+                <div className="flex flex-col gap-2 p-4 bg-slate-50/30 border-t border-slate-200/60">
+                    <div className="flex items-center justify-end gap-3">
+                        <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-brand-dark border border-slate-200/70 shadow-sm transition hover:bg-slate-50 active:translate-y-[1px]"
+                            onClick={() => onResolve(false)}
+                        >
+                            {config.cancelLabel}
+                        </button>
+                        {config.thirdLabel && (
+                            <button
+                                type="button"
+                                className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-bold shadow-sm ring-1 ring-inset ring-black/5 transition active:translate-y-[1px] ${config.thirdVariant === 'danger'
+                                    ? 'bg-red-500 text-white hover:bg-red-600'
+                                    : config.thirdVariant === 'ghost'
+                                        ? 'bg-transparent text-slate-600 hover:bg-slate-100 border border-slate-200'
+                                        : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                                    }`}
+                                onClick={() => onResolve('third')}
+                            >
+                                {config.thirdLabel}
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            className={`inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-bold shadow-sm ring-1 ring-inset ring-black/5 transition active:translate-y-[1px] ${config.confirmVariant === 'danger'
+                                ? 'bg-red-500 text-white hover:bg-red-600'
+                                : 'bg-[#3fa9f5] text-white hover:bg-[#2f97e6]'
+                                }`}
+                            onClick={() => onResolve(true)}
+                        >
+                            {config.confirmLabel}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

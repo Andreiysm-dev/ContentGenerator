@@ -164,6 +164,23 @@ router.post('/content-calendar/analyze-brand-visuals', async (req, res) => {
     }
 });
 
+// POST - /api/content-calendar/:contentCalendarId/propose-image-ideas
+router.post('/content-calendar/:contentCalendarId/propose-image-ideas', async (req, res) => {
+    try {
+        const { contentCalendarId } = req.params;
+        const userId = req.user?.id;
+        const { proposeImageIdeas } = await import('../services/imageGenerationService.js');
+        const result = await proposeImageIdeas(contentCalendarId, { userId });
+        if (!result.ok) {
+            return res.status(result.status || 500).json({ error: result.error });
+        }
+        return res.status(200).json({ ideas: result.ideas });
+    } catch (err) {
+        console.error('Propose image ideas endpoint error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // UPDATE - PUT /api/content-calendar/:id
 router.put('/content-calendar/:id', updateContentCalendar);
 

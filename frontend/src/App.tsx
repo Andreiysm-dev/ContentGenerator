@@ -791,8 +791,10 @@ function App() {
     confirmLabel: string;
     cancelLabel: string;
     confirmVariant?: 'primary' | 'danger';
+    thirdLabel?: string;
+    thirdVariant?: 'primary' | 'danger' | 'ghost';
   } | null>(null);
-  const confirmResolverRef = useRef<((value: boolean) => void) | null>(null);
+  const confirmResolverRef = useRef<((value: boolean | 'third') => void) | null>(null);
 
   const statusOptions = [
     '',
@@ -1718,7 +1720,7 @@ function App() {
 
   const filteredCalendarRows = useMemo(() => {
     // Detect mode from URL
-    const isPublishedTab = location.pathname.includes('/calendar/published');
+    const isArchivesTab = location.pathname.includes('/calendar/published');
     const search = calendarSearch.trim().toLowerCase();
     const statusFilter = calendarStatusFilter.toLowerCase();
 
@@ -1727,7 +1729,7 @@ function App() {
     const filtered = calendarRows.filter((row) => {
       const statusValue = getStatusValue(row.status).toLowerCase();
       const rawId = typeof row.status === 'string' ? row.status.toLowerCase() : (row.status?.state?.toLowerCase() || "");
-      const isPublished = statusValue === 'published' || rawId === 'published';
+      const isArchived = statusValue === 'archived' || rawId === 'archived';
 
       // Map dynamic status ID to title for consistent filtering
       const colMatch = kanbanCols.find((c: any) =>
@@ -1737,8 +1739,11 @@ function App() {
       const displayStatus = colMatch ? colMatch.title.toLowerCase() : statusValue;
 
       // Filter by tab mode
-      if (isPublishedTab) {
-        if (!isPublished) return false;
+      if (isArchivesTab) {
+        if (!isArchived) return false;
+      } else {
+        // Pipeline tab - exclude archived
+        if (isArchived) return false;
       }
 
       // Filter by status dropdown
@@ -1835,8 +1840,10 @@ function App() {
     description: string;
     confirmLabel: string;
     cancelLabel: string;
+    thirdLabel?: string;
     confirmVariant?: 'primary' | 'danger';
-  }): Promise<boolean> => {
+    thirdVariant?: 'primary' | 'danger' | 'ghost';
+  }): Promise<boolean | 'third'> => {
     setConfirmConfig({ confirmVariant: 'primary', ...config });
     setIsConfirmOpen(true);
     return new Promise((resolve) => {
@@ -1844,7 +1851,7 @@ function App() {
     });
   };
 
-  const resolveConfirm = (value: boolean) => {
+  const resolveConfirm = (value: boolean | 'third') => {
     if (confirmResolverRef.current) {
       confirmResolverRef.current(value);
       confirmResolverRef.current = null;
@@ -2161,7 +2168,13 @@ function App() {
     cutoff.setDate(now.getDate() + 7);
 
     calendarRows.forEach((row) => {
-      const status = getStatusValue(row.status).trim().toLowerCase();
+      const statusValue = getStatusValue(row.status).toLowerCase();
+      const rawId = typeof row.status === 'string' ? row.status.toLowerCase() : (row.status?.state?.toLowerCase() || "");
+      const isArchived = statusValue === 'archived' || rawId === 'archived';
+
+      if (isArchived) return; // Exclude from dashboard stats
+
+      const status = statusValue.trim();
       if (status === 'ready' || status === 'approved') counts.approved += 1;
       else if (status === 'review') counts.review += 1;
       else if (status === 'generate') counts.generate += 1;
@@ -3231,6 +3244,7 @@ function App() {
                       onStatusMoved={(postId, status, originalStatus) => {
                         recentStatusMoves.current.set(postId, { status, originalStatus, ts: Date.now() });
                       }}
+                      requestConfirm={requestConfirm}
                       userPermissions={userPermissions}
                     />
                   }
@@ -3511,6 +3525,9 @@ function App() {
                       authedFetch={authedFetch}
                       notify={notify}
                       getImageGeneratedUrl={getImageGeneratedUrl}
+                      setIsImageModalOpen={setIsImageModalOpen}
+                      setSelectedRow={setSelectedRow}
+                      selectedRow={selectedRow}
                     />
                   }
                 />
