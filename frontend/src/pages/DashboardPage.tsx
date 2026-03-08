@@ -29,6 +29,10 @@ import {
   Twitter,
   Globe,
   Tags,
+  Activity,
+  Loader2,
+  ShieldCheck,
+  User,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -303,7 +307,7 @@ export function DashboardPage({
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <section className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-full">
           {/* Dark Header Banner - Inside the section now */}
-          <div className="bg-[#1E3A5F] bg-gradient-to-br from-[#1E3A5F] to-[#0B2641] p-8 relative overflow-hidden">
+          <div className="bg-[#1E3A5F] bg-gradient-to-br from-[#1E3A5F] to-[#0B2641] px-8 py-4 relative overflow-hidden">
             {/* Decorative background elements */}
             <div className="absolute top-0 right-0 w-[40%] h-full bg-gradient-to-l from-blue-400/10 to-transparent pointer-events-none" />
             <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
@@ -374,6 +378,8 @@ export function DashboardPage({
                         activeCompanyId={activeCompanyId}
                         calendarRows={calendarRows}
                         activeCompany={activeCompany}
+                        authedFetch={authedFetch}
+                        backendBaseUrl={backendBaseUrl}
                       />
                     </div>
                   ))}
@@ -521,13 +527,22 @@ export function DashboardPage({
 
                   <div className="space-y-8">
                     {/* PLANNING */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-slate-300" />
-                          1. Planning (Backlog / Ideas)
-                        </label>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-slate-300 shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Stage 1</span>
                       </div>
+                      <input
+                        type="text"
+                        value={editingWidget.planningLabel ?? 'Planning'}
+                        placeholder="e.g. Planning, Backlog, Ideas"
+                        onChange={e => {
+                          const nw = localSettings.widgets.map((w: any) => w.id === editingWidget.id ? { ...w, planningLabel: e.target.value } : w);
+                          setLocalSettings({ ...localSettings, widgets: nw });
+                          setEditingWidget({ ...editingWidget, planningLabel: e.target.value });
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#0B2641] outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-400 transition-all"
+                      />
                       <div className="flex flex-wrap gap-2">
                         {columns.map((c: any) => {
                           const isSel = (editingWidget.planningIds || []).includes(c.id);
@@ -550,13 +565,22 @@ export function DashboardPage({
                     </div>
 
                     {/* EXECUTION */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-amber-400" />
-                          2. Execution (In Production / Review)
-                        </label>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Stage 2</span>
                       </div>
+                      <input
+                        type="text"
+                        value={editingWidget.executionLabel ?? 'Execution'}
+                        placeholder="e.g. Execution, In Progress, Review"
+                        onChange={e => {
+                          const nw = localSettings.widgets.map((w: any) => w.id === editingWidget.id ? { ...w, executionLabel: e.target.value } : w);
+                          setLocalSettings({ ...localSettings, widgets: nw });
+                          setEditingWidget({ ...editingWidget, executionLabel: e.target.value });
+                        }}
+                        className="w-full bg-amber-50/40 border border-amber-100 rounded-xl px-4 py-2.5 text-sm font-bold text-amber-800 outline-none focus:ring-4 focus:ring-amber-50 focus:border-amber-300 transition-all placeholder:text-amber-300"
+                      />
                       <div className="flex flex-wrap gap-2">
                         {columns.map((c: any) => {
                           const isSel = (editingWidget.executionIds || []).includes(c.id);
@@ -579,13 +603,22 @@ export function DashboardPage({
                     </div>
 
                     {/* SUCCESS */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-[#3FA9F5] flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#3FA9F5]" />
-                          3. Success (Published / Complete)
-                        </label>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-[#3FA9F5] shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#3FA9F5]">Stage 3</span>
                       </div>
+                      <input
+                        type="text"
+                        value={editingWidget.successLabel ?? 'Success'}
+                        placeholder="e.g. Success, Published, Done"
+                        onChange={e => {
+                          const nw = localSettings.widgets.map((w: any) => w.id === editingWidget.id ? { ...w, successLabel: e.target.value } : w);
+                          setLocalSettings({ ...localSettings, widgets: nw });
+                          setEditingWidget({ ...editingWidget, successLabel: e.target.value });
+                        }}
+                        className="w-full bg-blue-50/40 border border-blue-100 rounded-xl px-4 py-2.5 text-sm font-bold text-blue-800 outline-none focus:ring-4 focus:ring-blue-50 focus:border-[#3FA9F5] transition-all placeholder:text-blue-300"
+                      />
                       <div className="flex flex-wrap gap-2">
                         {columns.map((c: any) => {
                           const isSel = (editingWidget.successIds || []).includes(c.id);
@@ -637,6 +670,33 @@ export function DashboardPage({
                 </div>
               )}
 
+              {editingWidget.type === 'activity_log' && (
+                <div className="space-y-4 pt-6 border-t border-slate-100">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Recent Entries to Show</p>
+                  <div className="flex gap-3">
+                    {[5, 10, 20, 50].map(count => (
+                      <button
+                        key={count}
+                        onClick={() => {
+                          const nw = localSettings.widgets.map((w: any) =>
+                            w.id === editingWidget.id ? { ...w, logsCount: count } : w
+                          );
+                          setLocalSettings({ ...localSettings, widgets: nw });
+                          setEditingWidget({ ...editingWidget, logsCount: count });
+                        }}
+                        className={`flex-1 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${(editingWidget.logsCount ?? 10) === count
+                          ? 'bg-teal-50 border-teal-200 text-teal-600'
+                          : 'bg-white border-slate-200 text-slate-400'
+                          }`}
+                      >
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[9px] text-slate-400 font-medium italic">Shows the most recent N events from your company's audit log.</p>
+                </div>
+              )}
+
               {editingWidget.type === 'platform_stats' && (
                 <div className="space-y-4 pt-6 border-t border-slate-100">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Active Channels</p>
@@ -677,7 +737,7 @@ export function DashboardPage({
                     { label: 'Workboard', path: `/company/${activeCompanyId}/workboard`, icon: LayoutGrid },
                     { label: 'Content Studio', path: `/company/${activeCompanyId}/studio`, icon: Wand2 },
                     { label: 'Content Board', path: `/company/${activeCompanyId}/calendar`, icon: Calendar },
-                    { label: 'Image Hub', path: `/company/${activeCompanyId}/images`, icon: ImageIcon },
+                    { label: 'Settings', path: `/company/${activeCompanyId}/settings`, icon: Settings2 },
                     { label: 'Intelligence', path: `/company/${activeCompanyId}/brand`, icon: Target },
                   ].map((page) => (
                     <button
@@ -956,6 +1016,24 @@ export function DashboardPage({
                       </div>
                       <Plus size={14} className="text-slate-300 group-hover:text-amber-500" />
                     </button>
+                    <button
+                      onClick={() => setLocalSettings({
+                        ...localSettings,
+                        widgets: [...localSettings.widgets, { id: Date.now().toString(), type: 'activity_log', label: 'Activity Logs', logsCount: 10 }]
+                      })}
+                      className="w-full flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl hover:border-teal-500 hover:bg-teal-50/30 transition-all text-left group shadow-sm"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-teal-50 text-teal-500 rounded-lg">
+                          <Activity size={16} />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black text-[#0B2641] uppercase tracking-widest block">Activity Log</span>
+                          <span className="text-[9px] text-slate-400 font-medium">Recent company audit activity.</span>
+                        </div>
+                      </div>
+                      <Plus size={14} className="text-slate-300 group-hover:text-teal-500" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1080,7 +1158,8 @@ function SortableWidgetRow({ widget, onDelete, setEditingWidget }: any) {
               widget.type === 'platform_stats' ? 'bg-sky-50 text-sky-500' :
                 widget.type === 'upcoming_schedule' ? 'bg-indigo-50 text-indigo-500' :
                   widget.type === 'tag_velocity' ? 'bg-amber-50 text-amber-500' :
-                    'bg-slate-50 text-slate-400'
+                    widget.type === 'activity_log' ? 'bg-teal-50 text-teal-500' :
+                      'bg-slate-50 text-slate-400'
           }`}>
           {widget.type === 'stat_card' ? <LayoutGrid size={16} /> :
             widget.type === 'attention_list' ? <ListFilter size={16} /> :
@@ -1088,7 +1167,8 @@ function SortableWidgetRow({ widget, onDelete, setEditingWidget }: any) {
                 widget.type === 'platform_stats' ? <Globe size={16} /> :
                   widget.type === 'upcoming_schedule' ? <Calendar size={16} /> :
                     widget.type === 'tag_velocity' ? <Tags size={16} /> :
-                      <BarChart3 size={16} />}
+                      widget.type === 'activity_log' ? <Activity size={16} /> :
+                        <BarChart3 size={16} />}
         </div>
         <div>
           <p className="text-[11px] font-black text-[#0B2641] uppercase tracking-tight">{widget.label}</p>
@@ -1115,7 +1195,18 @@ function SortableWidgetRow({ widget, onDelete, setEditingWidget }: any) {
   );
 }
 
-function WidgetRenderer({ widget, columns, navigate, activeCompanyId, calendarRows, activeCompany }: any) {
+function WidgetRenderer({ widget, columns, navigate, activeCompanyId, calendarRows, activeCompany, authedFetch, backendBaseUrl }: any) {
+  if (widget.type === 'activity_log') {
+    return (
+      <ActivityLogWidget
+        widget={widget}
+        activeCompanyId={activeCompanyId}
+        authedFetch={authedFetch}
+        backendBaseUrl={backendBaseUrl}
+      />
+    );
+  }
+
   if (widget.type === 'navigation_grid') {
     const navs = [
       { label: 'Workboard', icon: LayoutGrid, path: `/company/${activeCompanyId}/workboard`, color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -1228,17 +1319,17 @@ function WidgetRenderer({ widget, columns, navigate, activeCompanyId, calendarRo
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2 px-2 border-l-2 border-slate-200">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Planning</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{widget.planningLabel || 'Planning'}</p>
               <p className="text-sm font-black text-[#1E3A5F]">{planCount}</p>
               <p className="text-[8px] text-slate-300 font-medium leading-none">Drafts & Ideas</p>
             </div>
             <div className="space-y-2 px-2 border-l-2 border-amber-400">
-              <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Execution</p>
+              <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">{widget.executionLabel || 'Execution'}</p>
               <p className="text-sm font-black text-[#1E3A5F]">{activeCount}</p>
               <p className="text-[8px] text-slate-300 font-medium leading-none">In Production</p>
             </div>
             <div className="space-y-2 px-2 border-l-2 border-[#3FA9F5]">
-              <p className="text-[9px] font-black text-[#3FA9F5] uppercase tracking-widest">Success</p>
+              <p className="text-[9px] font-black text-[#3FA9F5] uppercase tracking-widest">{widget.successLabel || 'Success'}</p>
               <p className="text-sm font-black text-[#1E3A5F]">{doneCount}</p>
               <p className="text-[8px] text-slate-300 font-medium leading-none">Finalized Items</p>
             </div>
@@ -1504,6 +1595,122 @@ function WidgetRenderer({ widget, columns, navigate, activeCompanyId, calendarRo
     </div>
   );
 }
+
+// ─── Activity Log Widget (top-level) ───────────────────────────────────────────
+function ActivityLogWidget({ widget, activeCompanyId, authedFetch, backendBaseUrl }: any) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const logsCount = widget.logsCount ?? 10;
+
+  useEffect(() => {
+    if (!activeCompanyId || !authedFetch || !backendBaseUrl) return;
+    setLoading(true);
+    authedFetch(`${backendBaseUrl}/api/audit/${activeCompanyId}?pageSize=${logsCount}`)
+      .then((r: Response) => r.json())
+      .then((data: any) => setLogs(data.logs || []))
+      .catch(() => setLogs([]))
+      .finally(() => setLoading(false));
+  }, [activeCompanyId, authedFetch, backendBaseUrl, logsCount]);
+
+  const getActionStyle = (action: string) => {
+    const a = (action || '').toUpperCase();
+    if (a.includes('DELETE') || a.includes('REMOVE')) return { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-100', dot: 'bg-rose-400' };
+    if (a.includes('CREATE') || a.includes('ADD') || a.includes('INVITE')) return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-100', dot: 'bg-emerald-400' };
+    if (a.includes('UPDATE') || a.includes('EDIT') || a.includes('ASSIGN')) return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-100', dot: 'bg-blue-400' };
+    if (a.includes('PUBLISH') || a.includes('APPROVE')) return { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-100', dot: 'bg-violet-400' };
+    if (a.includes('LOGIN') || a.includes('IMPERSONATE')) return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-100', dot: 'bg-amber-400' };
+    return { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-100', dot: 'bg-slate-400' };
+  };
+
+  const formatRelative = (ts: string) => {
+    const diff = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'Just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden h-full">
+      {/* Header */}
+      <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-teal-50 rounded-xl flex items-center justify-center">
+            <Activity size={16} className="text-teal-500" />
+          </div>
+          <div>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{widget.label || 'Activity Log'}</h3>
+            <p className="text-[9px] text-slate-400 font-medium">Showing last {logsCount} events</p>
+          </div>
+        </div>
+        {loading && <Loader2 size={14} className="text-teal-400 animate-spin" />}
+      </div>
+
+      {/* Log List */}
+      <div className="divide-y divide-slate-50 max-h-[420px] overflow-y-auto">
+        {loading && logs.length === 0 ? (
+          <div className="py-16 text-center">
+            <Loader2 size={24} className="text-slate-200 animate-spin mx-auto mb-3" />
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Loading Activity…</p>
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="py-16 flex flex-col items-center justify-center text-center">
+            <ShieldCheck size={32} className="text-slate-200 mb-3" />
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No Activity Recorded</p>
+            <p className="text-[9px] text-slate-300 mt-1">Team actions will appear here.</p>
+          </div>
+        ) : (
+          logs.map((log: any, i: number) => {
+            const style = getActionStyle(log.action);
+            return (
+              <div key={log.id || i} className="flex items-start gap-4 px-6 py-4 hover:bg-slate-50/60 transition-colors group">
+                {/* Timeline dot */}
+                <div className="flex flex-col items-center mt-1 shrink-0">
+                  <div className={`w-2 h-2 rounded-full ${style.dot}`} />
+                  {i < logs.length - 1 && <div className="w-px flex-1 bg-slate-100 mt-1.5" style={{ minHeight: '16px' }} />}
+                </div>
+
+                {/* Actor avatar */}
+                <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
+                  <User size={12} className="text-slate-400" />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-black text-slate-700 truncate max-w-[140px]">
+                      {log.actorEmail || 'Unknown'}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${style.bg} ${style.text} ${style.border}`}>
+                      {(log.action || '').replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-slate-400 mt-0.5 truncate">
+                    {log.action === 'ROLE_ASSIGN' && `Assigned role "${log.details?.role}" to teammate`}
+                    {log.action === 'ROLES_UPDATE' && 'Updated custom role definitions'}
+                    {log.action === 'CREATE_CONTENT' && `Created content: ${log.details?.title || 'Untitled'}`}
+                    {log.action === 'UPDATE_CONTENT' && `Updated content: ${log.details?.title || 'Untitled'}`}
+                    {log.action === 'DELETE_CONTENT' && `Deleted a content entry`}
+                    {!['ROLE_ASSIGN', 'ROLES_UPDATE', 'CREATE_CONTENT', 'UPDATE_CONTENT', 'DELETE_CONTENT'].includes(log.action) &&
+                      (log.details?.description || `Performed: ${log.action?.replace(/_/g, ' ').toLowerCase() || 'action'}`)}
+                  </p>
+                </div>
+
+                {/* Timestamp */}
+                <div className="text-[9px] font-black text-slate-300 shrink-0 mt-1">
+                  {formatRelative(log.created_at)}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function StatCard({ label, value, subLabel, trend, trendColor, trendBg }: any) {
   return (

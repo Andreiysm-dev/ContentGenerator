@@ -504,7 +504,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
       <main className="flex-1 flex flex-col overflow-hidden p-2.5 md:p-6">
         <div className="w-full bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col h-full border border-slate-200/60">
           {/* Dark Premium Header */}
-          <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 relative overflow-hidden flex flex-col gap-2">
+          <div className="px-8 py-4 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 relative overflow-hidden flex flex-col gap-2">
             <SettingsIcon className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
 
             <div className="relative z-10">

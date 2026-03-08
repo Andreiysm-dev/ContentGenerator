@@ -374,7 +374,7 @@ export function SchedulerPage({
             <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full min-h-[850px] relative z-10 font-ribo">
 
                 {/* DARK HERO HEADER */}
-                <header className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 flex-shrink-0">
+                <header className="px-8 py-4 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
                     <div>
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">Content Strategy</div>
                         <h2 className="text-2xl font-black text-white tracking-tight leading-none uppercase">Content Scheduler</h2>

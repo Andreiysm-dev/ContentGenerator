@@ -191,7 +191,7 @@ export function AIToolboxPage() {
 
             <div className="w-full flex flex-col gap-6 relative z-10">
                 <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-                    <div className="px-8 py-10 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col gap-2 relative">
+                    <div className="px-8 py-4 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col gap-2 relative">
                         <Sparkles className="absolute top-8 right-8 text-blue-400/20 w-32 h-32 rotate-12" />
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full w-fit text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-2">
                             Turbocharged AI

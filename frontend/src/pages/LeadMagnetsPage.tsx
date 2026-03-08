@@ -184,7 +184,7 @@ export function LeadMagnetsPage() {
 
             <div className="w-full flex flex-col gap-6 relative z-10">
                 <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full">
-                    <div className="px-8 py-10 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative overflow-hidden">
+                    <div className="px-8 py-4 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative overflow-hidden">
                         <Magnet className="absolute top-4 right-8 text-emerald-400/10 w-32 h-32 rotate-12 pointer-events-none" />
 
                         <div className="relative z-10">

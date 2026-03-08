@@ -546,7 +546,7 @@ export function StudioEditorPage({
 
             <section className="flex-1 bg-white border border-slate-200/60 rounded-3xl shadow-2xl shadow-slate-200/50 overflow-hidden flex flex-col relative z-10 max-w-[1800px] mx-auto w-full">
                 {/* Unified Header */}
-                <header className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-10 py-7 flex items-center justify-between border-b border-slate-700 shrink-0">
+                <header className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-10 py-4 flex items-center justify-between border-b border-slate-700 shrink-0">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => navigate(`/company/${encodeURIComponent(activeCompanyId || '')}/studio`)}

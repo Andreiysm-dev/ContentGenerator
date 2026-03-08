@@ -500,7 +500,7 @@ export function StudioPage({
 
           <div className="flex-1 flex flex-col min-w-0">
             {/* Header Section */}
-            <div className="px-8 py-8 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 relative overflow-hidden">
+            <div className="px-8 py-4 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 relative overflow-hidden">
               <FileText className="absolute top-4 right-8 text-blue-400/10 w-32 h-32 rotate-12 pointer-events-none" />
 
               <div className="relative z-10">
