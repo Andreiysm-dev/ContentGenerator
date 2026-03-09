@@ -31,14 +31,17 @@ export function PostInsightsPage({ calendarRows, getStatusValue, activeCompanyId
 
     // Filter for published posts only
     const publishedPosts = calendarRows.filter(row => {
-        const s = typeof row.status === 'string' ? row.status.toLowerCase() : (row.status?.state?.toLowerCase() || row.status?.value?.toLowerCase() || "");
-        return s === 'published' || getStatusValue(row.status).toLowerCase() === 'published';
+        const s = typeof row.status === 'string' ? row.status.toLowerCase() : (String(row.status?.state || '').toLowerCase() || String(row.status?.value || '').toLowerCase() || "");
+        return s === 'published' || String(getStatusValue(row.status) || '').toLowerCase() === 'published';
     });
 
-    const filteredPosts = publishedPosts.filter(post =>
-        (post.finalCaption || post.captionOutput || "").toLowerCase().includes(search.toLowerCase()) ||
-        (post.theme || "").toLowerCase().includes(search.toLowerCase())
-    );
+    const filteredPosts = publishedPosts.filter(post => {
+        const searchLow = String(search || '').toLowerCase();
+        return (
+            String(post.finalCaption || post.captionOutput || "").toLowerCase().includes(searchLow) ||
+            String(post.theme || "").toLowerCase().includes(searchLow)
+        );
+    });
 
     // Aggregates using real data (with fallback to 0)
     const stats = useMemo(() => {

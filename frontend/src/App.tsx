@@ -1111,26 +1111,35 @@ function App() {
 
   function getStatusValue(status: any): string {
     if (status === null || status === undefined) return '';
-    let s = '';
+    let s: any = '';
     if (typeof status === 'string') {
       s = status;
     } else if (typeof status === 'object') {
-      s = status.state || status.value || status.status || '';
-    } else {
-      try {
-        s = String(status);
-      } catch {
-        return '';
+      // Handle the case where the whole post object is passed
+      const actualStatus = status.status || status;
+      if (typeof actualStatus === 'string') {
+        s = actualStatus;
+      } else if (typeof actualStatus === 'object') {
+        s = actualStatus.state || actualStatus.value || actualStatus.status || '';
       }
     }
 
-    if (!s) return '';
+    // Ensure we have a string before proceeding
+    if (typeof s !== 'string') {
+      try {
+        s = String(s || '');
+      } catch {
+        s = '';
+      }
+    }
+
+    if (!s || s === '[object Object]') return '';
 
     // Try to find a match in company custom columns
     const columns = (activeCompany as any)?.kanban_settings?.columns || [];
     const match = columns.find((c: any) =>
-      c.id.toLowerCase() === s.toLowerCase() ||
-      c.title.toLowerCase() === s.toLowerCase()
+      String(c.id || '').toLowerCase() === s.toLowerCase() ||
+      String(c.title || '').toLowerCase() === s.toLowerCase()
     );
 
     if (match) return match.title;

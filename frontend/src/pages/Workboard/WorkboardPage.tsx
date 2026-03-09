@@ -138,8 +138,8 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                 const match = currentColumns.find(c =>
                     c.id === statusStr ||
                     c.title === statusStr ||
-                    c.id.toLowerCase() === statusStr.toLowerCase() ||
-                    c.title.toLowerCase() === statusStr.toLowerCase()
+                    String(c.id || '').toLowerCase() === String(statusStr || '').toLowerCase() ||
+                    String(c.title || '').toLowerCase() === String(statusStr || '').toLowerCase()
                 );
 
                 return {
@@ -504,9 +504,9 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     };
 
     const filteredPosts = posts.filter(p =>
-        p.theme.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.cardName && p.cardName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        p.contentType.toLowerCase().includes(searchQuery.toLowerCase())
+        String(p.theme || '').toLowerCase().includes(String(searchQuery || '').toLowerCase()) ||
+        (p.cardName && String(p.cardName || '').toLowerCase().includes(String(searchQuery || '').toLowerCase())) ||
+        String(p.contentType || '').toLowerCase().includes(String(searchQuery || '').toLowerCase())
     );
 
     return (

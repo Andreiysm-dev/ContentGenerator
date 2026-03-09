@@ -200,12 +200,12 @@ export function StudioPage({
     if (!tab) return [];
 
     const companyCols = activeCompany?.kanban_settings?.columns || [];
-    const colIds = companyCols.map((c: any) => c.id.toLowerCase());
-    const colTitles = companyCols.map((c: any) => c.title.toLowerCase());
+    const colIds = companyCols.map((c: any) => String(c.id || '').toLowerCase());
+    const colTitles = companyCols.map((c: any) => String(c.title || '').toLowerCase());
 
     // Normalize and SANITIZE tab statuses: Only match against current columns or known core IDs
     const tabStatuses = (tab.statuses || [])
-      .map((s: string) => s.toLowerCase())
+      .map((s: any) => String(s || '').toLowerCase())
       .filter((s: string) => colIds.includes(s) || colTitles.includes(s) || s === 'scheduled' || s === 'published' || s === 'idea');
 
     return allRows.filter(r => {
@@ -233,16 +233,16 @@ export function StudioPage({
     const st = String(row.statusTitle || '').toLowerCase();
     const companyCols = activeCompany?.kanban_settings?.columns || [];
     const match = companyCols.find((c: any) =>
-      c.id.toLowerCase() === s ||
-      c.title.toLowerCase() === s ||
-      c.id.toLowerCase() === st ||
-      c.title.toLowerCase() === st
+      String(c.id || '').toLowerCase() === s ||
+      String(c.title || '').toLowerCase() === s ||
+      String(c.id || '').toLowerCase() === st ||
+      String(c.title || '').toLowerCase() === st
     );
 
     if (st === 'for approval') return 'For Approval';
     if (st === 'ready' || st === 'approved') return 'Ready';
     if (st === 'reviewed' || st === 'design completed') return 'Reviewed';
-    return match ? match.title : (labelMap[st] || row.statusTitle || st.replace(/\b\w/g, (l: string) => l.toUpperCase()));
+    return match ? match.title : (labelMap[st] || row.statusTitle || String(st || '').replace(/\b\w/g, (l: string) => l.toUpperCase()));
   };
 
   const getActiveRows = () => {
@@ -250,15 +250,15 @@ export function StudioPage({
 
     if (selectedStatusFilter !== 'all') {
       rows = rows.filter(r =>
-        String(r.status || '').toLowerCase() === selectedStatusFilter.toLowerCase() ||
-        String(r.statusTitle || '').toLowerCase() === selectedStatusFilter.toLowerCase()
+        String(r.status || '').toLowerCase() === String(selectedStatusFilter || '').toLowerCase() ||
+        String(r.statusTitle || '').toLowerCase() === String(selectedStatusFilter || '').toLowerCase()
       );
     }
 
     // Channel Filtering
     if (selectedChannelId) {
       const selectedAccount = connectedAccounts?.find(a => a.id === selectedChannelId);
-      const provider = selectedAccount?.provider?.toLowerCase();
+      const provider = String(selectedAccount?.provider || '').toLowerCase();
 
       rows = rows.filter(r => {
         // Precise matching for published posts
@@ -280,13 +280,13 @@ export function StudioPage({
         if (Array.isArray(raw)) {
           rowChans = raw.map(c => String(c || '').toLowerCase().trim());
         } else if (typeof raw === 'string' && raw.trim()) {
-          rowChans = raw.split(',').map(c => c.trim().toLowerCase());
+          rowChans = raw.split(',').map(c => String(c || '').trim().toLowerCase());
         }
 
         return rowChans.some(c => {
           if (!c) return false;
           // Match by UUID/ID
-          if (c === selectedChannelId?.toLowerCase()) return true;
+          if (c === String(selectedChannelId || '').toLowerCase()) return true;
 
           // Fuzzy match by provider name only if there are no UUIDs in the list
           // and we don't have a specific record for another account on same provider
@@ -301,8 +301,8 @@ export function StudioPage({
 
     if (searchQuery) {
       return rows.filter(r =>
-        (r.finalCaption || r.captionOutput || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.theme || "").toLowerCase().includes(searchQuery.toLowerCase())
+        String(r.finalCaption || r.captionOutput || "").toLowerCase().includes(String(searchQuery || '').toLowerCase()) ||
+        String(r.theme || "").toLowerCase().includes(String(searchQuery || '').toLowerCase())
       );
     }
     return rows;
@@ -314,7 +314,7 @@ export function StudioPage({
     if (!chanId) return rows.length;
 
     const selectedAccount = connectedAccounts?.find(a => a.id === chanId);
-    const provider = selectedAccount?.provider?.toLowerCase();
+    const provider = String(selectedAccount?.provider || '').toLowerCase();
 
     return rows.filter(r => {
       let raw = r.channels || r.platform || [];
@@ -331,7 +331,7 @@ export function StudioPage({
       if (Array.isArray(raw)) {
         rowChans = raw.map(c => String(c || '').toLowerCase().trim());
       } else if (typeof raw === 'string' && raw.trim()) {
-        rowChans = raw.split(',').map(c => c.trim().toLowerCase());
+        rowChans = String(raw || '').split(',').map(c => c.trim().toLowerCase());
       }
 
       // Precise matching for published posts
@@ -342,7 +342,7 @@ export function StudioPage({
       return rowChans.some(c => {
         if (!c) return false;
         // Match by UUID/ID
-        if (c === chanId?.toLowerCase()) return true;
+        if (c === String(chanId || '').toLowerCase()) return true;
 
         // Fuzzy match by provider name 
         if (provider && (c.includes(provider) || provider.includes(c))) {
@@ -357,7 +357,7 @@ export function StudioPage({
   const filteredRows = getActiveRows();
 
   const getPlatformIcon = (provider: string) => {
-    const p = provider.toLowerCase();
+    const p = String(provider || '').toLowerCase();
     if (p === 'linkedin') return <Linkedin className="w-5 h-5" />;
     if (p === 'facebook') return <Facebook className="w-5 h-5" />;
     if (p === 'instagram') return <Instagram className="w-5 h-5" />;
@@ -374,7 +374,7 @@ export function StudioPage({
       count = tabRows.filter(r => {
         if (r.social_account_id) return r.social_account_id === selectedChannelId;
         const rowChans = Array.isArray(r.channels) ? r.channels : (r.channels ? [r.channels] : []);
-        return rowChans.some((c: any) => String(c).toLowerCase() === selectedChannelId.toLowerCase());
+        return rowChans.some((c: any) => String(c).toLowerCase() === String(selectedChannelId || '').toLowerCase());
       }).length;
     }
 
@@ -400,7 +400,7 @@ export function StudioPage({
         })
       });
       if (res.ok) {
-        notify(`Status updated to ${newStatus.toLowerCase()}!`, 'success');
+        notify(`Status updated to ${String(newStatus || '').toLowerCase()}!`, 'success');
       } else {
         notify('Failed to update status', 'error');
       }
@@ -1003,9 +1003,9 @@ export function StudioPage({
 
                                     if (isSel) {
                                       // Remove ALL instances of ID and Title to purge duplicates/legacy names
-                                      nt[tIdx].statuses = currentStatuses.filter((s: string) =>
-                                        s.toLowerCase() !== colId.toLowerCase() &&
-                                        s.toLowerCase() !== colTitle.toLowerCase()
+                                      nt[tIdx].statuses = currentStatuses.filter((s: any) =>
+                                        String(s || '').toLowerCase() !== String(colId || '').toLowerCase() &&
+                                        String(s || '').toLowerCase() !== String(colTitle || '').toLowerCase()
                                       );
                                     } else {
                                       // Add ID and Title for maximum match compatibility

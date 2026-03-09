@@ -495,11 +495,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {users.filter(u =>
-                                    u.full_name?.toLowerCase().includes(filterText.toLowerCase()) ||
-                                    u.email?.toLowerCase().includes(filterText.toLowerCase()) ||
-                                    u.id.toLowerCase().includes(filterText.toLowerCase())
-                                ).map((user) => (
+                                {users.filter(u => {
+                                    const ft = String(filterText || '').toLowerCase();
+                                    return (
+                                        String(u.full_name || '').toLowerCase().includes(ft) ||
+                                        String(u.email || '').toLowerCase().includes(ft) ||
+                                        String(u.id || '').toLowerCase().includes(ft)
+                                    );
+                                }).map((user) => (
                                     <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">

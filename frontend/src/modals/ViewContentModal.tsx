@@ -633,8 +633,8 @@ export function ViewContentModal({
                                         const columns = activeCompany?.kanban_settings?.columns || [];
                                         const match = columns.find(
                                             (c: any) => c.id === rawStatus || c.title === rawStatus ||
-                                                c.id.toLowerCase() === rawStatus.toLowerCase() ||
-                                                c.title.toLowerCase() === rawStatus.toLowerCase()
+                                                String(c.id || '').toLowerCase() === String(rawStatus || '').toLowerCase() ||
+                                                String(c.title || '').toLowerCase() === String(rawStatus || '').toLowerCase()
                                         );
 
                                         if (match) {

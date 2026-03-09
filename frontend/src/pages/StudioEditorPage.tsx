@@ -453,7 +453,7 @@ export function StudioEditorPage({
             const errorMsg = error.message || 'Failed to upload image';
             notify(errorMsg, 'error');
 
-            if (errorMsg.toLowerCase().includes('size') || errorMsg.toLowerCase().includes('limit')) {
+            if (String(errorMsg || '').toLowerCase().includes('size') || String(errorMsg || '').toLowerCase().includes('limit')) {
                 notify('Hint: Check your Supabase Storage bucket max file size settings.', 'info');
             }
         } finally {
@@ -557,10 +557,10 @@ export function StudioEditorPage({
                         </button>
                         <div className="flex flex-col gap-1">
                             <span className={`w-fit px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusValue(status).toUpperCase() === 'PUBLISHED' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/10' :
-                                getStatusValue(status).toUpperCase() === 'SCHEDULED' ? 'bg-amber-500/20 text-amber-400 border-amber-500/10' :
+                                String(getStatusValue(status) || '').toUpperCase() === 'SCHEDULED' ? 'bg-amber-500/20 text-amber-400 border-amber-500/10' :
                                     'bg-white/10 text-white/50 border-white/10 shadow-sm'
                                 }`}>
-                                {getStatusValue(status).toLowerCase()}
+                                {String(getStatusValue(status) || '').toLowerCase()}
                             </span>
                             <div className="flex items-center gap-3">
                                 <h1 className="text-[24px] font-black text-white tracking-widest uppercase">

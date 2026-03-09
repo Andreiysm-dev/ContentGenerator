@@ -126,7 +126,7 @@ export function DashboardPage({
       });
     } else if (activeCompany && columns.length > 0) {
       // Default setup for new companies
-      const drf = columns.filter((c: any) => c.title.toLowerCase().includes('draft') || c.title.toLowerCase().includes('backlog')).map((c: any) => c.id);
+      const drf = columns.filter((c: any) => String(c.title || '').toLowerCase().includes('draft') || String(c.title || '').toLowerCase().includes('backlog')).map((c: any) => c.id);
       setLocalSettings({
         widgets: [
           { id: 'w-nav', type: 'navigation_grid', label: 'Quick Access' },
@@ -196,10 +196,10 @@ export function DashboardPage({
     let newWidgets: any[] = [];
 
     // Find common column IDs (approximation)
-    const reviewIds = columns.filter((c: any) => c.title.toLowerCase().includes('review') || c.title.toLowerCase().includes('waiting')).map((c: any) => c.id);
-    const designIds = columns.filter((c: any) => c.title.toLowerCase().includes('design') || c.title.toLowerCase().includes('generate')).map((c: any) => c.id);
-    const approvalIds = columns.filter((c: any) => c.title.toLowerCase().includes('approval') || c.title.toLowerCase().includes('ready')).map((c: any) => c.id);
-    const draftIds = columns.filter((c: any) => c.title.toLowerCase().includes('draft') || c.title.toLowerCase().includes('backlog')).map((c: any) => c.id);
+    const reviewIds = columns.filter((c: any) => String(c.title || '').toLowerCase().includes('review') || String(c.title || '').toLowerCase().includes('waiting')).map((c: any) => c.id);
+    const designIds = columns.filter((c: any) => String(c.title || '').toLowerCase().includes('design') || String(c.title || '').toLowerCase().includes('generate')).map((c: any) => c.id);
+    const approvalIds = columns.filter((c: any) => String(c.title || '').toLowerCase().includes('approval') || String(c.title || '').toLowerCase().includes('ready')).map((c: any) => c.id);
+    const draftIds = columns.filter((c: any) => String(c.title || '').toLowerCase().includes('draft') || String(c.title || '').toLowerCase().includes('backlog')).map((c: any) => c.id);
 
     if (preset === 'standard') {
       newWidgets = [
@@ -1694,7 +1694,7 @@ function ActivityLogWidget({ widget, activeCompanyId, authedFetch, backendBaseUr
                     {log.action === 'UPDATE_CONTENT' && `Updated content: ${log.details?.title || 'Untitled'}`}
                     {log.action === 'DELETE_CONTENT' && `Deleted a content entry`}
                     {!['ROLE_ASSIGN', 'ROLES_UPDATE', 'CREATE_CONTENT', 'UPDATE_CONTENT', 'DELETE_CONTENT'].includes(log.action) &&
-                      (log.details?.description || `Performed: ${log.action?.replace(/_/g, ' ').toLowerCase() || 'action'}`)}
+                      (log.details?.description || `Performed: ${String(log.action || '').replace(/_/g, ' ').toLowerCase() || 'action'}`)}
                   </p>
                 </div>
 
