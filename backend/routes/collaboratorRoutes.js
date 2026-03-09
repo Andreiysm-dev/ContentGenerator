@@ -100,10 +100,10 @@ export const addCollaborator = async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Verify user is owner
+    // Verify user is owner OR has canAddCollaborators or canEditSettings permission
     const { data: company, error: companyError } = await db
       .from('company')
-      .select('user_id')
+      .select('user_id, collaborator_roles, custom_roles')
       .eq('companyId', companyId)
       .single();
 
@@ -111,8 +111,21 @@ export const addCollaborator = async (req, res) => {
       return res.status(404).json({ error: 'Company not found' });
     }
 
-    if (company.user_id !== userId) {
-      return res.status(403).json({ error: 'Only the owner can add collaborators' });
+    const isOwner = company.user_id === userId;
+    let hasPermission = isOwner;
+
+    if (!isOwner) {
+      const userRole = company.collaborator_roles?.[userId];
+      if (userRole) {
+        const roleDef = company.custom_roles?.find(r => r.name === userRole);
+        if (roleDef?.permissions?.canAddCollaborators || roleDef?.permissions?.canEditSettings) {
+          hasPermission = true;
+        }
+      }
+    }
+
+    if (!hasPermission) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to add collaborators' });
     }
 
     // Resolve email to uid using Supabase admin API

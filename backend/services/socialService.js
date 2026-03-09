@@ -8,8 +8,9 @@ const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 
 export const postToLinkedIn = async (companyId, content, accountId = null) => {
     // Destructure input
-    // content = { text, url, visibility }
-    const { text, url, visibility = 'PUBLIC' } = content;
+    // content = { text, url, media_urls, visibility }
+    const { text, url, media_urls, visibility = 'PUBLIC' } = content;
+    const finalUrls = (media_urls && media_urls.length > 0) ? media_urls : (url ? [url] : []);
 
     // 1. Get Access Token
     let query = supabase
@@ -33,78 +34,55 @@ export const postToLinkedIn = async (companyId, content, accountId = null) => {
     // Usually stored as ID like '12345'
     const authorUrn = personUrnParam.startsWith('urn:li:person:') ? personUrnParam : `urn:li:person:${personUrnParam}`;
 
-    // 2. Handle Image Upload if URL exists
-    let assetUrn = null;
-    if (url) {
+    // 2. Handle Image Uploads if URLs exist
+    let assetUrns = [];
+    if (finalUrls.length > 0) {
         try {
-            console.log('Starting LinkedIn image upload for:', url);
+            for (const imgUrl of finalUrls) {
+                console.log('Starting LinkedIn image upload for:', imgUrl);
 
-            // A. Register Upload
-            const registerResponse = await axios.post(`${LINKEDIN_API_URL}/assets?action=registerUpload`, {
-                registerUploadRequest: {
-                    recipes: ["urn:li:digitalmediaRecipe:feedshare-image"],
-                    owner: authorUrn,
-                    serviceRelationships: [{
-                        relationshipType: "OWNER",
-                        identifier: "urn:li:userGeneratedContent"
-                    }]
-                }
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${access_token}`,
-                    'X-Restli-Protocol-Version': '2.0.0',
-                    'Content-Type': 'application/json'
-                }
-            });
+                // A. Register Upload
+                const registerResponse = await axios.post(`${LINKEDIN_API_URL}/assets?action=registerUpload`, {
+                    registerUploadRequest: {
+                        recipes: ["urn:li:digitalmediaRecipe:feedshare-image"],
+                        owner: authorUrn,
+                        serviceRelationships: [{
+                            relationshipType: "OWNER",
+                            identifier: "urn:li:userGeneratedContent"
+                        }]
+                    }
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${access_token}`,
+                        'X-Restli-Protocol-Version': '2.0.0',
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-            const uploadUrl = registerResponse.data.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
-            assetUrn = registerResponse.data.value.asset;
+                const uploadUrl = registerResponse.data.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+                const assetUrn = registerResponse.data.value.asset;
 
-            // B. Download Image Content
-            const imageResponse = await axios.get(url, { responseType: 'arraybuffer' });
-            const imageBuffer = imageResponse.data;
-            const contentType = imageResponse.headers['content-type'];
+                // B. Download Image Content
+                const imageResponse = await axios.get(imgUrl, { responseType: 'arraybuffer' });
+                const imageBuffer = imageResponse.data;
+                const contentType = imageResponse.headers['content-type'];
 
-            // C. Upload Binary to LinkedIn's URL
-            await axios.put(uploadUrl, imageBuffer, {
-                headers: {
-                    'Authorization': `Bearer ${access_token}`,
-                    'Content-Type': 'application/octet-stream' // LinkedIn requires this for the binary upload, not the actual mime type
-                }
-            });
+                // C. Upload Binary to LinkedIn's URL
+                await axios.put(uploadUrl, imageBuffer, {
+                    headers: {
+                        'Authorization': `Bearer ${access_token}`,
+                        'Content-Type': 'application/octet-stream'
+                    }
+                });
 
-            // D. Poll for Asset Status (Wait until 'AVAILABLE')
-            // LinkedIn assets aren't immediately usable after upload.
-            let isAvailable = false;
-            let checks = 0;
-            while (!isAvailable && checks < 5) {
-                await sleep(1000); // Wait 1s
-                try {
-                    // Extract ID from asset URN: urn:li:digitalmediaAsset:123 -> 123
-                    const assetId = assetUrn.split(':').pop();
-                    const statusRes = await axios.get(`${LINKEDIN_API_URL}/assets/${assetId}`, {
-                        headers: {
-                            'Authorization': `Bearer ${access_token}`,
-                            'X-Restli-Protocol-Version': '2.0.0'
-                        }
-                    });
-                    // Note: LinkedIn V2 Assets API response structure might vary, 
-                    // but typically if we get here without error it implies existence. 
-                    // The 'recipes' status check is complex. 
-                    // For now, a simple delay is often enough, but let's assume if no 404, it's indexing.
-                    // Actually, simpler: Just wait 2-3 seconds blindly is safer than complex polling for MVP.
-                    isAvailable = true;
-                } catch (e) {
-                    // If 404, wait.
-                    checks++;
-                }
+                assetUrns.push(assetUrn);
             }
-            await sleep(2000); // Safety buffer
+
+            // D. Safety buffer - assets aren't immediately usable
+            await sleep(2000);
 
         } catch (uploadError) {
             console.error('Failed to upload image to LinkedIn:', uploadError?.response?.data || uploadError.message);
-            // Don't fallback to text-only if image was expected, it's better to fail or let user know.
-            // But for now, we leave assetUrn null, which might make it a text post.
             throw new Error('Image upload to LinkedIn failed.');
         }
     }
@@ -115,16 +93,16 @@ export const postToLinkedIn = async (companyId, content, accountId = null) => {
         shareCommentary: {
             text: text
         },
-        shareMediaCategory: assetUrn ? "IMAGE" : "NONE"
+        shareMediaCategory: assetUrns.length > 0 ? "IMAGE" : "NONE"
     };
 
-    if (assetUrn) {
-        shareContent.media = [{
+    if (assetUrns.length > 0) {
+        shareContent.media = assetUrns.map((urn, i) => ({
             status: "READY",
             description: { text: "Generated by StartupLab Content Generator" },
-            media: assetUrn,
-            title: { text: "Post Image" }
-        }];
+            media: urn,
+            title: { text: `Post Image ${i + 1}` }
+        }));
     }
 
     const payload = {
@@ -160,8 +138,9 @@ export const postToLinkedIn = async (companyId, content, accountId = null) => {
  */
 // Helper for Facebook publishing
 export const postToFacebookPage = async (companyId, content, accountId = null) => {
-    // content = { text, url }
-    const { text, url } = content;
+    // content = { text, url, media_urls }
+    const { text, url, media_urls } = content;
+    const finalUrls = (media_urls && media_urls.length > 0) ? media_urls : (url ? [url] : []);
 
     // 1. Get Page Access Token and Page ID from DB
     let query = supabase
@@ -185,15 +164,34 @@ export const postToFacebookPage = async (companyId, content, accountId = null) =
 
     try {
         let response;
-        if (url) {
-            // Posting with Image
-            // IMPORTANT: 'url' param in FB Graph API often requires a public URL.
-            // If it's a signed URL or local, we might need to upload bytes, but 'url' is standard for public hosted images.
-            response = await axios.post(`${FB_GRAPH_URL}/photos`, {
-                url: url,
-                message: text, // 'message' is caption for photos
-                access_token: pageAccessToken
-            });
+        if (finalUrls.length > 0) {
+            if (finalUrls.length === 1) {
+                // Posting with single Image
+                response = await axios.post(`${FB_GRAPH_URL}/photos`, {
+                    url: finalUrls[0],
+                    message: text,
+                    access_token: pageAccessToken
+                });
+            } else {
+                // Carousel / Multiple Images
+                // 1. Upload each photo as 'published=false' to get IDs
+                const imageIds = [];
+                for (const imgUrl of finalUrls) {
+                    const uploadRes = await axios.post(`${FB_GRAPH_URL}/photos`, {
+                        url: imgUrl,
+                        published: false,
+                        access_token: pageAccessToken
+                    });
+                    imageIds.push(uploadRes.data.id);
+                }
+
+                // 2. Create feed post with attached_media
+                response = await axios.post(`${FB_GRAPH_URL}/feed`, {
+                    message: text,
+                    attached_media: imageIds.map(id => ({ media_fbid: id })),
+                    access_token: pageAccessToken
+                });
+            }
         } else {
             // Text-only post
             response = await axios.post(`${FB_GRAPH_URL}/feed`, {

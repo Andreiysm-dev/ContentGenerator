@@ -81,7 +81,9 @@ export const createContentCalendar = async (req, res) => {
                     scheduled_at: row.scheduled_at,
                     status: 'PENDING',
                     content: row.finalCaption || row.captionOutput || '',
-                    media_urls: row.imageGenerated ? [row.imageGenerated] : (row.imageGeneratedUrl ? [row.imageGeneratedUrl] : []),
+                    media_urls: (row.media_urls && row.media_urls.length > 0)
+                        ? row.media_urls
+                        : (row.imageGenerated ? [row.imageGenerated] : (row.imageGeneratedUrl ? [row.imageGeneratedUrl] : [])),
                     account_ids: row.channels || []
                 };
 
@@ -417,7 +419,9 @@ export const updateContentCalendar = async (req, res) => {
                     scheduled_at: row.scheduled_at,
                     status: 'PENDING',
                     content: row.finalCaption || row.captionOutput || '',
-                    media_urls: row.imageGenerated ? [row.imageGenerated] : (row.imageGeneratedUrl ? [row.imageGeneratedUrl] : []),
+                    media_urls: (row.media_urls && row.media_urls.length > 0)
+                        ? row.media_urls
+                        : (row.imageGenerated ? [row.imageGenerated] : (row.imageGeneratedUrl ? [row.imageGeneratedUrl] : [])),
                     account_ids: row.channels || []
                 };
 

@@ -76,6 +76,7 @@ export type CalendarPageProps = {
   setCalendarRows: React.Dispatch<React.SetStateAction<any[]>>;
   filteredCalendarRows: any[];
   activeCompanyId: string | undefined;
+  activeCompany?: any;
   isPageFullySelected: boolean;
   toggleSelectAllOnPage: (checked: boolean) => void;
   toggleSelectOne: (id: string, checked: boolean) => void;
@@ -228,6 +229,7 @@ export function CalendarPage(props: CalendarPageProps) {
 
   const KANBAN_CACHE_KEY = activeCompanyId ? `kanban_settings_${activeCompanyId}` : null;
   const [kanbanColumns, setKanbanColumns] = useState<KanbanColumn[]>(SOKMED_COLUMNS);
+  const [isKanbanSettingsLoading, setIsKanbanSettingsLoading] = useState(true);
   const [automations, setAutomations] = useState<any[]>([]);
   const [pendingMove, setPendingMove] = useState<{ postId: string; status: string; rules: any[] } | null>(null);
   const [pendingApprovalMove, setPendingApprovalMove] = useState<{ postId: string; status: string; roleName: string } | null>(null);
@@ -487,15 +489,21 @@ export function CalendarPage(props: CalendarPageProps) {
 
   useEffect(() => {
     if (!activeCompanyId) return;
+    setIsKanbanSettingsLoading(true);
     authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`).then(res => {
-      if (res.ok) res.json().then(data => {
-        if (data.company?.kanban_settings) {
-          const { columns, automations } = data.company.kanban_settings;
-          setKanbanColumns(columns?.length > 0 ? columns : SOKMED_COLUMNS);
-          setAutomations(automations || []);
-        }
-      });
-    });
+      if (res.ok) {
+        res.json().then(data => {
+          if (data.company?.kanban_settings) {
+            const { columns, automations } = data.company.kanban_settings;
+            setKanbanColumns(columns?.length > 0 ? columns : SOKMED_COLUMNS);
+            setAutomations(automations || []);
+          }
+          setIsKanbanSettingsLoading(false);
+        }).catch(() => setIsKanbanSettingsLoading(false));
+      } else {
+        setIsKanbanSettingsLoading(false);
+      }
+    }).catch(() => setIsKanbanSettingsLoading(false));
   }, [activeCompanyId, authedFetch, backendBaseUrl]);
 
   const mapStatusToKanban = (status: any) => {
@@ -937,7 +945,7 @@ export function CalendarPage(props: CalendarPageProps) {
                 columns={calendarStatusFilter === 'all' ? kanbanColumns : kanbanColumns.filter(c => c.title === calendarStatusFilter)}
                 posts={filteredCalendarRows.map(row => ({
                   id: row.contentCalendarId,
-                  theme: row.theme || row.topic || 'Untitled Post',
+                  theme: row.card_name || row.theme || row.topic || 'Untitled Post',
                   contentType: row.contentType || 'Social Post',
                   status: mapStatusToKanban(row.status),
                   postDate: row.date || 'Unscheduled',
@@ -950,6 +958,8 @@ export function CalendarPage(props: CalendarPageProps) {
                   collaborators: row.collaborators,
                   checklist: row.checklist,
                 }))}
+                loading={isKanbanSettingsLoading}
+                activeCompanyId={activeCompanyId}
                 automations={automations}
                 userPermissions={userPermissions}
                 onCardDelete={handleArchiveOrDelete}
@@ -1025,7 +1035,7 @@ export function CalendarPage(props: CalendarPageProps) {
                             <div className="flex gap-4">
                               <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">{row.attachedDesign ? <Share2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />}</div>
                               <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-bold text-slate-900 truncate">{row.card_name || row.theme || "Untitled Post"}</span>
+                                <span className="text-sm font-bold text-slate-900 truncate">{row.card_name || row.theme || row.topic || "Untitled Post"}</span>
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <span className="text-[10px] text-slate-400 uppercase font-bold">{row.contentType}</span>
                                   {row.tags && row.tags.length > 0 && (
@@ -1107,22 +1117,24 @@ export function CalendarPage(props: CalendarPageProps) {
             )}
           </div>
 
-          <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-black text-slate-400 uppercase">Size</span>
-              <select value={pageSize} onChange={e => { setPage(1); setPageSize(e.target.value === "all" ? "all" : Number(e.target.value)); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none shadow-inner">
-                {[10, 25, 50, "all"].map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <span className="text-[11px] font-bold text-slate-500">{currentPageRows.length} of {filteredCalendarRows.length}</span>
-            </div>
-            {pageSize !== "all" && (
-              <div className="flex items-center gap-2">
-                <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
-                <div className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-black"><span className="text-blue-600">{page}</span> / {Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1)))}</div>
-                <button disabled={page >= Math.ceil(filteredCalendarRows.length / (pageSize || 1))} onClick={() => setPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+          {!(viewMode === 'drafts' && displayType === 'kanban') && (
+            <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black text-slate-400 uppercase">Size</span>
+                <select value={pageSize} onChange={e => { setPage(1); setPageSize(e.target.value === "all" ? "all" : Number(e.target.value)); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none shadow-inner">
+                  {[10, 25, 50, "all"].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <span className="text-[11px] font-bold text-slate-500">{currentPageRows.length} of {filteredCalendarRows.length}</span>
               </div>
-            )}
-          </div>
+              {pageSize !== "all" && (
+                <div className="flex items-center gap-2">
+                  <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
+                  <div className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-black"><span className="text-blue-600">{page}</span> / {Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1)))}</div>
+                  <button disabled={page >= Math.ceil(filteredCalendarRows.length / (pageSize || 1))} onClick={() => setPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

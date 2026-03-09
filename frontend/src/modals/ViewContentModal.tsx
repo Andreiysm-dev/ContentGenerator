@@ -113,6 +113,7 @@ export function ViewContentModal({
     const [editingListId, setEditingListId] = useState<string | null>(null);
     const [editingListTitle, setEditingListTitle] = useState('');
     const [isFullscreenImage, setIsFullscreenImage] = useState(false);
+    const [modalActiveImageIndex, setModalActiveImageIndex] = useState(0);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
 
@@ -726,25 +727,72 @@ export function ViewContentModal({
                                     )}
                                 </div>
                                 <div className="w-full bg-slate-100 rounded-[1.5rem] border-4 border-white shadow-xl relative overflow-hidden group max-w-2xl mx-auto">
-                                    {getImageGeneratedUrl(selectedRow) ? (
-                                        <div className="relative group/img cursor-pointer" onClick={() => setIsFullscreenImage(true)}>
-                                            <img
-                                                src={`${getImageGeneratedUrl(selectedRow)}${getImageGeneratedUrl(selectedRow)?.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
-                                                alt="Generated visual"
-                                                className="w-full h-auto object-contain mx-auto transition-all duration-300"
-                                                style={{ maxHeight: '320px' }}
-                                            />
-                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-all flex items-center justify-center">
-                                                <Maximize2 size={24} className="text-white opacity-0 group-hover/img:opacity-100 transition-all" />
+                                    {(() => {
+                                        const urls = [];
+                                        if (selectedRow?.media_urls && Array.isArray(selectedRow.media_urls)) {
+                                            urls.push(...selectedRow.media_urls);
+                                        } else {
+                                            const single = getImageGeneratedUrl(selectedRow);
+                                            if (single) urls.push(single);
+                                        }
+
+                                        if (urls.length > 0) {
+                                            const currentUrl = urls[modalActiveImageIndex] || urls[0];
+                                            return (
+                                                <div className="relative group/img">
+                                                    <div onClick={() => setIsFullscreenImage(true)} className="cursor-pointer">
+                                                        <img
+                                                            src={`${currentUrl}${currentUrl.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
+                                                            alt="Generated visual"
+                                                            className="w-full h-auto object-contain mx-auto transition-all duration-300"
+                                                            style={{ maxHeight: '320px' }}
+                                                        />
+                                                    </div>
+
+                                                    {urls.length > 1 && (
+                                                        <>
+                                                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                                                                {urls.map((_, i) => (
+                                                                    <div
+                                                                        key={i}
+                                                                        className={`h-1.5 rounded-full transition-all duration-300 ${i === modalActiveImageIndex ? 'w-4 bg-white shadow-md' : 'w-1.5 bg-white/40'}`}
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setModalActiveImageIndex(prev => prev > 0 ? prev - 1 : urls.length - 1);
+                                                                }}
+                                                                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full opacity-0 group-hover/img:opacity-100 transition-all backdrop-blur-sm"
+                                                            >
+                                                                <ChevronLeft size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setModalActiveImageIndex(prev => prev < urls.length - 1 ? prev + 1 : 0);
+                                                                }}
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full opacity-0 group-hover/img:opacity-100 transition-all backdrop-blur-sm"
+                                                            >
+                                                                <ChevronRight size={16} />
+                                                            </button>
+                                                        </>
+                                                    )}
+
+                                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/5 transition-all pointer-events-none" />
+                                                    <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-[1.5rem] pointer-events-none" />
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className="flex flex-col items-center justify-center py-16 px-4 h-full bg-slate-50/50">
+                                                <Layout size={40} className="text-slate-200 mb-3" />
+                                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Image not generated yet</span>
                                             </div>
-                                            <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-[1.5rem] pointer-events-none" />
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-16 px-4 h-full bg-slate-50/50">
-                                            <Layout size={40} className="text-slate-200 mb-3" />
-                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Image not generated yet</span>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             </div>
 

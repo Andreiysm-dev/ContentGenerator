@@ -95,7 +95,7 @@ function RescheduleModal({
                 {/* Post Preview */}
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Post</p>
-                    <p className="text-sm font-bold text-slate-800 truncate">{state.post?.cardName || 'Untitled Campaign'}</p>
+                    <p className="text-sm font-bold text-slate-800 truncate">{state.post?.card_name || state.post?.cardName || state.post?.theme || state.post?.topic || 'Untitled Campaign'}</p>
                     <p className="text-[10px] text-slate-400 mt-0.5">{state.post?.contentType || 'Social Media'}</p>
                 </div>
 
@@ -543,7 +543,7 @@ export function SchedulerPage({
                                                 >
                                                     <div className="flex items-center gap-1.5 mb-1">
                                                         <Move size={9} className="text-slate-300 shrink-0" />
-                                                        <span className="truncate text-slate-700">{post.cardName || 'Untitled Campaign'}</span>
+                                                        <span className="truncate text-slate-700">{post.card_name || post.cardName || post.theme || post.topic || 'Untitled Campaign'}</span>
                                                     </div>
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{post.contentType || 'Social'}</span>

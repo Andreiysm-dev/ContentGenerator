@@ -30,6 +30,7 @@ interface KanbanViewProps {
     onCardDelete?: (postId: string, e: React.MouseEvent) => void;
     automations?: any[];
     userPermissions?: any;
+    activeCompanyId?: string;
 }
 
 export function KanbanView({
@@ -43,19 +44,32 @@ export function KanbanView({
     onColumnColorChange,
     onCardDelete,
     automations = [],
-    userPermissions = {}
+    userPermissions = {},
+    activeCompanyId
 }: KanbanViewProps) {
     const [columns, setColumns] = useState<KanbanColumn[]>(initialColumns);
     const [posts, setPosts] = useState<Post[]>(initialPosts);
     const [activePost, setActivePost] = useState<Post | null>(null);
     const [activeColumn, setActiveColumn] = useState<KanbanColumn | null>(null);
-    const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set());
+
+    const getCollapseKey = () => `kanban_collapsed_${activeCompanyId || 'default'}`;
+
+    const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(() => {
+        try {
+            const saved = localStorage.getItem(getCollapseKey());
+            if (saved) return new Set(JSON.parse(saved));
+        } catch { }
+        return new Set();
+    });
 
     const toggleColumnCollapse = (columnId: string) => {
         setCollapsedColumns(prev => {
             const next = new Set(prev);
             if (next.has(columnId)) next.delete(columnId);
             else next.add(columnId);
+            try {
+                localStorage.setItem(getCollapseKey(), JSON.stringify(Array.from(next)));
+            } catch { }
             return next;
         });
     };
@@ -179,17 +193,16 @@ export function KanbanView({
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-full min-h-[400px]">
-                <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-                <span className="ml-3 text-slate-500 font-bold uppercase tracking-widest text-xs">Synchronizing Board...</span>
-            </div>
-        );
-    }
-
     return (
-        <div className="flex-1 overflow-x-auto p-6 h-full">
+        <div className="flex-1 overflow-x-auto p-6 h-full relative">
+            {loading && (!columns || columns.length === 0) && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-[2px] z-50">
+                    <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                        <span className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Syncing Board...</span>
+                    </div>
+                </div>
+            )}
             <DndContext
                 sensors={sensors}
                 collisionDetection={closestCorners}

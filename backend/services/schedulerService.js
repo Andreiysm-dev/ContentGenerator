@@ -74,9 +74,18 @@ const checkPendingEmailNotifications = async () => {
             for (const companyId of Object.keys(companyGroups)) {
                 // Check if user has email notifications turned on for this specific company in metadata
                 const prefs = user.user_metadata?.notification_preferences?.[companyId] || {};
-                if (prefs.emailNotificationsEnabled !== true) continue;
-
                 const companyNotifications = companyGroups[companyId];
+                const notificationIds = companyNotifications.map(n => n.id);
+
+                if (prefs.emailNotificationsEnabled !== true) {
+                    // Mark as notified so we don't process them again, even though we didn't send an email
+                    await supabase
+                        .from('notifications')
+                        .update({ email_notified: true })
+                        .in('id', notificationIds);
+                    continue;
+                }
+
                 const companyName = companyNotifications[0].company_name || 'Company';
 
                 try {
@@ -89,7 +98,6 @@ const checkPendingEmailNotifications = async () => {
                     });
 
                     // 4. Mark these as notified
-                    const notificationIds = companyNotifications.map(n => n.id);
                     await supabase
                         .from('notifications')
                         .update({ email_notified: true })
@@ -180,10 +188,10 @@ const processPost = async (post) => {
             try {
                 let res;
                 if (account.provider === 'facebook') {
-                    res = await postToFacebookPage(post.company_id, { text: content, url: imageUrl }, account.id);
+                    res = await postToFacebookPage(post.company_id, { text: content, url: imageUrl, media_urls: mediaUrls }, account.id);
                 } else {
                     // Default to LinkedIn
-                    res = await postToLinkedIn(post.company_id, { text: content, url: imageUrl }, account.id);
+                    res = await postToLinkedIn(post.company_id, { text: content, url: imageUrl, media_urls: mediaUrls }, account.id);
                 }
                 results.push({ provider: account.provider, accountId: account.id, result: res, status: 'success' });
                 successCount++;

@@ -52,6 +52,7 @@ import { ContentPlannerPage } from '@/pages/ContentPlannerPage';
 import Faq from "@/pages/Faq";
 import { ImageHubPage } from '@/pages/ImageHubPage';
 import { SOKMED_COLUMNS } from './pages/Workboard/types';
+import { WorkboardPage } from './pages/Workboard/WorkboardPage';
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { MaintenancePage } from '@/pages/MaintenancePage';
 import { SchedulerPage } from '@/pages/SchedulerPage';
@@ -190,7 +191,7 @@ function App() {
   }, [backendBaseUrl]);
 
   const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: string }>>([]);
-  const [customRoles, setCustomRoles] = useState<Array<{ name: string; description?: string; permissions?: { canApprove: boolean; canGenerate: boolean; canCreate: boolean; canDelete: boolean; canEditSettings: boolean } }>>([]);
+  const [customRoles, setCustomRoles] = useState<Array<{ name: string; description?: string; permissions?: { canApprove: boolean; canGenerate: boolean; canCreate: boolean; canDelete: boolean; canEditSettings: boolean; canAddCollaborators: boolean } }>>([]);
   const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
 
@@ -556,16 +557,16 @@ function App() {
   );
 
   const userPermissions = useMemo(() => {
-    if (!session?.user || !activeCompany) return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, isOwner: false };
+    if (!session?.user || !activeCompany) return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, canAddCollaborators: false, isOwner: false };
     const userId = session.user.id;
 
     if (activeCompany.user_id === userId) {
-      return { canApprove: true, canGenerate: true, canCreate: true, canDelete: true, canEditSettings: true, isOwner: true, roleName: 'owner' };
+      return { canApprove: true, canGenerate: true, canCreate: true, canDelete: true, canEditSettings: true, canAddCollaborators: true, isOwner: true, roleName: 'owner' };
     }
 
     const collaboratorEntry = collaborators.find(c => c.id === userId);
     if (!collaboratorEntry) {
-      return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, isOwner: false, roleName: null };
+      return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, canAddCollaborators: false, isOwner: false, roleName: null };
     }
 
     const roleName = collaboratorEntry.role;
@@ -577,6 +578,7 @@ function App() {
       canCreate: roleDef?.permissions?.canCreate || false,
       canDelete: roleDef?.permissions?.canDelete || false,
       canEditSettings: roleDef?.permissions?.canEditSettings || false,
+      canAddCollaborators: roleDef?.permissions?.canAddCollaborators || false,
       isOwner: false,
       roleName
     };
@@ -1490,7 +1492,10 @@ function App() {
             return incoming;
           });
 
-          setCalendarRows(updatedRows);
+          setCalendarRows(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(updatedRows)) return prev;
+            return updatedRows;
+          });
 
           // Sync selectedRow if modal is open to avoid stale status display
           if (isViewModalOpen && selectedRow) {
@@ -2794,60 +2799,62 @@ function App() {
 
       // 4. Initialize Brand Intelligence
       if (newCompanyId) {
-        const brandPayload = {
-          companyId: newCompanyId,
-          form_answer: {
-            brandBasics: {
-              name: data.companyName,
-              industry: data.industry,
-              type: data.businessType,
-              offer: data.companyDescription,
-              goal: data.primaryGoal,
-            },
-            // Audience data from onboarding
-            audience: {
-              role: data.audienceRole || '',
-              industry: data.audienceIndustry || '',
-              painPoints: data.audiencePainPoints?.join(', ') || '',
-              outcome: data.audienceOutcome || '',
-            },
-            // Tone data from onboarding
-            tone: {
-              formal: data.toneFormal || 5,
-              energy: data.toneEnergy || 5,
-              bold: data.toneBold || 5,
-              emojiUsage: data.emojiUsage || 'Sometimes',
-              writingLength: data.writingLength || 'Medium',
-              ctaStrength: data.ctaStrength || 'Moderate',
-            },
-            // Include enhanced brand data if extracted from website (for additional context)
-            ...(data.targetAudience && {
-              extractedAudience: {
-                role: data.targetAudience.role,
-                painPoints: data.targetAudience.painPoints?.join(', ') || '',
-                outcomes: data.targetAudience.outcomes?.join(', ') || '',
+        if (!data.skipBrandSetup) {
+          const brandPayload = {
+            companyId: newCompanyId,
+            form_answer: {
+              brandBasics: {
+                name: data.companyName,
+                industry: data.industry,
+                type: data.businessType,
+                offer: data.companyDescription,
+                goal: data.primaryGoal,
               },
-            }),
-            ...(data.brandVoice && {
-              extractedTone: {
-                formality: data.brandVoice.formality,
-                energy: data.brandVoice.energy,
-                confidence: data.brandVoice.confidence,
+              // Audience data from onboarding
+              audience: {
+                role: data.audienceRole || '',
+                industry: data.audienceIndustry || '',
+                painPoints: data.audiencePainPoints?.join(', ') || '',
+                outcome: data.audienceOutcome || '',
               },
-            }),
-            ...(data.visualIdentity && {
-              visualIdentity: {
-                colors: data.visualIdentity.primaryColors?.join(', ') || '',
+              // Tone data from onboarding
+              tone: {
+                formal: data.toneFormal || 5,
+                energy: data.toneEnergy || 5,
+                bold: data.toneBold || 5,
+                emojiUsage: data.emojiUsage || 'Sometimes',
+                writingLength: data.writingLength || 'Medium',
+                ctaStrength: data.ctaStrength || 'Moderate',
               },
-            }),
-          },
-        };
+              // Include enhanced brand data if extracted from website (for additional context)
+              ...(data.targetAudience && {
+                extractedAudience: {
+                  role: data.targetAudience.role,
+                  painPoints: data.targetAudience.painPoints?.join(', ') || '',
+                  outcomes: data.targetAudience.outcomes?.join(', ') || '',
+                },
+              }),
+              ...(data.brandVoice && {
+                extractedTone: {
+                  formality: data.brandVoice.formality,
+                  energy: data.brandVoice.energy,
+                  confidence: data.brandVoice.confidence,
+                },
+              }),
+              ...(data.visualIdentity && {
+                visualIdentity: {
+                  colors: data.visualIdentity.primaryColors?.join(', ') || '',
+                },
+              }),
+            },
+          };
 
-        await authedFetch(`${backendBaseUrl}/api/brandkb`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(brandPayload),
-        });
+          await authedFetch(`${backendBaseUrl}/api/brandkb`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(brandPayload),
+          });
+        }
 
         // Update local state - only add if not already in list
         setCompanies((prev) => {
@@ -3243,6 +3250,7 @@ function App() {
                       setCalendarRows={setCalendarRows}
                       filteredCalendarRows={filteredCalendarRows}
                       activeCompanyId={activeCompanyId}
+                      activeCompany={activeCompany}
                       isPageFullySelected={isPageFullySelected}
                       toggleSelectAllOnPage={toggleSelectAllOnPage}
                       toggleSelectOne={toggleSelectOne}
@@ -3265,6 +3273,21 @@ function App() {
                       }}
                       requestConfirm={requestConfirm}
                       userPermissions={userPermissions}
+                    />
+                  }
+                />
+                <Route
+                  path="/company/:companyId/workboard"
+                  element={
+                    <WorkboardPage
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
+                      onStatusMoved={(postId, status, originalStatus) => {
+                        recentStatusMoves.current.set(postId, { status, originalStatus, ts: Date.now() });
+                      }}
+                      userPermissions={userPermissions}
+                      activeCompany={activeCompany}
                     />
                   }
                 />
@@ -3330,6 +3353,7 @@ function App() {
                       setCalendarRows={setCalendarRows}
                       filteredCalendarRows={filteredCalendarRows}
                       activeCompanyId={activeCompanyId}
+                      activeCompany={activeCompany}
                       isPageFullySelected={isPageFullySelected}
                       toggleSelectAllOnPage={toggleSelectAllOnPage}
                       toggleSelectOne={toggleSelectOne}

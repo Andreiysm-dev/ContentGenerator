@@ -8,6 +8,7 @@ interface OnboardingBrandIdentityStepProps {
     setIndustry: (val: string) => void;
     onNext: () => void;
     onBack: () => void;
+    onSkipBrandSetup?: () => void;
 }
 
 const INDUSTRY_OPTIONS = [
@@ -21,7 +22,8 @@ export function OnboardingBrandIdentityStep({
     industry,
     setIndustry,
     onNext,
-    onBack
+    onBack,
+    onSkipBrandSetup
 }: OnboardingBrandIdentityStepProps) {
     const isValid = companyName.trim() && industry;
 
@@ -87,13 +89,23 @@ export function OnboardingBrandIdentityStep({
                     )}
                 </div>
 
-                <div className="pt-4 flex gap-3">
+                <div className="pt-4 flex flex-wrap gap-3">
                     <button
                         onClick={onBack}
                         className="px-6 py-3 rounded-xl font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
                     >
                         Back
                     </button>
+                    {onSkipBrandSetup && (
+                        <button
+                            onClick={onSkipBrandSetup}
+                            disabled={!isValid}
+                            className={`px-5 py-2 rounded-xl flex flex-col items-center justify-center border transition-all duration-200 ${isValid ? 'border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400' : 'border-slate-100 text-slate-300'}`}
+                        >
+                            <span className="font-bold text-sm">Skip & Create</span>
+                            <span className="text-[10px] font-medium opacity-70 mt-0.5">Set up brand later</span>
+                        </button>
+                    )}
                     <button
                         onClick={onNext}
                         disabled={!isValid}

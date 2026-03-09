@@ -39,17 +39,22 @@ interface WorkboardPageProps {
     notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
     userPermissions?: any;
     onStatusMoved?: (postId: string, status: string, originalStatus?: any) => void;
+    activeCompany?: any;
 }
 
 const getStatusValue = (status: any) => {
+    if (!status) return 'Draft';
     if (typeof status === 'string') return status;
-    if (status && typeof status === 'object' && status.state) return status.state;
-    return 'Draft';
+    if (status && typeof status === 'object') {
+        if (status.state) return status.state;
+        if (status.value) return status.value;
+    }
+    return String(status || 'Draft');
 };
 
-export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMoved, userPermissions }: WorkboardPageProps) {
+export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMoved, userPermissions, activeCompany }: WorkboardPageProps) {
     const { companyId } = useParams();
-    const [columns, setColumns] = useState<KanbanColumn[]>(SOKMED_COLUMNS);
+    const [columns, setColumns] = useState<KanbanColumn[]>([]);
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
     const [activePost, setActivePost] = useState<Post | null>(null);
@@ -57,6 +62,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     // Tracks the target column during an active drag — updated by onDragOver via ref
     // so onDragEnd always has the latest value without stale closure issues.
     const dragTargetColumnRef = useRef<string | null>(null);
+    const lastLoadedCompanyIdRef = useRef<string | null>(null);
 
     // Automation state
     const [automations, setAutomations] = useState<any[]>([]);
@@ -65,6 +71,9 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     const [rememberChoice, setRememberChoice] = useState(false);
     // Per-card generation cooldown — card is locked while AI is processing
     const [generatingPostIds, setGeneratingPostIds] = useState<Set<string>>(new Set());
+
+    // Settings loaded flag to prevent partial-save overwrites
+    const [settingsLoaded, setSettingsLoaded] = useState(false);
 
     // Add-column popover state
     const [showAddColumn, setShowAddColumn] = useState(false);
@@ -81,18 +90,69 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
 
     // Automation preferences (localStorage based)
     const [showAutomations, setShowAutomations] = useState(false);
-    const [automationPrefs, setAutomationPrefs] = useState<Record<string, string>>({});
+    const [automationPrefs, setAutomationPrefs] = useState<Record<string, string>>(() => {
+        if (typeof window === 'undefined') return {};
+        const companyId = window.location.pathname.split('/').find((s, i, a) => a[i - 1] === 'company');
+        if (!companyId) return {};
+        try {
+            const saved = localStorage.getItem(`automation_pref_${companyId}`);
+            return saved ? JSON.parse(saved) : {};
+        } catch { return {}; }
+    });
+
+    // Collapsed columns state
+    const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>(() => {
+        if (typeof window === 'undefined') return {};
+        const companyId = window.location.pathname.split('/').find((s, i, a) => a[i - 1] === 'company');
+        if (!companyId) return {};
+        try {
+            const saved = localStorage.getItem(`collapsed_columns_${companyId}`);
+            return saved ? JSON.parse(saved) : {};
+        } catch { return {}; }
+    });
 
     useEffect(() => {
         if (!companyId) return;
         const prefKey = `automation_pref_${companyId}`;
+        const collapseKey = `collapsed_columns_${companyId}`;
         try {
             const saved = localStorage.getItem(prefKey);
-            setAutomationPrefs(saved ? JSON.parse(saved) : {});
+            if (saved) setAutomationPrefs(JSON.parse(saved));
+
+            const savedCollapse = localStorage.getItem(collapseKey);
+            if (savedCollapse) setCollapsedColumns(JSON.parse(savedCollapse));
         } catch (e) {
-            setAutomationPrefs({});
+            console.error("Local preferences load failed", e);
         }
     }, [companyId]);
+
+    const saveCollapsedState = async (newCollapsed: Record<string, boolean>) => {
+        if (!companyId || !settingsLoaded) return;
+        try {
+            await authedFetch(`${backendBaseUrl}/api/profile/notifications/${companyId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    watchedColumns,
+                    collapsedColumns: newCollapsed
+                }),
+            });
+        } catch (err) {
+            console.error('Failed to save collapsed state to backend:', err);
+        }
+    };
+
+    const toggleColumnCollapse = (columnId: string) => {
+        const newCollapsed = {
+            ...collapsedColumns,
+            [columnId]: !collapsedColumns[columnId]
+        };
+        setCollapsedColumns(newCollapsed);
+        if (companyId) {
+            localStorage.setItem(`collapsed_columns_${companyId}`, JSON.stringify(newCollapsed));
+            saveCollapsedState(newCollapsed);
+        }
+    };
 
     const updateAutomationPref = (columnId: string, pref: string | null) => {
         if (!companyId) return;
@@ -110,7 +170,6 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     // Fetch real data from backend
     const fetchPosts = async () => {
         if (!companyId) return;
-        setLoading(true);
         try {
             const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${companyId}`);
             const data = await res.json();
@@ -118,59 +177,84 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
 
             const unwrapped = data.contentCalendars || data;
 
-            // Fetch kanban settings first to map status titles to IDs if needed
-            let currentColumns = SOKMED_COLUMNS;
-            const compRes = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`);
-            if (compRes.ok) {
-                const compData = await compRes.json();
-                if (compData.company?.kanban_settings?.columns?.length > 0) {
-                    currentColumns = compData.company.kanban_settings.columns;
-                    setColumns(currentColumns);
-                    if (compData.company.kanban_settings.automations) {
-                        setAutomations(compData.company.kanban_settings.automations);
+            // Only fetch kanban settings if we haven't already.
+            let currentColumns = columns.length > 0 ? columns : SOKMED_COLUMNS;
+            if (columns.length === 0) {
+                const compRes = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`);
+                if (compRes.ok) {
+                    const compData = await compRes.json();
+                    if (compData.company?.kanban_settings?.columns?.length > 0) {
+                        currentColumns = compData.company.kanban_settings.columns;
+                        setColumns(currentColumns);
+                        if (compData.company.kanban_settings.automations) {
+                            setAutomations(compData.company.kanban_settings.automations);
+                        }
                     }
                 }
             }
 
-            const mappedPosts: Post[] = unwrapped.map((row: any) => {
-                const statusStr = getStatusValue(row.status).trim();
-                // Find matching column ID if DB status is a title
-                const match = currentColumns.find(c =>
-                    c.id === statusStr ||
-                    c.title === statusStr ||
-                    String(c.id || '').toLowerCase() === String(statusStr || '').toLowerCase() ||
-                    String(c.title || '').toLowerCase() === String(statusStr || '').toLowerCase()
-                );
+            const mappedPosts: Post[] = unwrapped
+                .filter((row: any) => {
+                    const statusStr = getStatusValue(row.status).toLowerCase();
+                    return statusStr !== 'archived';
+                })
+                .map((row: any) => {
+                    const statusStr = getStatusValue(row.status).trim();
+                    // Find matching column ID if DB status is a title
+                    const match = currentColumns.find(c =>
+                        c.id === statusStr ||
+                        c.title === statusStr ||
+                        String(c.id || '').toLowerCase() === String(statusStr || '').toLowerCase() ||
+                        String(c.title || '').toLowerCase() === String(statusStr || '').toLowerCase()
+                    );
 
-                return {
-                    id: row.contentCalendarId,
-                    theme: row.theme || row.topic || 'Untitled Post',
-                    contentType: row.contentType || 'Social Post',
-                    status: match ? match.id : statusStr,
-                    postDate: row.scheduled_at ? new Date(row.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Draft',
-                    brandName: row.brandName || '',
-                    cardName: row.card_name,
-                    imageUrl: row.imageGenerated || row.imageGeneratedUrl,
-                    content_deadline: row.content_deadline || row.scheduled_at,
-                    design_deadline: row.design_deadline || row.scheduled_at,
-                    organization_id: companyId,
-                    tags: row.tags,
-                    collaborators: row.collaborators,
-                    checklist: row.checklist,
-                };
-            });
+                    return {
+                        id: row.contentCalendarId,
+                        theme: row.card_name || row.theme || row.topic || 'Untitled Post',
+                        contentType: row.contentType || 'Social Post',
+                        status: match ? match.id : statusStr,
+                        postDate: row.scheduled_at ? new Date(row.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Draft',
+                        brandName: row.brandName || '',
+                        cardName: row.card_name,
+                        imageUrl: row.imageGenerated || row.imageGeneratedUrl,
+                        content_deadline: row.content_deadline || row.scheduled_at,
+                        design_deadline: row.design_deadline || row.scheduled_at,
+                        organization_id: companyId,
+                        tags: row.tags,
+                        collaborators: row.collaborators,
+                        checklist: row.checklist,
+                    };
+                });
 
             setPosts(mappedPosts);
         } catch (err: any) {
             notify(err.message || 'Error loading workboard', 'error');
         } finally {
-            setLoading(false);
+            // Managed by loadAll
         }
     };
 
     useEffect(() => {
-        fetchPosts();
-        fetchNotificationSettings();
+        if (!companyId) return;
+
+        const loadAll = async () => {
+            // Only show the full synchronized loader if the company changed
+            if (lastLoadedCompanyIdRef.current !== companyId) {
+                setLoading(true);
+                // Reset state to avoid showing stale data from previous company
+                setPosts([]);
+                setColumns([]);
+                setAutomations([]);
+            }
+
+            await Promise.all([
+                fetchPosts(),
+                fetchNotificationSettings()
+            ]);
+            setLoading(false);
+            lastLoadedCompanyIdRef.current = companyId;
+        };
+        loadAll();
     }, [companyId]);
 
     const fetchNotificationSettings = async () => {
@@ -180,6 +264,8 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
             if (res.ok) {
                 const data = await res.json();
                 setWatchedColumns(data.watchedColumns || {});
+                setCollapsedColumns(prev => ({ ...prev, ...(data.collapsedColumns || {}) }));
+                setSettingsLoaded(true);
             }
         } catch (err) {
             console.error('Failed to fetch notification settings:', err);
@@ -193,7 +279,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
             const res = await authedFetch(`${backendBaseUrl}/api/profile/notifications/${companyId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ watchedColumns }),
+                body: JSON.stringify({ watchedColumns, collapsedColumns }),
             });
             if (res.ok) {
                 notify('Notification preferences saved!', 'success');
@@ -216,14 +302,10 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     };
 
     const executeStatusChange = async (postId: string, newStatus: string, skipAutomation = false) => {
-        // Optimistic UI updates
-        const originalPost = posts.find(p => p.id === postId);
-        const originalStatus = originalPost?.status;
+        const row = posts.find(p => p.id === postId);
+        const originalStatus = row?.status;
 
-        // Notify App.tsx about the move for polling preservation
-        onStatusMoved?.(postId, newStatus, originalStatus);
-
-        // Local state update
+        // Optimistic UI update
         setPosts(prev => prev.map(p => p.id === postId ? { ...p, status: newStatus } : p));
 
         try {
@@ -763,47 +845,47 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
             </div>
 
             {/* Board Content */}
-            <div className="flex-1 overflow-x-auto p-6">
-                {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-                        <span className="ml-3 text-slate-500 font-bold uppercase tracking-widest text-xs">Synchronizing Workboard...</span>
+            <div className="flex-1 overflow-x-auto p-6 relative">
+                {loading && columns.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#F8FAFC] z-20">
+                        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
                     </div>
-                ) : (
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCorners}
-                        onDragStart={onDragStart}
-                        onDragOver={onDragOver}
-                        onDragEnd={onDragEnd}
-                    >
-                        <div className="inline-flex gap-6 h-full min-w-full">
-                            {columns.map((column) => (
-                                <Column
-                                    key={column.id}
-                                    column={column}
-                                    posts={filteredPosts.filter(p => p.status === column.id)}
-                                    generatingPostIds={generatingPostIds}
-                                    onRename={handleColumnRename}
-                                    onColorChange={handleColumnColorChange}
-                                    onDeletePost={handleDeletePost}
-                                />
-                            ))}
-                        </div>
-
-                        {createPortal(
-                            <DragOverlay>
-                                {activePost && (
-                                    <TaskCard
-                                        post={activePost}
-                                        statusColor={columns.find(c => c.id === activePost.status)?.color}
-                                    />
-                                )}
-                            </DragOverlay>,
-                            document.body
-                        )}
-                    </DndContext>
                 )}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCorners}
+                    onDragStart={onDragStart}
+                    onDragOver={onDragOver}
+                    onDragEnd={onDragEnd}
+                >
+                    <div className="inline-flex gap-6 h-full min-w-full">
+                        {columns.map((column) => (
+                            <Column
+                                key={column.id}
+                                column={column}
+                                posts={filteredPosts.filter(p => p.status === column.id)}
+                                generatingPostIds={generatingPostIds}
+                                onRename={handleColumnRename}
+                                onColorChange={handleColumnColorChange}
+                                onDeletePost={handleDeletePost}
+                                isCollapsed={!!collapsedColumns[column.id]}
+                                onToggleCollapse={() => toggleColumnCollapse(column.id)}
+                            />
+                        ))}
+                    </div>
+
+                    {createPortal(
+                        <DragOverlay>
+                            {activePost && (
+                                <TaskCard
+                                    post={activePost}
+                                    statusColor={columns.find(c => c.id === activePost.status)?.color}
+                                />
+                            )}
+                        </DragOverlay>,
+                        document.body
+                    )}
+                </DndContext>
             </div>
 
             {/* Automation Modal */}

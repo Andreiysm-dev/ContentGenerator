@@ -51,6 +51,7 @@ export interface OnboardingData {
     visualIdentity?: any;
     socialProof?: string[];
     competitiveEdge?: string[];
+    skipBrandSetup?: boolean;
 }
 
 export function OnboardingModal({ isOpen, onComplete, notify, isAiAssistantOpen }: OnboardingModalProps) {
@@ -239,6 +240,37 @@ export function OnboardingModal({ isOpen, onComplete, notify, isAiAssistantOpen 
         });
     };
 
+    const handleSkipBrandSetup = () => {
+        onComplete({
+            role,
+            companyName,
+            companyDescription: companyDescription || `A ${industry} company.`,
+            industry,
+            businessType: businessType,
+            primaryGoal: primaryGoal,
+
+            // New fields empty
+            mission,
+            valuePropositions: [],
+            contentPillars: [],
+            primaryPlatform,
+
+            audienceRole,
+            audienceIndustry,
+            audiencePainPoints: [],
+            audienceOutcome,
+
+            toneFormal: 5,
+            toneEnergy: 5,
+            toneBold: 5,
+            emojiUsage: 'Sometimes',
+            writingLength: 'Medium',
+            ctaStrength: 'Moderate',
+
+            skipBrandSetup: true,
+        });
+    };
+
     return (
         <OnboardingShell
             currentStep={step}
@@ -288,6 +320,7 @@ export function OnboardingModal({ isOpen, onComplete, notify, isAiAssistantOpen 
                     setIndustry={setIndustry}
                     onNext={() => setStep(4)}
                     onBack={() => setStep(2)}
+                    onSkipBrandSetup={handleSkipBrandSetup}
                 />
             )}
 

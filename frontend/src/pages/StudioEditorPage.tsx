@@ -11,13 +11,16 @@ import {
     Clock,
     CheckCircle2,
     Loader2,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Trash2,
     Plus,
     FileText,
     Eye,
     Globe,
     Layers,
-    SendHorizontal,
-    Check
+    SendHorizontal
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DateTimePicker } from '../components/DateTimePicker';
@@ -60,7 +63,8 @@ export function StudioEditorPage({
 
     const [caption, setCaption] = useState('');
     const [hashtags, setHashtags] = useState('');
-    const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+    const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
     const [platform, setPlatform] = useState<'linkedin' | 'twitter'>('linkedin');
     const [scheduleDate, setScheduleDate] = useState('');
     const [isScheduleEnabled, setIsScheduleEnabled] = useState(false);
@@ -81,11 +85,11 @@ export function StudioEditorPage({
     useEffect(() => {
         if (globalSelectedRow && globalSelectedRow.contentCalendarId === contentId) {
             const newUrl = getImageGeneratedUrl ? getImageGeneratedUrl(globalSelectedRow) : (globalSelectedRow.imageGenerated || globalSelectedRow.imageGeneratedUrl);
-            if (newUrl && newUrl !== mediaUrl) {
-                setMediaUrl(newUrl);
+            if (newUrl && !mediaUrls.includes(newUrl)) {
+                setMediaUrls(prev => [...prev, newUrl]);
             }
         }
-    }, [globalSelectedRow, contentId, mediaUrl, getImageGeneratedUrl]);
+    }, [globalSelectedRow, contentId, mediaUrls, getImageGeneratedUrl]);
 
     // Keep global selectedRow in sync for modals to work
     useEffect(() => {
@@ -118,7 +122,15 @@ export function StudioEditorPage({
                 setRow(rowData);
                 setCaption(rowData.finalCaption || rowData.captionOutput || '');
                 setHashtags(rowData.finalHashtags || rowData.hastagsOutput || '');
-                setMediaUrl(getImageGeneratedUrl ? getImageGeneratedUrl(rowData) : (rowData.imageGenerated || rowData.imageGeneratedUrl || null));
+
+                const initialMedia = [];
+                if (rowData.media_urls && Array.isArray(rowData.media_urls)) {
+                    initialMedia.push(...rowData.media_urls);
+                } else {
+                    const singleUrl = getImageGeneratedUrl ? getImageGeneratedUrl(rowData) : (rowData.imageGenerated || rowData.imageGeneratedUrl || null);
+                    if (singleUrl) initialMedia.push(singleUrl);
+                }
+                setMediaUrls(initialMedia);
 
                 let fallbackDate = '';
                 if (rowData.scheduled_at) {
@@ -229,7 +241,8 @@ export function StudioEditorPage({
                 captionOutput: caption,
                 finalHashtags: hashtags,
                 hastagsOutput: hashtags, // Misspelling in DB
-                imageGenerated: mediaUrl, // DB column is imageGenerated
+                media_urls: mediaUrls,
+                imageGenerated: mediaUrls.length > 0 ? mediaUrls[0] : null, // DB column is imageGenerated
                 status: newStatus,
                 // Only set scheduled_at on the content calendar if NOT using the new system (or for display)
                 scheduled_at: (newStatus === 'SCHEDULED' || newStatus === 'For Approval') && isScheduleEnabled && scheduleDate ? new Date(scheduleDate).toISOString() :
@@ -291,16 +304,21 @@ export function StudioEditorPage({
         try {
             if (!supabase) throw new Error('Supabase client not initialized');
 
-            // 1. Upload/Copy Image to 'scheduled-assets' bucket
+            // 0. Delete existing PENDING scheduled posts for this calendar row to avoid duplicates on reschedule
+            await supabase!
+                .from('scheduled_posts')
+                .delete()
+                .eq('content_calendar_id', calendarId)
+                .eq('status', 'PENDING');
+
+            // 1. Upload/Copy Images to 'scheduled-assets' bucket
             let finalMediaUrls: string[] = [];
 
-            if (mediaUrl) {
-                // If it's already a supabase URL, we might want to copy it to ensure permanence
-                // For MVP simplicity: we'll try to fetch the blob and re-upload to 'scheduled-assets'
+            for (const mUrl of mediaUrls) {
                 try {
-                    const response = await fetch(mediaUrl);
+                    const response = await fetch(mUrl);
                     const blob = await response.blob();
-                    const fileName = `${activeCompanyId}/${calendarId}/${Date.now()}.png`; // Organize by company/calendarId
+                    const fileName = `${activeCompanyId}/${calendarId}/${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
 
                     const { data: uploadData, error: uploadError } = await supabase!.storage
                         .from('scheduled-assets')
@@ -314,8 +332,8 @@ export function StudioEditorPage({
 
                     finalMediaUrls.push(publicUrl);
                 } catch (e) {
-                    console.warn('Failed to copy asset to scheduled bucket, using original URL:', e);
-                    finalMediaUrls.push(mediaUrl);
+                    console.warn(`Failed to copy asset ${mUrl} to scheduled bucket, using original URL:`, e);
+                    finalMediaUrls.push(mUrl);
                 }
             }
 
@@ -418,46 +436,54 @@ export function StudioEditorPage({
     };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !activeCompanyId) return;
-
-        // Limit file size to 50MB
-        if (file.size > 50 * 1024 * 1024) {
-            notify('File is too large. Maximum size is 50MB.', 'error');
-            return;
-        }
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0 || !activeCompanyId) return;
 
         setIsUploading(true);
-        try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${activeCompanyId}/${Date.now()}.${fileExt}`;
-            const filePath = `generated-images/${fileName}`;
+        let successCount = 0;
 
+        try {
             if (!supabase) throw new Error('Supabase client not initialized');
 
-            const { error: uploadError } = await supabase.storage
-                .from('generated-images')
-                .upload(fileName, file);
+            for (const file of files) {
+                // Limit file size to 50MB
+                if (file.size > 50 * 1024 * 1024) {
+                    notify(`File ${file.name} is too large. Maximum size is 50MB.`, 'error');
+                    continue;
+                }
 
-            if (uploadError) throw uploadError;
+                try {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${activeCompanyId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    const filePath = `generated-images/${fileName}`;
 
-            // Get public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('generated-images')
-                .getPublicUrl(fileName);
+                    const { error: uploadError } = await supabase.storage
+                        .from('generated-images')
+                        .upload(fileName, file);
 
-            setMediaUrl(publicUrl);
-            notify('Image uploaded successfully', 'success');
-        } catch (error: any) {
-            console.error('Upload error:', error);
-            const errorMsg = error.message || 'Failed to upload image';
-            notify(errorMsg, 'error');
+                    if (uploadError) throw uploadError;
 
-            if (String(errorMsg || '').toLowerCase().includes('size') || String(errorMsg || '').toLowerCase().includes('limit')) {
-                notify('Hint: Check your Supabase Storage bucket max file size settings.', 'info');
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('generated-images')
+                        .getPublicUrl(fileName);
+
+                    setMediaUrls(prev => [...prev, publicUrl]);
+                    successCount++;
+                } catch (err: any) {
+                    console.error('Upload error for file:', file.name, err);
+                    notify(`Failed to upload ${file.name}: ${err.message}`, 'error');
+                }
             }
+
+            if (successCount > 0) {
+                notify(`${successCount} item(s) uploaded successfully`, 'success');
+            }
+        } catch (error: any) {
+            console.error('Global upload error:', error);
+            notify('An unexpected error occurred during upload.', 'error');
         } finally {
             setIsUploading(false);
+            if (e.target) e.target.value = ''; // Clear for re-selection
         }
     };
 
@@ -497,7 +523,7 @@ export function StudioEditorPage({
                                     const finalHash = remix?.hashtags || remixes.master?.hashtags || hashtags;
                                     return [finalCap, finalHash].filter(Boolean).join('\n\n');
                                 })(),
-                                url: mediaUrl
+                                media_urls: mediaUrls
                             }
                         })
                     });
@@ -874,42 +900,60 @@ export function StudioEditorPage({
                                         ref={fileInputRef}
                                         onChange={handleImageUpload}
                                         accept="image/*"
+                                        multiple
                                         className="hidden"
                                     />
-                                    {mediaUrl ? (
-                                        <div className="relative group rounded-3xl overflow-hidden border-2 border-slate-100 shadow-sm">
-                                            <img
-                                                src={mediaUrl}
-                                                alt="Post asset"
-                                                className="w-full h-72 object-cover"
-                                                onError={(e) => {
-                                                    console.warn("Media failed to load, clearing URL:", mediaUrl);
-                                                    setMediaUrl(null);
-                                                }}
-                                            />
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
+                                    {mediaUrls.length > 0 ? (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                {mediaUrls.map((url, idx) => (
+                                                    <div key={idx} className="relative group rounded-2xl overflow-hidden border-2 border-slate-100 shadow-sm aspect-square bg-slate-50">
+                                                        <img
+                                                            src={url}
+                                                            alt={`Post asset ${idx + 1}`}
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => {
+                                                                console.warn("Media failed to load, keeping entry:", url);
+                                                            }}
+                                                        />
+                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                                                            <button
+                                                                onClick={() => setMediaUrls(prev => prev.filter((_, i) => i !== idx))}
+                                                                className="p-2 bg-white rounded-xl text-rose-600 hover:bg-rose-50 transition-all shadow-lg"
+                                                                title="Remove Image"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => window.open(url, '_blank')}
+                                                                className="p-2 bg-white rounded-xl text-slate-800 hover:bg-slate-50 transition-all shadow-lg"
+                                                                title="View Full"
+                                                            >
+                                                                <Eye className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                        {idx === 0 && (
+                                                            <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-600 text-[8px] font-black text-white rounded-full shadow-lg uppercase tracking-widest">
+                                                                Primary
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
                                                 <button
                                                     onClick={() => fileInputRef.current?.click()}
-                                                    className="p-3 bg-white rounded-2xl text-slate-900 hover:bg-blue-50 hover:text-blue-600 transition-all shadow-xl"
-                                                    title="Change Image"
+                                                    disabled={isUploading}
+                                                    className="aspect-square flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 transition-all hover:border-blue-500/40 hover:bg-blue-50/50 disabled:opacity-50"
                                                 >
-                                                    <ImageIcon className="h-5 w-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => setMediaUrl(null)}
-                                                    className="p-3 bg-white rounded-2xl text-slate-900 hover:bg-rose-50 hover:text-rose-600 transition-all shadow-xl"
-                                                    title="Remove Image"
-                                                >
-                                                    <AlertCircle className="h-5 w-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => window.open(mediaUrl, '_blank')}
-                                                    className="p-3 bg-white rounded-2xl text-slate-900 hover:bg-emerald-50 hover:text-emerald-600 transition-all shadow-xl"
-                                                    title="View Full Image"
-                                                >
-                                                    <Eye className="h-5 w-5" />
+                                                    <Plus className="h-6 w-6 text-slate-400" />
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Add more</span>
                                                 </button>
                                             </div>
+                                            {isUploading && (
+                                                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl border border-blue-100">
+                                                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                                                    <span className="text-[10px] font-bold text-blue-600 uppercase">Uploading assets...</span>
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <button
@@ -980,9 +1024,46 @@ export function StudioEditorPage({
                                     )}
                                 </div>
 
-                                {mediaUrl ? (
-                                    <div className="mx-2 mb-2 rounded-[1.5rem] overflow-hidden border border-slate-100">
-                                        <img src={mediaUrl} alt="Visual preview" className="w-full h-auto object-cover max-h-[400px]" />
+                                {mediaUrls.length > 0 ? (
+                                    <div className="mx-2 mb-2 rounded-[1.5rem] overflow-hidden border border-slate-100 relative group/preview group">
+                                        <div className="relative aspect-square sm:aspect-video bg-slate-50">
+                                            <img
+                                                src={mediaUrls[activeImageIndex]}
+                                                alt="Visual preview"
+                                                className="w-full h-full object-cover transition-all duration-500"
+                                            />
+
+                                            {mediaUrls.length > 1 && (
+                                                <>
+                                                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                                                        {mediaUrls.map((_, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className={`h-1.5 rounded-full transition-all duration-300 ${i === activeImageIndex ? 'w-4 bg-white shadow-md' : 'w-1.5 bg-white/40'}`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setActiveImageIndex(prev => prev > 0 ? prev - 1 : mediaUrls.length - 1);
+                                                        }}
+                                                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm"
+                                                    >
+                                                        <ChevronLeft className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setActiveImageIndex(prev => prev < mediaUrls.length - 1 ? prev + 1 : 0);
+                                                        }}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm"
+                                                    >
+                                                        <ChevronRight className="h-4 w-4" />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="mx-2 mb-2 rounded-[1.5rem] bg-slate-50 aspect-video flex items-center justify-center border border-dashed border-slate-200 text-slate-300">

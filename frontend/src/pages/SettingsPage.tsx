@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
-import { Settings as SettingsIcon, Trash2, Plus, Pencil, Save, X, ShieldCheck, Zap, UserPlus, Users, Check, Info, Activity, Layout, Link2, GitBranch } from "lucide-react";
+import { Settings as SettingsIcon, Trash2, Plus, Pencil, Save, X, ShieldCheck, Zap, UserPlus, Users, Check, Info, Activity, Layout, Link2, GitBranch, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { BrandCoreTab } from "./settings/BrandCoreTab";
 import { WorkflowSettingsTab } from "./settings/WorkflowSettingsTab";
@@ -122,6 +122,7 @@ export type CompanySettingsShellProps = {
     canCreate: boolean;
     canDelete: boolean;
     canEditSettings: boolean;
+    canAddCollaborators: boolean;
     isOwner: boolean;
   };
   customRoles: any[];
@@ -343,12 +344,14 @@ export function SettingsPage(props: CompanySettingsShellProps) {
       canCreate: false,
       canDelete: false,
       canEditSettings: false,
+      canAddCollaborators: false,
       isOwner: false
     },
   } = props;
 
   const isOwner = userPermissions.isOwner;
   const canEditSettings = userPermissions.canEditSettings;
+  const canAddCollaborators = userPermissions.canAddCollaborators;
 
   const { companyId } = useParams<{ companyId: string }>();
   const [localAccounts, setLocalAccounts] = useState<any[]>([]);
@@ -362,7 +365,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
     canGenerate: true,
     canCreate: true,
     canDelete: false,
-    canEditSettings: false
+    canEditSettings: false,
+    canAddCollaborators: false
   });
   const [showRolesGuide, setShowRolesGuide] = useState(false);
   const [editingRoleIdx, setEditingRoleIdx] = useState<number | null>(null);
@@ -571,6 +575,27 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         </div>
                       </div>
 
+                      {!hasBrandIntelligenceConfigured && (
+                        <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/50 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                              <Zap size={20} />
+                            </div>
+                            <div>
+                              <div className="text-sm font-black text-amber-900 uppercase tracking-tight">Brand Intelligence Pending</div>
+                              <p className="text-xs text-amber-700/80 font-medium">Your AI generation capabilities are currently limited. Complete the brand core setup to unlock full potential.</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => navigate(`${companyUrlBase}/brand-intelligence`)}
+                            className="w-full sm:w-auto px-6 py-2.5 bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-amber-700 transition-all shadow-lg shadow-amber-200 flex items-center justify-center gap-2 group"
+                          >
+                            <span>Setup Now</span>
+                            <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                          </button>
+                        </div>
+                      )}
+
                       <Card title="Company profile" subtitle="Used across AI outputs and collaboration surfaces." className="bg-slate-50/60">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div className="space-y-1.5">
@@ -667,7 +692,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                   </div>
 
                   {/* Invite Teammates Card */}
-                  <Card className={`bg-white border-slate-200/60 shadow-sm ${!canEditSettings ? 'opacity-60 pointer-events-none' : ''}`} title="Invite Teammates" subtitle="Add coworkers to collaborate on content and branding.">
+                  <Card className={`bg-white border-slate-200/60 shadow-sm ${!(canEditSettings || canAddCollaborators) ? 'opacity-60 pointer-events-none' : ''}`} title="Invite Teammates" subtitle="Add coworkers to collaborate on content and branding.">
                     <div className="space-y-4">
                       <div className="space-y-2 relative">
                         <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider ml-1">New Teammate Email</label>
@@ -851,6 +876,15 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                   <p className="text-[9px] text-slate-500 font-medium leading-normal">Allows modification of company profile, brand core, workflow, and integrations.</p>
                                 </div>
                               </div>
+                              <div className="flex gap-3">
+                                <div className="h-6 w-6 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 shrink-0">
+                                  <UserPlus size={12} />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] font-black uppercase text-slate-900">Add Collaborators</div>
+                                  <p className="text-[9px] text-slate-500 font-medium leading-normal">Allows members to invite new teammates and search for users.</p>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -879,7 +913,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                       setEditingRoleIdx(idx);
                                       setNewRoleName(role.name);
                                       setNewRoleDesc(role.description || "");
-                                      setNewRolePermissions(role.permissions || { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false });
+                                      setNewRolePermissions(role.permissions || { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, canAddCollaborators: false });
                                     }}
                                     className="p-1 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
                                   >
@@ -920,6 +954,11 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                     <SettingsIcon size={8} /> Sett
                                   </div>
                                 )}
+                                {role.permissions?.canAddCollaborators && (
+                                  <div className="px-1.5 py-0.5 rounded-md bg-indigo-50 text-[8px] font-black uppercase text-indigo-700 flex items-center gap-1 border border-indigo-100/50">
+                                    <UserPlus size={8} /> Team
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -938,7 +977,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                     setEditingRoleIdx(null);
                                     setNewRoleName("");
                                     setNewRoleDesc("");
-                                    setNewRolePermissions({ canGenerate: true, canCreate: true, canDelete: false, canEditSettings: false });
+                                    setNewRolePermissions({ canGenerate: true, canCreate: true, canDelete: false, canEditSettings: false, canAddCollaborators: false });
                                   }} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">
                                     Cancel
                                   </button>
@@ -1012,6 +1051,16 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                       </div>
                                       Settings
                                     </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewRolePermissions(p => ({ ...p, canAddCollaborators: !p.canAddCollaborators }))}
+                                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[9px] font-black uppercase transition-all ${newRolePermissions.canAddCollaborators ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-100 text-slate-400'}`}
+                                    >
+                                      <div className={`h-2.5 w-2.5 rounded-full border flex items-center justify-center ${newRolePermissions.canAddCollaborators ? 'bg-indigo-500 border-indigo-600' : 'bg-white border-slate-200'}`}>
+                                        {newRolePermissions.canAddCollaborators && <Check size={6} className="text-white" />}
+                                      </div>
+                                      Add Team
+                                    </button>
                                   </div>
                                 </div>
 
@@ -1030,7 +1079,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                       }
                                       setNewRoleName("");
                                       setNewRoleDesc("");
-                                      setNewRolePermissions({ canGenerate: true, canCreate: true, canDelete: false, canEditSettings: false });
+                                      setNewRolePermissions({ canGenerate: true, canCreate: true, canDelete: false, canEditSettings: false, canAddCollaborators: false });
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-black uppercase tracking-widest text-slate-900 border border-slate-200 bg-slate-50 rounded-xl hover:bg-slate-900 hover:text-white transition-all duration-300 disabled:opacity-50"
@@ -1243,7 +1292,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
             </div>
           </div>
         </div>
-      </main>
+      </main >
 
       <style>{`
         @keyframes panelFade {
@@ -1251,6 +1300,6 @@ export function SettingsPage(props: CompanySettingsShellProps) {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-    </div>
+    </div >
   );
 }

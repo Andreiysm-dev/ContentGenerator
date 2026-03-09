@@ -111,7 +111,8 @@ export const getNotificationSettings = async (req, res) => {
         const settings = user.user_metadata?.notification_preferences?.[companyId] || {};
         return res.status(200).json({
             watchedColumns: settings.watchedColumns || {},
-            emailNotificationsEnabled: settings.emailNotificationsEnabled || false
+            emailNotificationsEnabled: settings.emailNotificationsEnabled || false,
+            collapsedColumns: settings.collapsedColumns || {}
         });
     } catch (error) {
         console.error('getNotificationSettings error:', error);
@@ -124,7 +125,7 @@ export const updateNotificationSettings = async (req, res) => {
     try {
         const userId = req.user?.id;
         const { companyId } = req.params;
-        const { watchedColumns, emailNotificationsEnabled } = req.body;
+        const { watchedColumns, emailNotificationsEnabled, collapsedColumns } = req.body;
 
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -138,7 +139,8 @@ export const updateNotificationSettings = async (req, res) => {
             [companyId]: {
                 ...currentPrefs[companyId],
                 watchedColumns,
-                emailNotificationsEnabled
+                emailNotificationsEnabled,
+                collapsedColumns: collapsedColumns !== undefined ? collapsedColumns : currentPrefs[companyId]?.collapsedColumns
             }
         };
 
