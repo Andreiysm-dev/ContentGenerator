@@ -12,7 +12,10 @@ import {
     logImpersonation,
     sendBroadcast,
     clearAuditLogs,
-    adminDeleteCompany
+    adminDeleteCompany,
+    getPromptSettings,
+    updatePromptSetting,
+    resetPromptSetting
 } from '../controller/adminController.js';
 import { adminAuth } from '../middleware/adminAuth.js';
 
@@ -34,5 +37,10 @@ router.post('/settings', updateSystemSetting);
 router.post('/audit/impersonate', logImpersonation);
 router.post('/broadcast', sendBroadcast);
 router.delete('/companies/:companyId', adminDeleteCompany);
+
+// Prompt Settings
+router.get('/prompts', getPromptSettings);
+router.put('/prompts/:key', updatePromptSetting);
+router.delete('/prompts/:key/reset', resetPromptSetting);
 
 export default router;

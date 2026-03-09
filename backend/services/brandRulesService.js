@@ -1,17 +1,6 @@
 import db from '../database/db.js';
 import { logApiUsage } from './apiUsageService.js';
-import {
-  BRAND_PACK_SYSTEM_PROMPT,
-  BRAND_PACK_USER_PROMPT,
-  BRAND_CAPABILITY_SYSTEM_PROMPT,
-  BRAND_CAPABILITY_USER_PROMPT,
-  WRITER_AGENT_SYSTEM_PROMPT,
-  WRITER_AGENT_USER_PROMPT,
-  REVIEWER_AGENT_SYSTEM_PROMPT,
-  REVIEWER_AGENT_USER_PROMPT,
-  VISUAL_IDENTITY_SYSTEM_PROMPT,
-  VISUAL_IDENTITY_USER_PROMPT
-} from './prompts.js';
+import { getPrompt } from './promptService.js';
 
 const callOpenAIText = async ({ systemPrompt, userPrompt, temperature = 1, companyId, userId }) => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -84,9 +73,8 @@ export async function generateBrandRulesSystem(payload = {}) {
 
   const formAnswerText = typeof formAnswer === 'string' ? formAnswer : JSON.stringify(formAnswer);
 
-  const brandPackSystem = BRAND_PACK_SYSTEM_PROMPT;
-
-  const brandPackUser = BRAND_PACK_USER_PROMPT;
+  const brandPackSystem = await getPrompt('brand_pack_system_prompt');
+  const brandPackUser = await getPrompt('brand_pack_user_prompt');
 
   const packRes = await callOpenAIText({
     systemPrompt: brandPackSystem.replaceAll('{{FORM_ANSWER}}', formAnswerText),
@@ -103,9 +91,8 @@ export async function generateBrandRulesSystem(payload = {}) {
   const brandPack = (packRes.content || '').trim();
 
   // 2) Generate Brand Capabilities
-  const capabilitySystem = BRAND_CAPABILITY_SYSTEM_PROMPT;
-
-  const capabilityUser = BRAND_CAPABILITY_USER_PROMPT;
+  const capabilitySystem = await getPrompt('brand_capability_system_prompt');
+  const capabilityUser = await getPrompt('brand_capability_user_prompt');
 
   const capRes = await callOpenAIText({
     systemPrompt: capabilitySystem,
@@ -125,9 +112,16 @@ export async function generateBrandRulesSystem(payload = {}) {
   // 3) Generate Writer Agent, Reviewer Agent, and Visual Identity in PARALLEL
   // They all depend on Brand Pack & Capabilities, but not on each other.
 
+  const [writerAgentSystem, writerAgentUser, reviewerAgentSystem, reviewerAgentUser] = await Promise.all([
+    getPrompt('writer_agent_system_prompt'),
+    getPrompt('writer_agent_user_prompt'),
+    getPrompt('reviewer_agent_system_prompt'),
+    getPrompt('reviewer_agent_user_prompt'),
+  ]);
+
   const writerPromise = callOpenAIText({
-    systemPrompt: WRITER_AGENT_SYSTEM_PROMPT,
-    userPrompt: WRITER_AGENT_USER_PROMPT
+    systemPrompt: writerAgentSystem,
+    userPrompt: writerAgentUser
       .replaceAll('{{BRAND_PACK}}', brandPack)
       .replaceAll('{{BRAND_CAP}}', brandCapability),
     temperature: 1,
@@ -135,8 +129,8 @@ export async function generateBrandRulesSystem(payload = {}) {
   });
 
   const reviewerPromise = callOpenAIText({
-    systemPrompt: REVIEWER_AGENT_SYSTEM_PROMPT,
-    userPrompt: REVIEWER_AGENT_USER_PROMPT
+    systemPrompt: reviewerAgentSystem,
+    userPrompt: reviewerAgentUser
       .replaceAll('{{BRAND_PACK}}', brandPack)
       .replaceAll('{{BRAND_CAP}}', brandCapability),
     temperature: 1,
@@ -228,9 +222,12 @@ export async function generateVisualIdentitySystem(payload = {}) {
 
   // 2) Generate Visual Identity Guidelines
   // We use the VISUAL_IDENTITY_USER_PROMPT but inject the specific wizard results as well
+  const visSystemPrompt = await getPrompt('visual_identity_system_prompt');
+  const visUserPrompt = await getPrompt('visual_identity_user_prompt');
+
   const visualRes = await callOpenAIText({
-    systemPrompt: VISUAL_IDENTITY_SYSTEM_PROMPT,
-    userPrompt: VISUAL_IDENTITY_USER_PROMPT
+    systemPrompt: visSystemPrompt,
+    userPrompt: visUserPrompt
       .replaceAll('{{BRAND_PACK}}', brandPack || '')
       .replaceAll('{{BRAND_CAP}}', brandCapability || '')
       .replaceAll('{{FORM_ANSWER}}', `${formAnswerText}\n\nUSER VISUAL PREFERENCES: ${visualStateText}`),

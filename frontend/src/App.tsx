@@ -4281,6 +4281,17 @@ function App() {
                     />
                   }
                 />
+                <Route
+                  path="/admin/prompts"
+                  element={
+                    <AdminDashboardPage
+                      tab="prompts"
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      notify={notify}
+                    />
+                  }
+                />
                 <Route path="/profile" element={<ProfilePage session={session} supabase={supabase} notify={notify} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

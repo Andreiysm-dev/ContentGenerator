@@ -266,6 +266,7 @@ export function Sidebar({
                 <nav className="flex flex-col gap-1.5 mt-2">
                   <div className="text-[10px] tracking-[0.2em] uppercase text-amber-500/40 font-black px-3 mb-1">Management</div>
                   <button
+                    data-tour="admin-console"
                     className={`flex items-center gap-3.5 py-3 px-4 rounded-2xl font-bold text-sm transition-all duration-300 relative group overflow-hidden ${location.pathname.startsWith('/admin') ? "text-white bg-amber-600 shadow-lg shadow-amber-600/20" : "text-amber-500/60 hover:text-amber-400 hover:bg-amber-500/5"}`}
                     onClick={() => {
                       navigate("/admin/overview");

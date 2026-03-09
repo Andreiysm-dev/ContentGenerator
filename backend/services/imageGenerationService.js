@@ -1,7 +1,7 @@
 import db from '../database/db.js';
 import { logAudit } from './auditService.js';
 import { getTargetStatusFromAutomation } from './kanbanAutomationService.js';
-import { IMAGE_GENERATION_SYSTEM_PROMPT, IMAGE_GENERATION_USER_PROMPT } from './prompts.js';
+import { getPrompt } from './promptService.js';
 import { sendNotification, sendTeamNotification } from './notificationService.js';
 import { callReplicatePredict } from './replicateService.js';
 import { callFalAiPredict } from './falService.js';
@@ -266,7 +266,7 @@ export async function generateDmpForCalendarRow(contentCalendarId, opts = {}) {
       ? opts.systemInstruction
       : (brandKB?.systemInstruction ?? '');
 
-  const openAiSystem = IMAGE_GENERATION_SYSTEM_PROMPT;
+  const openAiSystem = await getPrompt('image_generation_system_prompt');
 
   // Refined Logic: Triple-Threat Merger
   // Priority 1: User Instructions (Direct Subject)

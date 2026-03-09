@@ -1,5 +1,6 @@
 import db from '../database/db.js';
 import { logAudit } from '../services/auditService.js';
+import { getAllPrompts, savePrompt, resetPrompt } from '../services/promptService.js';
 
 export const getAdminStats = async (req, res) => {
     try {
@@ -516,3 +517,62 @@ export const adminDeleteCompany = async (req, res) => {
         return res.status(500).json({ error: 'Failed to delete company' });
     }
 }
+
+// ─── AI Prompt Settings ───────────────────────────────────────────────────────
+
+export const getPromptSettings = async (req, res) => {
+    try {
+        const prompts = await getAllPrompts();
+        return res.status(200).json({ prompts });
+    } catch (error) {
+        console.error('Error fetching prompt settings:', error);
+        return res.status(500).json({ error: 'Failed to fetch prompt settings' });
+    }
+};
+
+export const updatePromptSetting = async (req, res) => {
+    try {
+        const { key } = req.params;
+        const { value } = req.body;
+
+        if (!key) return res.status(400).json({ error: 'Prompt key is required' });
+        if (typeof value !== 'string') return res.status(400).json({ error: 'Prompt value must be a string' });
+
+        const result = await savePrompt(key, value);
+        if (!result.ok) {
+            return res.status(400).json({ error: result.error });
+        }
+
+        await logAudit(req.user.id, 'PROMPT_SETTING_UPDATE', 'ai_prompt_settings', key, {
+            key,
+            updated_by: req.user.id,
+        });
+
+        return res.status(200).json({ message: 'Prompt updated successfully' });
+    } catch (error) {
+        console.error('Error updating prompt setting:', error);
+        return res.status(500).json({ error: 'Failed to update prompt setting' });
+    }
+};
+
+export const resetPromptSetting = async (req, res) => {
+    try {
+        const { key } = req.params;
+        if (!key) return res.status(400).json({ error: 'Prompt key is required' });
+
+        const result = await resetPrompt(key);
+        if (!result.ok) {
+            return res.status(400).json({ error: result.error });
+        }
+
+        await logAudit(req.user.id, 'PROMPT_SETTING_RESET', 'ai_prompt_settings', key, {
+            key,
+            reset_by: req.user.id,
+        });
+
+        return res.status(200).json({ message: 'Prompt reset to default', defaultValue: result.defaultValue });
+    } catch (error) {
+        console.error('Error resetting prompt setting:', error);
+        return res.status(500).json({ error: 'Failed to reset prompt setting' });
+    }
+};

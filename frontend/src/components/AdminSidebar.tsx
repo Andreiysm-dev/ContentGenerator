@@ -1,4 +1,4 @@
-import { BarChart3, Building2, ChevronLeft, HelpCircle, LayoutDashboard, Settings, ShieldCheck, Users, Activity, FileText, Target, CalendarDays, Boxes, Headphones } from "lucide-react";
+import { BarChart3, Building2, ChevronLeft, HelpCircle, LayoutDashboard, MessageSquare, Settings, ShieldCheck, Users, Activity, FileText, Target, CalendarDays, Boxes, Headphones } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
@@ -24,6 +24,7 @@ export function AdminSidebar({
     const systemItems = [
         { key: "health", label: "System Health", icon: Activity, path: "/admin/health" },
         { key: "logs", label: "Audit Logs", icon: FileText, path: "/admin/logs" },
+        { key: "prompts", label: "Prompt Settings", icon: MessageSquare, path: "/admin/prompts" },
     ];
 
     return (

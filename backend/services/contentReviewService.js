@@ -2,7 +2,7 @@ import db from '../database/db.js';
 import { logAudit } from './auditService.js';
 import { getTargetStatusFromAutomation } from './kanbanAutomationService.js';
 
-import { REVIEW_USER_PROMPT_TEMPLATE } from './prompts.js';
+import { getPrompt } from './promptService.js';
 
 const nowIso = () => new Date().toISOString();
 
@@ -175,12 +175,14 @@ const safeParseReviewerText = (text) => {
   };
 };
 
-const buildReviewerUserPrompt = ({ contentCalendar, brandKB }) => {
+const buildReviewerUserPrompt = async ({ contentCalendar, brandKB }) => {
   const channelsValue = Array.isArray(contentCalendar.channels)
     ? contentCalendar.channels.join(', ')
     : contentCalendar.channels ?? '';
 
-  return REVIEW_USER_PROMPT_TEMPLATE
+  const template = await getPrompt('review_user_prompt');
+
+  return template
     .replaceAll('{{captionOutput}}', contentCalendar.captionOutput ?? '')
     .replaceAll('{{ctaOuput}}', contentCalendar.ctaOuput ?? '')
     .replaceAll('{{hastagsOutput}}', contentCalendar.hastagsOutput ?? '')

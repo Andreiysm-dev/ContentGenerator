@@ -2,7 +2,7 @@ import db from '../database/db.js';
 import { logAudit } from './auditService.js';
 import { getTargetStatusFromAutomation } from './kanbanAutomationService.js';
 
-import { CAPTION_USER_PROMPT_TEMPLATE } from './prompts.js';
+import { getPrompt } from './promptService.js';
 import { sendNotification, sendTeamNotification } from './notificationService.js';
 import { logApiUsage } from './apiUsageService.js';
 
@@ -47,12 +47,14 @@ const writeStatus = (state, extra = {}) => ({
   ...extra,
 });
 
-const buildUserPrompt = ({ contentCalendar, brandKB }) => {
+const buildUserPrompt = async ({ contentCalendar, brandKB }) => {
   const channelsValue = Array.isArray(contentCalendar.channels)
     ? contentCalendar.channels.join(', ')
     : contentCalendar.channels ?? '';
 
-  return CAPTION_USER_PROMPT_TEMPLATE
+  const template = await getPrompt('caption_user_prompt');
+
+  return template
     .replaceAll('{{brandHighlight}}', contentCalendar.brandHighlight ?? '')
     .replaceAll('{{crossPromo}}', contentCalendar.crossPromo ?? '')
     .replaceAll('{{theme}}', contentCalendar.theme ?? '')

@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { AdminHealth } from '@/components/admin/AdminHealth';
 import { AdminLogs } from '@/components/admin/AdminLogs';
 import { AdminToolbox } from '@/components/admin/AdminToolbox';
+import { AdminPrompts } from '@/components/admin/AdminPrompts';
 
 interface AdminStats {
     totalUsers: number;
@@ -48,7 +49,7 @@ interface AdminDashboardPageProps {
     authedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
     backendBaseUrl: string;
     notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
-    tab?: 'overview' | 'users' | 'companies' | 'health' | 'logs' | 'toolbox';
+    tab?: 'overview' | 'users' | 'companies' | 'health' | 'logs' | 'toolbox' | 'prompts';
 }
 interface UserProfile {
     id: string;
@@ -638,6 +639,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                     onUpdateSetting={handleUpdateSetting}
                     onSendBroadcast={handleSendBroadcast}
                     onPurgeLogs={handlePurgeLogs}
+                />
+            ) : activeTab === 'prompts' ? (
+                <AdminPrompts
+                    authedFetch={authedFetch}
+                    backendBaseUrl={backendBaseUrl}
+                    notify={notify}
                 />
             ) : null}
         </div>
