@@ -13,6 +13,7 @@ interface OnboardingModalProps {
     onComplete: (data: OnboardingData | null) => void;
     notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
     isAiAssistantOpen?: boolean;
+    isLoading?: boolean;
 }
 
 export interface OnboardingData {
@@ -54,7 +55,7 @@ export interface OnboardingData {
     skipBrandSetup?: boolean;
 }
 
-export function OnboardingModal({ isOpen, onComplete, notify, isAiAssistantOpen }: OnboardingModalProps) {
+export function OnboardingModal({ isOpen, onComplete, notify, isAiAssistantOpen, isLoading }: OnboardingModalProps) {
     // Navigation State
     const [step, setStep] = useState(1);
 
@@ -366,7 +367,7 @@ export function OnboardingModal({ isOpen, onComplete, notify, isAiAssistantOpen 
                     onSetVoice={setVoiceSettings}
                     onComplete={handleComplete}
                     onBack={() => setStep(6)}
-                    isSubmitting={false}
+                    isSubmitting={!!isLoading}
                 />
             )}
         </OnboardingShell>

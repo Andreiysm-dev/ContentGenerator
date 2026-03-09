@@ -2650,7 +2650,8 @@ function App() {
       console.error('Failed to create company', err);
       notify('Failed to create company. Check console for details.', 'error');
     } finally {
-      setIsCreatingCompany(false);
+      // Add a small delay before allowing another creation attempt to prevent double-clicks
+      setTimeout(() => setIsCreatingCompany(false), 2000);
     }
   };
 
@@ -2729,6 +2730,8 @@ function App() {
   };
 
   const handleOnboardingComplete = async (data: OnboardingData | null) => {
+    if (isCreatingCompany) return;
+    setIsCreatingCompany(true);
     try {
       // Handle skip
       if (!data) {
@@ -2878,6 +2881,9 @@ function App() {
       }
     } catch (err) {
       notify('Failed to complete onboarding. Please try again.', 'error');
+    } finally {
+      // Add a small delay before allowing another attempt
+      setTimeout(() => setIsCreatingCompany(false), 2000);
     }
   };
 
@@ -4348,6 +4354,7 @@ function App() {
           onComplete={handleOnboardingComplete}
           notify={notify}
           isAiAssistantOpen={isAiAssistantOpen}
+          isLoading={isCreatingCompany}
         />
 
         <AddCompanyModal
