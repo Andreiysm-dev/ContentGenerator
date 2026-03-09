@@ -327,7 +327,7 @@ export async function generateCaptionForContent(contentCalendarId, opts = {}) {
     return { ok: false, status: 500, error: 'Failed to load brandKB' };
   }
 
-  const userPrompt = buildUserPrompt({ contentCalendar, brandKB });
+  const userPrompt = await buildUserPrompt({ contentCalendar, brandKB });
   const openAiRes = await callOpenAIForCaption({
     systemPrompt: brandKB?.writerAgent ?? '',
     userPrompt,
@@ -516,7 +516,7 @@ export async function generateCaptionForContentSystem(payload = {}) {
     return { ok: false, status: 500, error: 'Failed to load brandKB' };
   }
 
-  const userPrompt = buildUserPrompt({ contentCalendar, brandKB });
+  const userPrompt = await buildUserPrompt({ contentCalendar, brandKB });
   const openAiRes = await callOpenAIForCaption({
     systemPrompt: brandKB?.writerAgent ?? '',
     userPrompt,

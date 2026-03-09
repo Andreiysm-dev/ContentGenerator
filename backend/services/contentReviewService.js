@@ -341,7 +341,7 @@ export async function reviewContentForCalendarRow(contentCalendarId, opts = {}) 
     return { ok: false, status: 500, error: 'Failed to load brandKB' };
   }
 
-  const userPrompt = buildReviewerUserPrompt({ contentCalendar, brandKB });
+  const userPrompt = await buildReviewerUserPrompt({ contentCalendar, brandKB });
 
   const openAiRes = await callOpenAIForReview({
     systemPrompt: brandKB?.reviewPrompt1 || brandKB?.writerAgent || '',
@@ -528,7 +528,7 @@ export async function reviewContentForCalendarRowSystem(payload = {}) {
     return { ok: false, status: 500, error: 'Failed to load brandKB' };
   }
 
-  const userPrompt = buildReviewerUserPrompt({ contentCalendar, brandKB });
+  const userPrompt = await buildReviewerUserPrompt({ contentCalendar, brandKB });
 
   const openAiRes = await callOpenAIForReview({
     systemPrompt: brandKB?.reviewPrompt1 || brandKB?.writerAgent || '',

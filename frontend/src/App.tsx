@@ -588,6 +588,15 @@ function App() {
 
   // Trigger product tour for new users (including collaborators)
   useEffect(() => {
+    if (!session) return;
+    // Periodic ping to keep 'last_seen' updated in the background
+    const interval = setInterval(() => {
+      authedFetch(`${backendBaseUrl}/api/profile`).catch(() => { });
+    }, 5 * 60 * 1000); // Pulse every 5 mins
+    return () => clearInterval(interval);
+  }, [session]);
+
+  useEffect(() => {
     if (!userProfile?.id || !activeCompanyId) return;
 
     const STORAGE_KEY = `productTourCompleted_${userProfile.id}`;

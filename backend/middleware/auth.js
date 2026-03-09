@@ -40,12 +40,24 @@ const authMiddleware = async (req, res, next) => {
 
     req.user = data.user;
 
-    // Fetch profile for role check
+    // Fetch profile for role check and presence
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, last_seen')
       .eq('id', req.user.id)
       .single();
+
+    // Update last_seen (throttled to 5 mins)
+    const now = new Date();
+    const lastSeen = profile?.last_seen ? new Date(profile.last_seen) : null;
+    if (!lastSeen || (now.getTime() - lastSeen.getTime() > 5 * 60 * 1000)) {
+      // Run in background to not block request
+      supabase
+        .from('profiles')
+        .update({ last_seen: now.toISOString() })
+        .eq('id', req.user.id)
+        .then(() => { });
+    }
 
     // Block non-admins if maintenance is ON
     if (isMaintenance && profile?.role !== 'ADMIN') {

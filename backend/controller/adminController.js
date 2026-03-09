@@ -87,7 +87,8 @@ export const getAllUsers = async (req, res) => {
                 id,
                 role,
                 onboarding_completed,
-                created_at
+                created_at,
+                last_seen
             `)
             .order('created_at', { ascending: false });
 

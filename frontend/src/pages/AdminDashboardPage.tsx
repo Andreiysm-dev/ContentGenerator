@@ -58,6 +58,7 @@ interface UserProfile {
     created_at: string;
     email?: string;
     full_name?: string;
+    last_seen?: string;
 }
 
 interface CompanyItem {
@@ -286,6 +287,30 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         { label: 'Total API Spend', value: stats?.totalSpend || 0, icon: Zap, color: 'text-rose-600', bg: 'bg-rose-50', trend: 'Live', trendUp: true, isCurrency: true },
     ];
 
+    const isUserOnline = (lastSeen?: string) => {
+        if (!lastSeen) return false;
+        const now = new Date();
+        const seen = new Date(lastSeen);
+        const diffMinutes = (now.getTime() - seen.getTime()) / (1000 * 60);
+        return diffMinutes < 15; // Online if active in last 15 mins
+    };
+
+    const formatLastSeen = (lastSeen?: string) => {
+        if (!lastSeen) return 'Never';
+        const now = new Date();
+        const seen = new Date(lastSeen);
+        const diff = now.getTime() - seen.getTime();
+
+        const mins = Math.floor(diff / (1000 * 60));
+        if (mins < 1) return 'Just now';
+        if (mins < 60) return `${mins}m ago`;
+
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `${hours}h ago`;
+
+        return seen.toLocaleDateString();
+    };
+
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -477,10 +502,27 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                                 ).map((user) => (
                                     <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-slate-900 leading-none mb-1">{user.full_name || 'Anonymous User'}</span>
-                                                <span className="text-xs text-slate-500 mb-1">{user.email}</span>
-                                                <span className="font-mono text-[10px] text-slate-400 select-all truncate max-w-[120px]" title={user.id}>{user.id}</span>
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-500 overflow-hidden">
+                                                        {user.full_name?.[0] || 'U'}
+                                                    </div>
+                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm ${isUserOnline(user.last_seen) ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-slate-900 leading-none">{user.full_name || 'Anonymous User'}</span>
+                                                        {isUserOnline(user.last_seen) && (
+                                                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100">Online</span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs text-slate-500 mt-1">{user.email}</span>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Active: {formatLastSeen(user.last_seen)}</span>
+                                                        <span className="text-slate-200">|</span>
+                                                        <span className="font-mono text-[9px] text-slate-300 select-all" title={user.id}>{user.id.slice(0, 8)}...</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
