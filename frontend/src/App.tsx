@@ -2753,11 +2753,14 @@ function App() {
       }
 
       // 1. Update profile with role and mark onboarding as complete
+      // Check if user is already an ADMIN to avoid overwriting it
+      const roleToUpdate = userProfile?.role === 'ADMIN' ? undefined : data.role;
+
       const profileRes = await authedFetch(`${backendBaseUrl}/api/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          role: data.role,
+          ...(roleToUpdate && { role: roleToUpdate }),
           onboarding_completed: true,
         }),
       });

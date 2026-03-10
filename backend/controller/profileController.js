@@ -58,9 +58,22 @@ export const updateProfile = async (req, res) => {
 
         const { role, onboarding_completed } = req.body;
 
+        // Fetch current profile to check existing role
+        const { data: currentProfile } = await db
+            .from('profiles')
+            .select('role')
+            .eq('id', userId)
+            .single();
+
         // Build update object with only provided fields
         const updateData = {};
-        if (role !== undefined) updateData.role = role;
+
+        // Prevent non-admins from promoting to ADMIN, and prevent ADMINS from losing their status
+        if (role !== undefined) {
+            if (currentProfile?.role !== 'ADMIN' && role !== 'ADMIN') {
+                updateData.role = role;
+            }
+        }
         if (onboarding_completed !== undefined) updateData.onboarding_completed = onboarding_completed;
         updateData.updated_at = new Date().toISOString();
 
