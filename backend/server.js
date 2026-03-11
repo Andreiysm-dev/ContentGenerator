@@ -32,6 +32,11 @@ initEmailScheduler();
 const app = express();
 const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
 
+// Trust the first proxy hop (Render/Cloudflare) so Express reads the real
+// client IP from X-Forwarded-For instead of the proxy's shared IP.
+// Without this, ALL users share one rate-limit bucket in production.
+app.set('trust proxy', 1);
+
 // --- Security Headers ---
 app.use(helmet());
 
@@ -62,28 +67,62 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// --- Rate Limiting ---
-// General limiter: 300 requests per 15 minutes per IP (applies to all /api routes)
+// General limiter: 500 requests per 15 minutes (applies to all /api routes).
+// Uses JWT user ID as the key when the token is present — this is accurate
+// for authenticated APIs and isn't affected by shared proxy IPs (Cloudflare/Render).
+// Falls back to IP for unauthenticated requests (e.g. /api/public).
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' }
+  message: { error: 'Too many requests, please try again later.' },
+  keyGenerator: (req) => {
+    // Extract user ID from Bearer token if present
+    try {
+      const auth = req.headers.authorization || '';
+      if (auth.startsWith('Bearer ')) {
+        const payload = JSON.parse(
+          Buffer.from(auth.split('.')[1], 'base64').toString()
+        );
+        if (payload?.sub) return `user:${payload.sub}`;
+      }
+    } catch { /* ignore malformed tokens */ }
+    // Fallback: X-Forwarded-For real IP (trust proxy is set above)
+    return req.ip || 'unknown';
+  },
 });
 
-// AI limiter: 30 requests per minute per IP (for expensive AI generation endpoints)
+// AI limiter: 40 requests per minute per user (for expensive AI generation only)
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: 40,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many AI generation requests, please wait a moment.' }
+  message: { error: 'Too many AI generation requests, please wait a moment.' },
+  keyGenerator: (req) => {
+    try {
+      const auth = req.headers.authorization || '';
+      if (auth.startsWith('Bearer ')) {
+        const payload = JSON.parse(
+          Buffer.from(auth.split('.')[1], 'base64').toString()
+        );
+        if (payload?.sub) return `user:${payload.sub}`;
+      }
+    } catch { /* ignore */ }
+    return req.ip || 'unknown';
+  },
 });
 
+
 app.use('/api', generalLimiter);
-app.use('/api/content-calendar', aiLimiter);
+// AI limiter only on genuinely expensive AI endpoints — NOT on content-calendar
+// (that route is polled every few seconds and is not an AI call)
+app.use('/api/generate-content', aiLimiter);
 app.use('/api/analyze-website', aiLimiter);
+app.use('/api/generate-image', aiLimiter);
+app.use('/api/generate-caption', aiLimiter);
+app.use('/api/assistant', aiLimiter);
 
 // Note the leading slash in mount paths
 app.use("/api/public", publicRoutes); // Publicly accessible system info
