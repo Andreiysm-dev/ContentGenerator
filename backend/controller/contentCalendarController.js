@@ -298,7 +298,43 @@ export const updateContentCalendar = async (req, res) => {
 
         if (fetchError || !existing) return res.status(404).json({ error: 'Content calendar not found' });
 
-        const { contentCalendarId, companyId, created_at, provider, model, ...updateData } = req.body;
+        // --- Mass Assignment Protection ---
+        // Only allow an explicit list of user-updatable fields.
+        // Sensitive fields (user_id, companyId, collaborator_ids, contentCalendarId, created_at)
+        // are never accepted from the request body — they come from the DB or route params.
+        const ALLOWED_UPDATE_FIELDS = [
+            // Core content fields
+            'status', 'theme', 'platform', 'contentType',
+            'captionOutput', 'finalCaption', 'imageGenerated', 'imageGeneratedUrl',
+            'media_urls', 'scheduled_at', 'channels',
+            // Workflow & comments
+            'supervisor_comments', 'reviewer_comments',
+            'post_status',          // draft/ready toggle from DraftPublishModal
+            'isApproved',
+            // Design & assets
+            'attachedDesign',       // design file URLs from handleUploadDesigns
+            // Brand & campaign context
+            'broadIdea', 'contentContext', 'brandKbId',
+            // Creative metadata
+            'dmp', 'card_name',
+            // Scheduling & planning
+            'content_deadline', 'design_deadline',
+            // Collaboration
+            'watchers', 'checklist', 'collaborators',
+            // Display / UI
+            'kanban_position', 'tags', 'content_notes', 'custom_fields',
+            'title', 'notes', 'format', 'objective',
+        ];
+        const updateData = {};
+        for (const field of ALLOWED_UPDATE_FIELDS) {
+            if (req.body[field] !== undefined) {
+                updateData[field] = req.body[field];
+            }
+        }
+        // Preserve internal provider/model metadata if explicitly passed (used by AI generation)
+        // but these are used for display only, not security-sensitive
+        if (req.body.provider !== undefined) updateData.provider = req.body.provider;
+        if (req.body.model !== undefined) updateData.model = req.body.model;
 
         // Safely extract status string (can be either a plain string or { state, updatedAt, by } object)
         const statusStr = updateData.status

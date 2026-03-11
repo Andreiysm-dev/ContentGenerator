@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { createClient, type Session } from '@supabase/supabase-js';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import {
 
   Plug,
@@ -78,6 +78,9 @@ import { ProductTour } from '@/components/ProductTour';
 import './App.css';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { AIAssistant } from '@/components/AIAssistant';
+import { useAuthedFetch } from '@/hooks/useAuthedFetch';
+import { useAuth } from '@/hooks/useAuth';
+import { useCompany } from '@/hooks/useCompany';
 
 
 type FormState = {
@@ -116,11 +119,18 @@ const CALENDAR_POLL_MS = 2500;
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [session, setSession] = useState<Session | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<any | null>(null);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-  const [showProductTour, setShowProductTour] = useState(false);
+  // --- Auth: session, profile, onboarding, product tour ---
+  // useAuth runs first so we have a real session before constructing authedFetch.
+  const {
+    session,
+    authLoading,
+    userProfile,
+    setUserProfile,
+    isOnboardingOpen,
+    setIsOnboardingOpen,
+    showProductTour,
+    setShowProductTour,
+  } = useAuth(backendBaseUrl);
 
   const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
   const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
@@ -174,6 +184,25 @@ function App() {
   const [csvScope, setCsvScope] = useState<'selected' | 'all'>('selected');
   const [publicSettings, setPublicSettings] = useState<{ maintenance_mode?: boolean; system_announcement?: string }>({});
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+
+  // Stable callback — only recreated if setPublicSettings identity changes (never).
+  const onMaintenanceDetected = useCallback(() => {
+    setPublicSettings(prev => ({ ...prev, maintenance_mode: true }));
+  }, []);
+
+  // authedFetch is stable (useCallback inside hook) and uses the live session
+  // token from useAuth above. Safe to use as a useEffect dependency.
+  const { authedFetch } = useAuthedFetch({ session, userProfile, onMaintenanceDetected });
+
+  // Background ping every 5 minutes to keep last_seen updated.
+  // Kept here (not inside useAuth) so it uses the session-aware authedFetch.
+  useEffect(() => {
+    if (!session) return;
+    const interval = setInterval(() => {
+      authedFetch(`${backendBaseUrl}/api/profile`).catch(() => { });
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [session, authedFetch, backendBaseUrl]);
 
   useEffect(() => {
     const fetchPublicSettings = async () => {
@@ -308,26 +337,6 @@ function App() {
     }
   };
 
-  const authedFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
-    const token = session?.access_token;
-    const impersonateUserId = sessionStorage.getItem('impersonateUserId');
-
-    const headers = {
-      ...(init.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(impersonateUserId ? { 'X-Impersonate-User': impersonateUserId } : {}),
-    };
-    return fetch(input, { ...init, headers }).then(res => {
-      if (res.status === 503) {
-        // Only set maintenance if we are not admin
-        if (userProfile?.role !== 'ADMIN') {
-          setPublicSettings(prev => ({ ...prev, maintenance_mode: true }));
-        }
-      }
-      return res;
-    });
-  };
-
   const getAttachedDesignUrls = (row: any): string[] => {
     if (!row?.attachedDesign) return [];
     const raw = row.attachedDesign;
@@ -446,178 +455,25 @@ function App() {
     }
   };
 
-  // Fetch user profile and handle onboarding trigger
-  const fetchProfile = async (currentSession: Session | null) => {
-    if (!currentSession) {
-      setAuthLoading(false);
-      return;
-    }
 
-    try {
-      const token = currentSession.access_token;
-      const res = await fetch(`${backendBaseUrl}/api/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!res.ok) {
-        setAuthLoading(false);
-        return;
-      }
-
-      const data = await res.json().catch(() => ({}));
-      setUserProfile(data.profile || null);
-
-      // Show onboarding if not completed
-      if (data.profile && !data.profile.onboarding_completed) {
-        setIsOnboardingOpen(true);
-      }
-    } catch (err) {
-      console.error('Error loading profile:', err);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!supabase) {
-      setAuthLoading(false);
-      return;
-    }
-
-    // Initial session check
-    supabase.auth.getSession().then(({ data }) => {
-      const s = data.session ?? null;
-      setSession(s);
-      fetchProfile(s); // This will eventually setAuthLoading(false)
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      const s = currentSession ?? null;
-      setSession(s);
-      if (_event === 'SIGNED_IN') {
-        fetchProfile(s);
-      }
-    });
-
-    return () => {
-      listener?.subscription?.unsubscribe();
-    };
-  }, []);
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [activeCompanyId, setActiveCompanyId] = useState<string | undefined>(() => {
-    // Try to get from localStorage first, fallback to defaultCompanyId
-    const saved = localStorage.getItem('activeCompanyId');
-    return saved || defaultCompanyId;
+  // ── Company, permissions, product tour ───────────────────────────────────
+  const {
+    companies,
+    setCompanies,
+    activeCompanyId,
+    setActiveCompanyId: setActiveCompanyIdWithPersistence,
+    recentCompanyIds,
+    activeCompany,
+    userPermissions,
+    automations,
+  } = useCompany({
+    session,
+    userProfile,
+    collaborators,
+    customRoles,
+    isOnboardingOpen,
+    setShowProductTour,
   });
-  const [recentCompanyIds, setRecentCompanyIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('recentCompanyIds');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Custom setter for activeCompanyId that persists to localStorage
-  const setActiveCompanyIdWithPersistence = (companyId: string | undefined) => {
-    setActiveCompanyId(companyId);
-    if (companyId) {
-      localStorage.setItem('activeCompanyId', companyId);
-    } else {
-      localStorage.removeItem('activeCompanyId');
-    }
-  };
-
-  const routeCompanyId = useMemo(() => {
-    const match = location.pathname.match(/^\/company\/([^/]+)(?:\/|$)/);
-    return match?.[1] ? decodeURIComponent(match[1]) : undefined;
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (!routeCompanyId) return;
-    if (routeCompanyId === activeCompanyId) return;
-    setActiveCompanyIdWithPersistence(routeCompanyId);
-  }, [routeCompanyId, activeCompanyId]);
-
-  useEffect(() => {
-    if (!activeCompanyId) return;
-    setRecentCompanyIds((prev) => {
-      const filtered = prev.filter((id) => id !== activeCompanyId);
-      const next = [activeCompanyId, ...filtered].slice(0, 3);
-      localStorage.setItem('recentCompanyIds', JSON.stringify(next));
-      return next;
-    });
-  }, [activeCompanyId]);
-
-  const activeCompany = useMemo(
-    () => companies.find((c) => c.companyId === activeCompanyId) || null,
-    [companies, activeCompanyId],
-  );
-
-  const userPermissions = useMemo(() => {
-    if (!session?.user || !activeCompany) return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, canAddCollaborators: false, isOwner: false };
-    const userId = session.user.id;
-
-    if (activeCompany.user_id === userId) {
-      return { canApprove: true, canGenerate: true, canCreate: true, canDelete: true, canEditSettings: true, canAddCollaborators: true, isOwner: true, roleName: 'owner' };
-    }
-
-    const collaboratorEntry = collaborators.find(c => c.id === userId);
-    if (!collaboratorEntry) {
-      return { canApprove: false, canGenerate: false, canCreate: false, canDelete: false, canEditSettings: false, canAddCollaborators: false, isOwner: false, roleName: null };
-    }
-
-    const roleName = collaboratorEntry.role;
-    const roleDef = customRoles.find(r => r.name === roleName);
-
-    return {
-      canApprove: roleDef?.permissions?.canApprove || false,
-      canGenerate: roleDef?.permissions?.canGenerate || false,
-      canCreate: roleDef?.permissions?.canCreate || false,
-      canDelete: roleDef?.permissions?.canDelete || false,
-      canEditSettings: roleDef?.permissions?.canEditSettings || false,
-      canAddCollaborators: roleDef?.permissions?.canAddCollaborators || false,
-      isOwner: false,
-      roleName
-    };
-  }, [session, activeCompany, collaborators, customRoles]);
-
-  const automations = useMemo(() => {
-    return (activeCompany as any)?.kanban_settings?.automations || [];
-  }, [activeCompany]);
-
-  // Trigger product tour for new users (including collaborators)
-  useEffect(() => {
-    if (!session) return;
-    // Periodic ping to keep 'last_seen' updated in the background
-    const interval = setInterval(() => {
-      authedFetch(`${backendBaseUrl}/api/profile`).catch(() => { });
-    }, 5 * 60 * 1000); // Pulse every 5 mins
-    return () => clearInterval(interval);
-  }, [session]);
-
-  useEffect(() => {
-    if (!userProfile?.id || !activeCompanyId) return;
-
-    const STORAGE_KEY = `productTourCompleted_${userProfile.id}`;
-    const tourCompleted = localStorage.getItem(STORAGE_KEY);
-    const justOnboarded = sessionStorage.getItem('justCompletedOnboarding');
-
-    // Trigger if:
-    // 1. They just finished onboarding (traditional path)
-    // 2. OR they are a new user/collaborator who hasn't seen the tour yet and is not currently in onboarding
-    if ((justOnboarded || !tourCompleted) && !tourCompleted && !isOnboardingOpen) {
-      // Delay to ensure layout is ready
-      const timer = setTimeout(() => {
-        setShowProductTour(true);
-        if (justOnboarded) sessionStorage.removeItem('justCompletedOnboarding');
-      }, 1500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [activeCompanyId, userProfile?.id, isOnboardingOpen]);
 
   useEffect(() => {
     const isCompanyRoute = /^\/company\/[^/]+/.test(location.pathname);
@@ -1382,40 +1238,60 @@ function App() {
 
   // Load companies for selector
   useEffect(() => {
+    if (!session) return;
+    let canceled = false;
     const loadCompanies = async () => {
-      if (!session) return;
       try {
         setIsBackendWaking(true);
         const res = await authedFetch(`${backendBaseUrl}/api/company`);
-        if (!res.ok) return;
+        if (!res.ok || canceled) return;
         const data = await res.json().catch(() => ({}));
         const list = (data && (data.companies || data)) as any;
         const rows = Array.isArray(list) ? list : [];
-        setCompanies(rows);
-        setIsBackendWaking(false);
-
-        if (!activeCompanyId) {
-          const fallbackId = rows[0]?.companyId as string | undefined;
-          setActiveCompanyIdWithPersistence(fallbackId || defaultCompanyId);
+        if (!canceled) {
+          setCompanies(rows);
+          setIsBackendWaking(false);
+          // Only set fallback if no company is currently selected at all
+          setActiveCompanyIdWithPersistence((current: string | undefined) => {
+            if (current) return current;
+            return (rows[0]?.companyId as string | undefined) || undefined;
+          });
         }
       } catch (err) {
-        console.error('Error loading companies:', err);
-        setIsBackendWaking(true);
-        window.setTimeout(loadCompanies, 3000);
+        if (!canceled) {
+          console.error('Error loading companies:', err);
+          setIsBackendWaking(true);
+          window.setTimeout(loadCompanies, 3000);
+        }
       }
     };
-
     loadCompanies();
-  }, [activeCompanyId, defaultCompanyId, session]);
+    return () => { canceled = true; };
+    // Only re-run when session changes, NOT when activeCompanyId changes.
+    // Switching companies doesn't require re-fetching the company list.
+  }, [session]);
 
-  const loadCalendar = async () => {
-    if (!session) return;
-    if (!activeCompanyId) return;
+  // Ref to hold the current AbortController for calendar loads —
+  // allows us to cancel stale in-flight requests when activeCompanyId changes.
+  const calendarAbortRef = useRef<AbortController | null>(null);
+
+  const loadCalendar = useCallback(async () => {
+    if (!session || !activeCompanyId) return;
+
+    // Cancel any previous in-flight fetch for a different company
+    calendarAbortRef.current?.abort();
+    const controller = new AbortController();
+    calendarAbortRef.current = controller;
+
     setIsLoadingCalendar(true);
     setCalendarError(null);
     try {
       setIsBackendWaking(true);
-      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`);
+      const res = await authedFetch(
+        `${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`,
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted) return; // stale response — ignore
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to load content board');
@@ -1423,13 +1299,16 @@ function App() {
       setCalendarRows(data.contentCalendars || data);
       setIsBackendWaking(false);
     } catch (err: any) {
+      if (err?.name === 'AbortError') return; // intentionally cancelled — not an error
       console.error('Error loading content board:', err);
       setCalendarError(err.message || 'Failed to load content board');
       setIsBackendWaking(true);
     } finally {
-      setIsLoadingCalendar(false);
+      if (!controller.signal.aborted) {
+        setIsLoadingCalendar(false);
+      }
     }
-  };
+  }, [session, activeCompanyId, authedFetch, backendBaseUrl]);
 
   const refreshAppData = async () => {
     const promises: Promise<any>[] = [
@@ -1442,9 +1321,14 @@ function App() {
     await Promise.all(promises);
   };
 
-  // Load existing content board entries for this company
+  // Load calendar when company changes — debounced 300ms so rapid
+  // company switches don't fire multiple simultaneous requests.
   useEffect(() => {
-    loadCalendar();
+    const timer = setTimeout(() => { loadCalendar(); }, 300);
+    return () => {
+      clearTimeout(timer);
+      calendarAbortRef.current?.abort(); // cancel any in-flight fetch on cleanup
+    };
   }, [activeCompanyId, session]);
 
   // Track recently-moved card statuses so the poll doesn't overwrite them

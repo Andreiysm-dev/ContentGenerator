@@ -297,8 +297,51 @@ export const removeCollaborator = async (req, res) => {
 export const searchUsers = async (req, res) => {
   try {
     const { email } = req.query;
-    if (!email || email.length < 2) {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Require at least 3 characters to reduce enumeration surface
+    if (!email || email.length < 3) {
       return res.json({ users: [] });
+    }
+
+    // Security: Only allow users who own or have collaborator-management rights
+    // in at least one company. This prevents any logged-in user from harvesting
+    // all emails in the system — the search is only meant for adding collaborators.
+    const { data: ownedCompanies } = await db
+      .from('company')
+      .select('companyId, custom_roles, collaborator_roles')
+      .eq('user_id', userId)
+      .limit(1);
+
+    let hasPermission = ownedCompanies && ownedCompanies.length > 0;
+
+    if (!hasPermission) {
+      // Also allow collaborators with explicit canAddCollaborators permission
+      const { data: memberCompanies } = await db
+        .from('company')
+        .select('companyId, custom_roles, collaborator_roles')
+        .filter('collaborator_ids', 'cs', `{${userId}}`);
+
+      if (memberCompanies && memberCompanies.length > 0) {
+        for (const company of memberCompanies) {
+          const roleName = company.collaborator_roles?.[userId];
+          if (roleName) {
+            const roleDef = company.custom_roles?.find(r => r.name === roleName);
+            if (roleDef?.permissions?.canAddCollaborators) {
+              hasPermission = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!hasPermission) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to search users' });
     }
 
     const { data: { users }, error: adminError } = await db.auth.admin.listUsers();
@@ -306,9 +349,9 @@ export const searchUsers = async (req, res) => {
       return res.status(500).json({ error: 'Failed to query users' });
     }
 
-    // Filter users by email (prefix match or contains)
+    // Filter users by email (contains match), exclude the requester themselves
     const filteredUsers = users
-      .filter(u => u.email.toLowerCase().includes(email.toLowerCase()))
+      .filter(u => u.id !== userId && u.email?.toLowerCase().includes(email.toLowerCase()))
       .map(u => ({ id: u.id, email: u.email }))
       .slice(0, 5); // Limit to top 5 results
 

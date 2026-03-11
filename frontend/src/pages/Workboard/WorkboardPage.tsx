@@ -62,6 +62,11 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     // Tracks the target column during an active drag — updated by onDragOver via ref
     // so onDragEnd always has the latest value without stale closure issues.
     const dragTargetColumnRef = useRef<string | null>(null);
+    // Tracks the last column we actually applied to posts state in onDragOver,
+    // to skip redundant setPosts calls on fast drags (prevents render flooding).
+    const lastDragOverColumnRef = useRef<string | null>(null);
+    // Guards against overlapping API calls when cards are moved rapidly.
+    const isMovingRef = useRef<Set<string>>(new Set());
     const lastLoadedCompanyIdRef = useRef<string | null>(null);
 
     // Automation state
@@ -302,6 +307,12 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     };
 
     const executeStatusChange = async (postId: string, newStatus: string, skipAutomation = false) => {
+        // In-flight guard: if this card already has a pending API call, skip.
+        // This prevents rapid drags from firing overlapping requests that can
+        // race each other and corrupt local state.
+        if (isMovingRef.current.has(postId)) return;
+        isMovingRef.current.add(postId);
+
         const row = posts.find(p => p.id === postId);
         const originalStatus = row?.status;
 
@@ -359,8 +370,13 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
         } catch (err: any) {
             console.error('Error in executeStatusChange:', err);
             notify(err.message || 'Error moving card', 'error');
-            // Revert to original state on failure
-            fetchPosts();
+            // Revert to original status using local state only — avoids a fetchPosts()
+            // call mid-drag which can race with ongoing drag state updates.
+            if (originalStatus !== undefined) {
+                setPosts(prev => prev.map(p => p.id === postId ? { ...p, status: originalStatus } : p));
+            }
+        } finally {
+            isMovingRef.current.delete(postId);
         }
     };
 
@@ -420,6 +436,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
 
     const onDragStart = (event: DragStartEvent) => {
         dragTargetColumnRef.current = null;
+        lastDragOverColumnRef.current = null; // reset per-drag tracking
         if (event.active.data.current?.type === 'Post') {
             // Read directly from posts state — accurate at drag start before any mutations
             const post = posts.find(p => p.id === event.active.id as string);
@@ -450,6 +467,13 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
 
         if (targetStatus) {
             dragTargetColumnRef.current = targetStatus;
+
+            // KEY FIX: only call setPosts when the visual target column actually changed.
+            // onDragOver fires on every pointer-move event (~60fps), so without this guard
+            // React gets flooded with state updates on fast drags, causing render loops.
+            if (lastDragOverColumnRef.current === targetStatus) return;
+            lastDragOverColumnRef.current = targetStatus;
+
             setPosts(tasks => {
                 const activeIndex = tasks.findIndex(t => t.id === activeId);
                 if (activeIndex === -1 || tasks[activeIndex].status === targetStatus) return tasks;

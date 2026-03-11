@@ -1,6 +1,35 @@
 import express from 'express';
 import { supabase as supabaseAdmin } from '../database/db.js';
 import axios from 'axios';
+import crypto from 'crypto';
+
+// --- OAuth State Helpers ---
+// Signs the state payload with HMAC-SHA256 so it cannot be tampered with.
+// Format: base64(payload).hmacSignature
+const signOAuthState = (payload) => {
+    const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback-oauth-secret';
+    const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const sig = crypto.createHmac('sha256', secret).update(encoded).digest('hex');
+    return `${encoded}.${sig}`;
+};
+
+// Verifies the HMAC signature and returns the decoded payload, or null if invalid.
+const verifyOAuthState = (state) => {
+    try {
+        const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback-oauth-secret';
+        const [encoded, sig] = state.split('.');
+        if (!encoded || !sig) return null;
+        const expectedSig = crypto.createHmac('sha256', secret).update(encoded).digest('hex');
+        // Constant-time comparison to prevent timing attacks
+        const sigBuffer = Buffer.from(sig, 'hex');
+        const expectedBuffer = Buffer.from(expectedSig, 'hex');
+        if (sigBuffer.length !== expectedBuffer.length) return null;
+        if (!crypto.timingSafeEqual(sigBuffer, expectedBuffer)) return null;
+        return JSON.parse(Buffer.from(encoded, 'base64url').toString());
+    } catch {
+        return null;
+    }
+};
 
 const router = express.Router();
 
@@ -39,21 +68,23 @@ router.get('/auth/linkedin/connect', (req, res) => {
         return res.status(400).json({ error: 'Missing companyId' });
     }
 
-    // Generate state to prevent CSRF and pass companyId through
-    const state = JSON.stringify({ companyId, userId: user.id, nonce: Math.random().toString(36).substring(7) });
-    const encodedState = Buffer.from(state).toString('base64');
+    // Generate HMAC-signed state to prevent CSRF attacks.
+    // nonce uses crypto.randomBytes for cryptographic strength.
+    const signedState = signOAuthState({
+        companyId,
+        userId: user.id,
+        nonce: crypto.randomBytes(16).toString('hex')
+    });
 
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: process.env.LINKEDIN_CLIENT_ID,
         redirect_uri: getRedirectUri(),
-        state: encodedState,
+        state: signedState,
         scope: LINKEDIN_SCOPES.join(' '),
     });
 
     const url = `${LINKEDIN_AUTH_URL}?${params.toString()}`;
-    console.log('LinkedIn Connect URL:', url); // Debugging
-    console.log('Redirect URI sent:', getRedirectUri()); // Debugging
     res.json({ url }); // Return the URL for frontend to redirect
 });
 
@@ -68,8 +99,12 @@ router.get('/auth/linkedin/callback', async (req, res) => {
     }
 
     try {
-        // Decode state
-        const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
+        // Verify the HMAC-signed state to prevent CSRF / state tampering
+        const decodedState = verifyOAuthState(state);
+        if (!decodedState) {
+            console.error('LinkedIn OAuth: Invalid or tampered state parameter');
+            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/settings?error=linkedin_invalid_state`);
+        }
         const { companyId, userId } = decodedState;
 
         // Exchange code for Access Token
@@ -138,8 +173,12 @@ router.get('/auth/facebook/connect', (req, res) => {
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
     if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
 
-    const state = JSON.stringify({ companyId, userId: user.id, nonce: Math.random().toString(36).substring(7) });
-    const encodedState = Buffer.from(state).toString('base64');
+    // Generate HMAC-signed state to prevent CSRF attacks.
+    const encodedState = signOAuthState({
+        companyId,
+        userId: user.id,
+        nonce: crypto.randomBytes(16).toString('hex')
+    });
 
     const params = new URLSearchParams({
         client_id: process.env.FACEBOOK_APP_ID,
@@ -150,7 +189,7 @@ router.get('/auth/facebook/connect', (req, res) => {
     });
 
     const url = `${FACEBOOK_AUTH_URL}?${params.toString()}`;
-    res.json({ url });
+    res.json({ url }); // Return the URL for frontend to redirect
 });
 
 // 4. GET /api/auth/facebook/callback
@@ -163,7 +202,12 @@ router.get('/auth/facebook/callback', async (req, res) => {
     }
 
     try {
-        const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
+        // Verify the HMAC-signed state to prevent CSRF / state tampering
+        const decodedState = verifyOAuthState(state);
+        if (!decodedState) {
+            console.error('Facebook OAuth: Invalid or tampered state parameter');
+            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/settings?error=facebook_invalid_state`);
+        }
         const { companyId } = decodedState;
 
         // A. Exchange code for User Access Token
