@@ -32,10 +32,11 @@ initEmailScheduler();
 const app = express();
 const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
 
-// Trust the first proxy hop (Render/Cloudflare) so Express reads the real
-// client IP from X-Forwarded-For instead of the proxy's shared IP.
-// Without this, ALL users share one rate-limit bucket in production.
-app.set('trust proxy', 1);
+// Trust the first proxy hop (Render/Cloudflare) only in production environments.
+// In local development, trusting a proxy when none exists can cause ERR_ERL_KEY_GEN_IPV6.
+if (process.env.NODE_ENV === "production" || process.env.RENDER) {
+  app.set('trust proxy', 1);
+}
 
 // --- Security Headers ---
 app.use(helmet());
@@ -76,6 +77,7 @@ const generalLimiter = rateLimit({
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
   message: { error: 'Too many requests, please try again later.' },
   keyGenerator: (req) => {
     // Extract user ID from Bearer token if present
@@ -99,6 +101,7 @@ const aiLimiter = rateLimit({
   max: 40,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
   message: { error: 'Too many AI generation requests, please wait a moment.' },
   keyGenerator: (req) => {
     try {
@@ -143,4 +146,6 @@ app.use("/api", assistantRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/audit", auditRoutes);
 
-app.listen(PORT, () => { });
+app.listen(PORT, () => {
+  console.log(`Backend is running on port ${PORT}`);
+});
