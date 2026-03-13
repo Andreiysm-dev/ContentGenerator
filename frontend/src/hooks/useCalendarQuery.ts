@@ -46,5 +46,6 @@ export function useCalendarQuery(
     },
     enabled: !!companyId && enabled,
     staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
   });
 }

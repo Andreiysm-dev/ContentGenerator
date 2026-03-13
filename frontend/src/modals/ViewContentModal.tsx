@@ -114,12 +114,50 @@ export function ViewContentModal({
     const [editingListTitle, setEditingListTitle] = useState('');
     const [isFullscreenImage, setIsFullscreenImage] = useState(false);
     const [modalActiveImageIndex, setModalActiveImageIndex] = useState(0);
+    const [persistedImageUrls, setPersistedImageUrls] = useState<string[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+    const resolvedImageUrls = React.useMemo(() => {
+        if (!selectedRow) return [];
+
+        const normalizedMediaUrls = Array.isArray(selectedRow.media_urls)
+            ? selectedRow.media_urls
+                .map((mediaUrl: string) => getImageGeneratedUrl({ imageGenerated: mediaUrl }))
+                .filter(Boolean) as string[]
+            : [];
+
+        const fallbackUrls = [
+            getImageGeneratedUrl(selectedRow),
+            typeof selectedRow.imageUrl === 'string' ? selectedRow.imageUrl : null,
+            typeof selectedRow.imageGeneratedUrl === 'string' ? selectedRow.imageGeneratedUrl : null,
+        ].filter(Boolean) as string[];
+
+        return Array.from(new Set([...normalizedMediaUrls, ...fallbackUrls]));
+    }, [getImageGeneratedUrl, selectedRow]);
+
+    const displayImageUrls = resolvedImageUrls.length > 0 ? resolvedImageUrls : persistedImageUrls;
+    const activeImageUrl = displayImageUrls[modalActiveImageIndex] || displayImageUrls[0] || null;
 
 
     const currentStatusInModal = getStatusValue(selectedRow?.status);
     const lockRuleInModal = automations?.find(a => a.type === 'access_rule' && a.columnId === currentStatusInModal);
     const isLockedInModal = !!(lockRuleInModal && !userPermissions?.isOwner && userPermissions?.roleName !== lockRuleInModal.roleName);
+
+    React.useEffect(() => {
+        setModalActiveImageIndex(0);
+        setPersistedImageUrls(resolvedImageUrls);
+    }, [selectedRow?.contentCalendarId]);
+
+    React.useEffect(() => {
+        if (resolvedImageUrls.length > 0) {
+            setPersistedImageUrls(resolvedImageUrls);
+        }
+    }, [resolvedImageUrls]);
+
+    React.useEffect(() => {
+        if (modalActiveImageIndex < displayImageUrls.length) return;
+        setModalActiveImageIndex(0);
+    }, [displayImageUrls.length, modalActiveImageIndex]);
 
     React.useEffect(() => {
         if (isOpen && selectedRow) {
@@ -716,7 +754,7 @@ export function ViewContentModal({
                                         <Layout size={14} className="text-blue-500" />
                                         Post Visual
                                     </h3>
-                                    {getImageGeneratedUrl(selectedRow) && (
+                                    {activeImageUrl && (
                                         <button
                                             onClick={() => setIsFullscreenImage(true)}
                                             className="text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg transition-all active:scale-95"
@@ -728,31 +766,22 @@ export function ViewContentModal({
                                 </div>
                                 <div className="w-full bg-slate-100 rounded-[1.5rem] border-4 border-white shadow-xl relative overflow-hidden group max-w-2xl mx-auto">
                                     {(() => {
-                                        const urls = [];
-                                        if (selectedRow?.media_urls && Array.isArray(selectedRow.media_urls)) {
-                                            urls.push(...selectedRow.media_urls);
-                                        } else {
-                                            const single = getImageGeneratedUrl(selectedRow);
-                                            if (single) urls.push(single);
-                                        }
-
-                                        if (urls.length > 0) {
-                                            const currentUrl = urls[modalActiveImageIndex] || urls[0];
+                                        if (displayImageUrls.length > 0 && activeImageUrl) {
                                             return (
                                                 <div className="relative group/img">
                                                     <div onClick={() => setIsFullscreenImage(true)} className="cursor-pointer">
                                                         <img
-                                                            src={`${currentUrl}${currentUrl.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
+                                                            src={`${activeImageUrl}${activeImageUrl.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
                                                             alt="Generated visual"
                                                             className="w-full h-auto object-contain mx-auto transition-all duration-300"
                                                             style={{ maxHeight: '320px' }}
                                                         />
                                                     </div>
 
-                                                    {urls.length > 1 && (
+                                                    {displayImageUrls.length > 1 && (
                                                         <>
                                                             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-                                                                {urls.map((_, i) => (
+                                                                {displayImageUrls.map((_, i) => (
                                                                     <div
                                                                         key={i}
                                                                         className={`h-1.5 rounded-full transition-all duration-300 ${i === modalActiveImageIndex ? 'w-4 bg-white shadow-md' : 'w-1.5 bg-white/40'}`}
@@ -762,7 +791,7 @@ export function ViewContentModal({
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setModalActiveImageIndex(prev => prev > 0 ? prev - 1 : urls.length - 1);
+                                                                    setModalActiveImageIndex(prev => prev > 0 ? prev - 1 : displayImageUrls.length - 1);
                                                                 }}
                                                                 className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full opacity-0 group-hover/img:opacity-100 transition-all backdrop-blur-sm"
                                                             >
@@ -771,7 +800,7 @@ export function ViewContentModal({
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setModalActiveImageIndex(prev => prev < urls.length - 1 ? prev + 1 : 0);
+                                                                    setModalActiveImageIndex(prev => prev < displayImageUrls.length - 1 ? prev + 1 : 0);
                                                                 }}
                                                                 className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full opacity-0 group-hover/img:opacity-100 transition-all backdrop-blur-sm"
                                                             >
@@ -1702,7 +1731,7 @@ export function ViewContentModal({
             </div>
 
             {/* Lightbox / Fullscreen Image Overlay */}
-            {isFullscreenImage && getImageGeneratedUrl(selectedRow) && (
+            {isFullscreenImage && activeImageUrl && (
                 <div
                     className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 sm:p-20 animate-in fade-in duration-300"
                     onClick={() => setIsFullscreenImage(false)}
@@ -1714,7 +1743,7 @@ export function ViewContentModal({
                         <X size={32} />
                     </button>
                     <img
-                        src={`${getImageGeneratedUrl(selectedRow)}${getImageGeneratedUrl(selectedRow)?.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
+                        src={`${activeImageUrl}${activeImageUrl.includes('?') ? '&' : '?'}v=${imagePreviewNonce}`}
                         alt="Fullscreen view"
                         className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-500"
                     />

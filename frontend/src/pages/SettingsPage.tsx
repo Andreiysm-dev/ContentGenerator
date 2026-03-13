@@ -113,7 +113,7 @@ export type CompanySettingsShellProps = {
   reviewerRulesUnlocked: boolean;
   newCollaboratorEmail: string;
   setNewCollaboratorEmail: (value: string) => void;
-  onAddCollaborator: () => void;
+  onAddCollaborator: (emailOverride?: string) => void;
   onRemoveCollaborator: (id: string) => void;
   onTransferOwnership?: (newOwnerId: string) => void;
   userPermissions?: {
@@ -456,7 +456,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
   // Handle user search for collaborators
   useEffect(() => {
     const searchUsers = async () => {
-      if (!newCollaboratorEmail || newCollaboratorEmail.length < 2) {
+      if (!newCollaboratorEmail || newCollaboratorEmail.trim().length < 6) {
         setUserSearchResults([]);
         setShowUserDropdown(false);
         return;
@@ -702,12 +702,13 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                             value={newCollaboratorEmail}
                             onChange={(e) => {
                               setNewCollaboratorEmail(e.target.value);
-                              if (e.target.value.length >= 2) setShowUserDropdown(true);
+                              if (e.target.value.trim().length >= 6) setShowUserDropdown(true);
+                              else setShowUserDropdown(false);
                             }}
                             onKeyPress={(e) => e.key === "Enter" && onAddCollaborator()}
                             className="h-10 rounded-xl border-slate-200 focus:ring-[#3fa9f5]/20"
                           />
-                          <button className="h-10 px-6 bg-[#3fa9f5] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2f97e6] transition-all flex items-center gap-2 shadow-sm" type="button" onClick={onAddCollaborator}>
+                          <button className="h-10 px-6 bg-[#3fa9f5] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2f97e6] transition-all flex items-center gap-2 shadow-sm" type="button" onClick={() => onAddCollaborator()}>
                             <UserPlus size={14} />
                             Invite
                           </button>
@@ -722,7 +723,6 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                                 onClick={() => {
                                   setNewCollaboratorEmail(user.email);
                                   setShowUserDropdown(false);
-                                  onAddCollaborator();
                                 }}
                               >
                                 <div className="flex items-center gap-3">

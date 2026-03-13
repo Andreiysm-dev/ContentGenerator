@@ -94,3 +94,39 @@ export const getImageGeneratedSignature = (row: any | null): string | null => {
     return String(ig);
   }
 };
+
+export const getStatusValue = (status: any, columns: Array<{ id?: string; title?: string }> = []): string => {
+  if (status === null || status === undefined) return '';
+  let normalizedStatus: any = '';
+
+  if (typeof status === 'string') {
+    normalizedStatus = status;
+  } else if (typeof status === 'object') {
+    const actualStatus = status.status || status;
+    if (typeof actualStatus === 'string') {
+      normalizedStatus = actualStatus;
+    } else if (typeof actualStatus === 'object') {
+      normalizedStatus = actualStatus.state || actualStatus.value || actualStatus.status || '';
+    }
+  }
+
+  if (typeof normalizedStatus !== 'string') {
+    try {
+      normalizedStatus = String(normalizedStatus || '');
+    } catch {
+      normalizedStatus = '';
+    }
+  }
+
+  if (!normalizedStatus || normalizedStatus === '[object Object]') return '';
+
+  const match = columns.find(
+    (column) =>
+      String(column.id || '').toLowerCase() === normalizedStatus.toLowerCase() ||
+      String(column.title || '').toLowerCase() === normalizedStatus.toLowerCase(),
+  );
+
+  if (match?.title) return match.title;
+
+  return normalizedStatus.replace(/_/g, ' ').replace(/\b\w/g, (char: string) => char.toUpperCase());
+};

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useQueryClient } from '@tanstack/react-query';
 import {
 
   Plug,
@@ -41,7 +40,7 @@ import { CreatePage } from '@/pages/CreatePage';
 import { StudioEditorPage } from '@/pages/StudioEditorPage';
 import { StudioPage } from '@/pages/StudioPage';
 import { ProfilePage } from '@/pages/ProfilePage';
-import { SettingsPage, type CompanySettingsTab } from '@/pages/SettingsPage';
+import { SettingsPage, type CompanySettingsShellProps, type CompanySettingsTab } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { IntegrationsPage } from '@/pages/IntegrationsPage';
 import { PostInsightsPage } from '@/pages/PostInsightsPage';
@@ -57,45 +56,41 @@ import { WorkboardPage } from './pages/Workboard/WorkboardPage';
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { MaintenancePage } from '@/pages/MaintenancePage';
 import { SchedulerPage } from '@/pages/SchedulerPage';
+import { AppOverlays } from '@/app/AppOverlays';
+import { ADMIN_ROUTES, buildAdminDashboardProps, buildSettingsPageProps, COMPANY_SETTINGS_ROUTES } from '@/app/routeBuilders';
 
 
 
-import {
-  AddCompanyModal,
-  CsvExportModal,
-  CopyModal,
-  DraftPublishModal,
-  BulkImportModal,
-  ConfirmModal,
-  ViewContentModal,
-  ImageGenerationModal,
-  OnboardingModal,
-  type OnboardingData,
-} from '@/modals';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 import { AdminSidebar } from '@/components/AdminSidebar';
-import { ProductTour } from '@/components/ProductTour';
 import './App.css';
 import { NotificationProvider } from '@/contexts/NotificationContext';
-import { AIAssistant } from '@/components/AIAssistant';
+import {
+  audienceRoleOptions,
+  backendBaseUrl,
+  defaultCompanyId,
+  industryOptions,
+  noSayOptions,
+  painPointOptions,
+  revisionWebhookUrl,
+  statusOptions,
+} from '@/constants/app';
 import { useAuthedFetch } from '@/hooks/useAuthedFetch';
 import { useAuth } from '@/hooks/useAuth';
+import { useBrandIntelligence } from '@/hooks/useBrandIntelligence';
+import { useCalendarBoard } from '@/hooks/useCalendarBoard';
+import { useCompanyLifecycle } from '@/hooks/useCompanyLifecycle';
 import { useCompany } from '@/hooks/useCompany';
-import { useContentActions } from '@/hooks/useContentActions';type FormState = {
-  date: string;
-  brandHighlight: string;
-  crossPromo: string;
-  theme: string;
-  contentType: string;
-  channels: string[];
-  targetAudience: string;
-  primaryGoal: string;
-  cta: string;
-  cardName: string;
-  promoType: string;
-  caption: string;
-};
+import { useContentActions } from '@/hooks/useContentActions';
+import { useTeamAndIntegrations } from '@/hooks/useTeamAndIntegrations';
+import type { FormState } from '@/types/app';
+import {
+  getAttachedDesignUrls,
+  getImageGeneratedSignature,
+  getImageGeneratedUrl,
+  getStatusValue as getStatusValueForColumns,
+} from '@/utils/contentUtils';
 
 
 function BrandRedirect() {
@@ -108,15 +103,7 @@ function BrandRedirect() {
 
 import { supabase } from '@/lib/supabase';
 
-const backendBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-const supabaseBaseUrl = (import.meta.env as any).VITE_SUPABASE_URL || '';
-const revisionWebhookUrl = (import.meta.env as any).VITE_MAKE_REVISION_WEBHOOK || '';
-const defaultCompanyId = import.meta.env.VITE_COMPANY_ID || '';
-const VIEW_MODAL_POLL_MS = 1500;
-const CALENDAR_POLL_MS = 2500;
-
 function App() {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   // --- Auth: session, profile, onboarding, product tour ---
@@ -150,27 +137,7 @@ function App() {
   });
 
 
-  const [calendarRows, setCalendarRows] = useState<any[]>([]);
-  const [isLoadingCalendar, setIsLoadingCalendar] = useState(false);
-  const [calendarError, setCalendarError] = useState<string | null>(null);
-  const [isBackendWaking, setIsBackendWaking] = useState(false);
-  const [calendarSearch, setCalendarSearch] = useState('');
-  const [calendarStatusFilter, setCalendarStatusFilter] = useState('all');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number | 'all'>(10);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<any | null>(null);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [imagePreviewNonce, setImagePreviewNonce] = useState(0);
-  const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
-  const [draftPublishIntent, setDraftPublishIntent] = useState<'draft' | 'ready'>('draft');
-  const [isUploadingDesigns, setIsUploadingDesigns] = useState(false);
-
   const [publicSettings, setPublicSettings] = useState<{ maintenance_mode?: boolean; system_announcement?: string }>({});
-  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
   // Stable callback — only recreated if setPublicSettings identity changes (never).
   const onMaintenanceDetected = useCallback(() => {
@@ -206,244 +173,90 @@ function App() {
     fetchPublicSettings();
   }, [backendBaseUrl]);
 
-  const [collaborators, setCollaborators] = useState<Array<{ id: string; email: string; role: string }>>([]);
-  const [customRoles, setCustomRoles] = useState<Array<{ name: string; description?: string; permissions?: { canApprove: boolean; canGenerate: boolean; canCreate: boolean; canDelete: boolean; canEditSettings: boolean; canAddCollaborators: boolean } }>>([]);
-  const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
-  const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
 
-  const fetchCollaborators = async (companyId: string) => {
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${companyId}`);
-      const data = await res.json();
-      if (!res.ok) {
-        notify(data.error || 'Failed to load collaborators.', 'error');
-        return;
-      }
-      setCollaborators(data.collaborators || []);
-      setCustomRoles(data.customRoles || []);
-    } catch (err) {
-      notify('Failed to load collaborators.', 'error');
-    }
-  };
-
-
-  const handleAddCollaborator = async () => {
-    if (!newCollaboratorEmail) {
-      notify('Please enter an email address.', 'info');
-      return;
-    }
-    if (!activeCompanyId) {
-      notify('Company context missing. Please refresh the page.', 'error');
-      console.error('[handleAddCollaborator] activeCompanyId is null');
-      return;
-    }
-
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newCollaboratorEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 404) {
-          notify(data.error || 'User with this email not found or not registered.', 'error');
-        } else if (res.status === 409) {
-          notify('User is already a collaborator.', 'error');
-        } else {
-          notify(data.error || 'Failed to add collaborator.', 'error');
-        }
-        return;
-      }
-      notify('Collaborator added successfully!', 'success');
-      setNewCollaboratorEmail('');
-      await fetchCollaborators(activeCompanyId);
-    } catch (err) {
-      console.error('handleAddCollaborator error:', err);
-      notify('Failed to add collaborator. Please check your connection.', 'error');
-    }
-  };
-
-  const handleUpdateCustomRoles = async (roles: any[]) => {
-    if (!activeCompanyId) return;
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}/roles`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customRoles: roles }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        notify(data.error || 'Failed to update custom roles.', 'error');
-        return;
-      }
-      setCustomRoles(roles);
-      notify('Custom roles updated!', 'success');
-    } catch (err) {
-      console.error('handleUpdateCustomRoles error:', err);
-      notify('Failed to update custom roles. This might be due to missing database columns.', 'error');
-    }
-  };
-
-  const handleAssignRole = async (targetUserId: string, role: string) => {
-    if (!activeCompanyId) return;
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}/${targetUserId}/role`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        notify(data.error || 'Failed to assign role.', 'error');
-        return;
-      }
-      setCollaborators(prev => prev.map(c => c.id === targetUserId ? { ...c, role } : c));
-      notify(`Role updated to ${role}`, 'success');
-    } catch (err) {
-      console.error('handleAssignRole error:', err);
-      notify('Failed to assign role. This might be due to missing database columns.', 'error');
-    }
-  };
-
-  const handleRemoveCollaborator = async (id: string) => {
-    if (!activeCompanyId) return;
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/collaborators/${activeCompanyId}/${id}`, {
-        method: 'DELETE',
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        notify(data.error || 'Failed to remove collaborator.', 'error');
-        return;
-      }
-      notify('Collaborator removed.', 'success');
-      await fetchCollaborators(activeCompanyId);
-    } catch (err) {
-      notify('Failed to remove collaborator.', 'error');
-    }
-  };
-
-  const getAttachedDesignUrls = (row: any): string[] => {
-    if (!row?.attachedDesign) return [];
-    const raw = row.attachedDesign;
-    if (Array.isArray(raw)) return raw.filter(Boolean);
-    if (typeof raw === 'string') {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed.filter(Boolean);
-        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.urls)) return parsed.urls.filter(Boolean);
-      } catch {
-        return raw ? [raw] : [];
-      }
-    }
-    if (typeof raw === 'object' && Array.isArray((raw as any).urls)) return (raw as any).urls.filter(Boolean);
-    return [];
-  };
-
-  const handleUploadDesigns = async (files: FileList | null) => {
-    if (!files || !files.length) return;
-    const client = supabase;
-    if (!client) {
-      notify('Supabase is not configured.', 'error');
-      return;
-    }
-    if (!selectedRow) return;
-    setIsUploadingDesigns(true);
-    try {
-      const uploads = Array.from(files).map(async (file) => {
-        // Validate file size (max 50MB)
-        if (file.size > 50 * 1024 * 1024) {
-          throw new Error(`File "${file.name}" is too large (max 50MB)`);
-        }
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const path = `designs/${selectedRow.contentCalendarId}-${Date.now()}-${safeName}`;
-        const { error } = await client.storage
-          .from('generated-images')
-          .upload(path, file, { upsert: true });
-        if (error) throw error;
-        const { data } = client.storage.from('generated-images').getPublicUrl(path);
-        return data?.publicUrl || '';
-      });
-
-      const uploadedUrls = (await Promise.all(uploads)).filter(Boolean);
-      const existing = getAttachedDesignUrls(selectedRow);
-      const nextDesigns = [...existing, ...uploadedUrls];
-
-      const payload = { attachedDesign: nextDesigns };
-      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '');
-        notify(`Failed to save designs. ${msg}`, 'error');
-        return;
-      }
-      setSelectedRow((prev: any) => (prev ? { ...prev, attachedDesign: nextDesigns } : prev));
-      setCalendarRows((prev) =>
-        prev.map((row) =>
-          row.contentCalendarId === selectedRow.contentCalendarId
-            ? { ...row, attachedDesign: nextDesigns }
-            : row,
-        ),
-      );
-      notify('Designs uploaded.', 'success');
-    } catch (err: any) {
-      console.error('Design upload failed', err);
-      const errorMsg = err.message || 'Failed to upload designs';
-      notify(errorMsg, 'error');
-      if (errorMsg.toLowerCase().includes('size') || errorMsg.toLowerCase().includes('limit')) {
-        notify('Hint: Check your Supabase Storage bucket max file size settings.', 'info');
-      }
-    } finally {
-      setIsUploadingDesigns(false);
-    }
-  };
-
-  const handleDraftPublishIntent = async (overrideStatus?: string) => {
-    if (!selectedRow) return;
-
-    const studioSettings = activeCompany?.kanban_settings?.studio_settings;
-    const nextStatus = overrideStatus || (draftPublishIntent === 'ready'
-      ? (studioSettings?.postedStatus || 'Ready')
-      : (selectedRow.status ?? ''));
-
-    const nextPostStatus = draftPublishIntent === 'ready' ? 'ready' : 'draft';
-    const payload = {
-      status: nextStatus,
-      post_status: nextPostStatus,
-    };
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${selectedRow.contentCalendarId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '');
-        notify(`Failed to update status. ${msg}`, 'error');
-        return;
-      }
-      setSelectedRow((prev: any) => (prev ? { ...prev, ...payload } : prev));
-      setCalendarRows((prev) =>
-        prev.map((row) =>
-          row.contentCalendarId === selectedRow.contentCalendarId ? { ...row, ...payload } : row,
-        ),
-      );
-      setIsDraftModalOpen(false);
-      notify(
-        draftPublishIntent === 'ready' ? 'Marked as ready to publish.' : 'Saved as draft.',
-        'success',
-      );
-    } catch (err) {
-      notify('Failed to update status.', 'error');
-    }
-  };
 
 
   // ── Company, permissions, product tour ───────────────────────────────────
+  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
+  const [preDefinedPlan, setPreDefinedPlan] = useState<any[] | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    confirmVariant?: 'primary' | 'danger';
+    thirdLabel?: string;
+    thirdVariant?: 'primary' | 'danger' | 'ghost';
+  } | null>(null);
+  const confirmResolverRef = useRef<((value: boolean | 'third') => void) | null>(null);
+
+  const notify = useCallback((message: string, tone: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, tone });
+  }, []);
+
+  const requestConfirm = useCallback((config: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    confirmVariant?: 'primary' | 'danger';
+    thirdLabel?: string;
+    thirdVariant?: 'primary' | 'danger' | 'ghost';
+  }) => {
+    setConfirmConfig({
+      title: config.title,
+      description: config.description,
+      confirmLabel: config.confirmLabel,
+      cancelLabel: config.cancelLabel,
+      confirmVariant: config.confirmVariant,
+      thirdLabel: config.thirdLabel,
+      thirdVariant: config.thirdVariant,
+    });
+    setIsConfirmOpen(true);
+    return new Promise<boolean | 'third'>((resolve) => {
+      confirmResolverRef.current = resolve;
+    });
+  }, []);
+
+  const resolveConfirm = useCallback((value: boolean | 'third') => {
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(value);
+      confirmResolverRef.current = null;
+    }
+    setIsConfirmOpen(false);
+    setConfirmConfig(null);
+  }, []);
+
+  const routeCompanyId = useMemo(() => {
+    const match = location.pathname.match(/^\/company\/([^/]+)(?:\/|$)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+  }, [location.pathname]);
+
+  const {
+    collaborators,
+    customRoles,
+    connectedAccounts,
+    newCollaboratorEmail,
+    setNewCollaboratorEmail,
+    handleAddCollaborator,
+    handleUpdateCustomRoles,
+    handleAssignRole,
+    handleRemoveCollaborator,
+    handleConnectLinkedIn,
+    handleConnectFacebook,
+    handleDisconnectAccount,
+  } = useTeamAndIntegrations({
+    companyId: routeCompanyId,
+    pathname: location.pathname,
+    session,
+    authedFetch,
+    backendBaseUrl,
+    notify,
+    requestConfirm,
+  });
+
   const {
     companies,
     activeCompanyId,
@@ -463,806 +276,218 @@ function App() {
     backendBaseUrl,
   });
 
-  useEffect(() => {
-    const isCompanyRoute = /^\/company\/[^/]+/.test(location.pathname);
-    if (!isCompanyRoute || !activeCompanyId || !session) return;
-    fetchCollaborators(activeCompanyId);
-  }, [location.pathname, activeCompanyId, session]);
-
-  const fetchConnectedAccounts = async (companyId: string) => {
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/social/${companyId}/accounts`);
-      const data = await res.json();
-      if (!res.ok) {
-        // notify(data.error || 'Failed to load social accounts.', 'error');
-        return;
-      }
-      setConnectedAccounts(data.accounts || []);
-    } catch (err) {
-      console.error('Failed to load social accounts.', err);
-    }
-  };
-
-
-
-
-  const handleConnectLinkedIn = async () => {
-    if (!activeCompanyId) return;
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/auth/linkedin/connect?companyId=${activeCompanyId}`);
-      if (!res.ok) {
-        notify('Failed to initiate LinkedIn connection.', 'error');
-        return;
-      }
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (e) {
-      console.error('LinkedIn connect error:', e);
-      notify('Failed to connect LinkedIn.', 'error');
-    }
-  };
-
-  const handleConnectFacebook = async () => {
-    if (!activeCompanyId) return;
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/auth/facebook/connect?companyId=${activeCompanyId}`);
-      if (!res.ok) {
-        notify('Failed to initiate Facebook connection.', 'error');
-        return;
-      }
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (e) {
-      console.error('Facebook connection error', e);
-      notify('An error occurred. Please try again.', 'error');
-    }
-  };
-
-  const handleDisconnectAccount = async (accountId: string) => {
-    if (!activeCompanyId) return;
-
-    try {
-      const confirmed = await requestConfirm({
-        title: 'Disconnect Account?',
-        description: 'Are you sure you want to disconnect this social account? You will need to reconnect it to publish content again.',
-        confirmLabel: 'Disconnect',
-        cancelLabel: 'Cancel',
-        confirmVariant: 'danger',
-      });
-
-      if (!confirmed) return;
-
-      const res = await authedFetch(`${backendBaseUrl}/api/social/${activeCompanyId}/accounts/${accountId}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to disconnect account');
-      }
-
-      notify('Account disconnected successfully', 'success');
-      setConnectedAccounts((prev) => prev.filter((acc) => acc.id !== accountId));
-    } catch (err: any) {
-      console.error('Error disconnecting account:', err);
-      notify(err.message || 'Failed to disconnect account', 'error');
-    }
-  };
-
-  useEffect(() => {
-    if (!activeCompanyId || !session) {
-      setConnectedAccounts([]);
-      return;
-    }
-    fetchConnectedAccounts(activeCompanyId);
-  }, [activeCompanyId, session]);
-  const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
-  const [newCompanyName, setNewCompanyName] = useState('');
-  const [newCompanyDescription, setNewCompanyDescription] = useState('');
-  const [brandKbId, setBrandKbId] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState('');
-  const [companyDescription, setCompanyDescription] = useState('');
-  const [brandPack, setBrandPack] = useState('');
-  const [brandCapability, setBrandCapability] = useState('');
-  const [emojiRule, setEmojiRule] = useState('');
-  const [systemInstruction, setSystemInstruction] = useState('');
-  const [aiWriterSystemPrompt, setAiWriterSystemPrompt] = useState('');
-  const [aiWriterUserPrompt, setAiWriterUserPrompt] = useState('');
-  const [brandSetupMode, setBrandSetupMode] = useState<'quick' | 'advanced' | 'custom' | null>(null);
-  const [brandSetupLevel, setBrandSetupLevel] = useState<'quick' | 'advanced' | 'custom' | null>(null);
-  const [brandSetupStep, setBrandSetupStep] = useState(0);
-  const [brandIntelligenceReady, setBrandIntelligenceReady] = useState(false);
-  const [isEditingBrandSetup, setIsEditingBrandSetup] = useState(false);
-  const brandEditingRef = useRef(false);
-  const [formAnswerCache, setFormAnswerCache] = useState<any | null>(null);
-  const [brandWebhookCooldownUntil, setBrandWebhookCooldownUntil] = useState<number>(0);
-  const [brandWebhookCooldownTick, setBrandWebhookCooldownTick] = useState<number>(0);
-  const [brandBasicsName, setBrandBasicsName] = useState('');
-  const [brandBasicsIndustry, setBrandBasicsIndustry] = useState('');
-  const [brandBasicsType, setBrandBasicsType] = useState('B2B');
-  const [brandBasicsOffer, setBrandBasicsOffer] = useState('');
-  const [brandBasicsGoal, setBrandBasicsGoal] = useState('Leads');
-  const [audienceRole, setAudienceRole] = useState('');
-  const [audienceIndustry, setAudienceIndustry] = useState('');
-  const [audiencePainPoints, setAudiencePainPoints] = useState<string[]>([]);
-  const [audienceOutcome, setAudienceOutcome] = useState('');
-  const [toneFormal, setToneFormal] = useState(50);
-  const [toneEnergy, setToneEnergy] = useState(50);
-  const [toneBold, setToneBold] = useState(50);
-  const [emojiUsage, setEmojiUsage] = useState('Light');
-  const [writingLength, setWritingLength] = useState('Balanced');
-  const [ctaStrength, setCtaStrength] = useState('Medium');
-  const [absoluteTruths, setAbsoluteTruths] = useState('');
-  const [noSayRules, setNoSayRules] = useState<string[]>([]);
-  const [regulatedIndustry, setRegulatedIndustry] = useState('No');
-  const [legalReview, setLegalReview] = useState('No');
-  const [advancedPositioning, setAdvancedPositioning] = useState('');
-  const [advancedDifferentiators, setAdvancedDifferentiators] = useState('');
-  const [advancedPillars, setAdvancedPillars] = useState('');
-  const [advancedCompetitors, setAdvancedCompetitors] = useState('');
-  const [advancedProofPoints, setAdvancedProofPoints] = useState('');
-  const [advancedRequiredPhrases, setAdvancedRequiredPhrases] = useState('');
-  const [advancedForbiddenPhrases, setAdvancedForbiddenPhrases] = useState('');
-  const [advancedComplianceNotes, setAdvancedComplianceNotes] = useState('');
-  const [writerRulesUnlocked, setWriterRulesUnlocked] = useState(false);
-  const [reviewerRulesUnlocked, setReviewerRulesUnlocked] = useState(false);
-  const [activeBrandRuleEdit, setActiveBrandRuleEdit] = useState<
-    'pack' | 'capabilities' | 'writer' | 'reviewer' | 'visual' | null
-  >(null);
-  const [brandRuleDraft, setBrandRuleDraft] = useState<{
-    pack: string;
-    capabilities: string;
-    writer: string;
-    reviewer: string;
-    visual: string;
-  }>({ pack: '', capabilities: '', writer: '', reviewer: '', visual: '' });
-  const brandRuleSnapshotRef = useRef<{
-    pack: string;
-    capabilities: string;
-    writer: string;
-    reviewer: string;
-    visual: string;
-  } | null>(null);
-  const viewModalPollRef = useRef<number | null>(null);
-  const imageModalPollRef = useRef<number | null>(null);
-  const suppressImageModalCloseCleanupRef = useRef<boolean>(false);
-  const reopenImageModalOnImageReadyRef = useRef<boolean>(false);
-  const imageModalReopenTimeoutRef = useRef<number | null>(null);
-  const [imagePollError, setImagePollError] = useState<string | null>(null);
-  const [isEditingDmp, setIsEditingDmp] = useState<boolean>(false);
-  const [dmpDraft, setDmpDraft] = useState<string>('');
-
-  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
-  const [preDefinedPlan, setPreDefinedPlan] = useState<any[] | null>(null);
-  const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [confirmConfig, setConfirmConfig] = useState<{
-    title: string;
-    description: string;
-    confirmLabel: string;
-    cancelLabel: string;
-    confirmVariant?: 'primary' | 'danger';
-    thirdLabel?: string;
-    thirdVariant?: 'primary' | 'danger' | 'ghost';
-  } | null>(null);
-  const confirmResolverRef = useRef<((value: boolean | 'third') => void) | null>(null);
-
-  const statusOptions = [
-    '',
-    'Generate',
-    'Ready',
-    'Revisioned',
-    'Design Completed',
-    'Scheduled',
-  ];
-
-  const buildFormAnswer = () => ({
-    brandBasics: {
-      name: brandBasicsName,
-      industry: brandBasicsIndustry,
-      type: brandBasicsType,
-      offer: brandBasicsOffer,
-      goal: brandBasicsGoal,
-    },
-    audience: {
-      role: audienceRole,
-      industry: audienceIndustry,
-      painPoints: audiencePainPoints,
-      outcome: audienceOutcome,
-    },
-    voice: {
-      formal: toneFormal,
-      energy: toneEnergy,
-      bold: toneBold,
-      emojiUsage,
-      writingLength,
-      ctaStrength,
-    },
-    guardrails: {
-      absoluteTruths,
-      noSay: noSayRules,
-      regulatedIndustry,
-      legalReview,
-    },
-    advanced: {
-      positioning: advancedPositioning,
-      differentiators: advancedDifferentiators,
-      pillars: advancedPillars,
-      competitors: advancedCompetitors,
-      proofPoints: advancedProofPoints,
-      requiredPhrases: advancedRequiredPhrases,
-      forbiddenPhrases: advancedForbiddenPhrases,
-      complianceNotes: advancedComplianceNotes,
-    },
+  const {
+    isCreatingCompany,
+    isAddCompanyModalOpen,
+    setIsAddCompanyModalOpen,
+    newCompanyName,
+    setNewCompanyName,
+    newCompanyDescription,
+    setNewCompanyDescription,
+    companyName,
+    setCompanyName,
+    companyDescription,
+    setCompanyDescription,
+    handleAddCompany,
+    handleOnboardingComplete,
+    handleLogout,
+    handleUpdateCompany,
+    handleDeleteCompany,
+    handleTransferOwnership,
+  } = useCompanyLifecycle({
+    session,
+    userProfile,
+    setUserProfile,
+    setIsOnboardingOpen,
+    companies,
+    collaborators,
+    activeCompanyId,
+    authedFetch,
+    backendBaseUrl,
+    supabase,
+    notify,
+    requestConfirm,
+    setActiveCompanyIdWithPersistence,
   });
 
-  const saveBrandSetup = async (overrides: any = {}) => {
-    if (!activeCompanyId) return null;
-    const formAnswer = buildFormAnswer();
-    const brandPayload = {
-      companyId: activeCompanyId,
-      brandPack: overrides.brandPack !== undefined ? overrides.brandPack : brandPack,
-      brandCapability: overrides.brandCapability !== undefined ? overrides.brandCapability : brandCapability,
-      emojiRule: overrides.emojiRule !== undefined ? overrides.emojiRule : emojiRule,
-      systemInstruction: overrides.systemInstruction !== undefined ? overrides.systemInstruction : systemInstruction,
-      writerAgent: overrides.writerAgent !== undefined ? overrides.writerAgent : aiWriterSystemPrompt,
-      reviewPrompt1: overrides.reviewPrompt1 !== undefined ? overrides.reviewPrompt1 : aiWriterUserPrompt,
-      form_answer: formAnswer,
-    };
-    const brandUrl = brandKbId
-      ? `${backendBaseUrl}/api/brandkb/${brandKbId}`
-      : `${backendBaseUrl}/api/brandkb`;
-    const brandMethod = brandKbId ? 'PUT' : 'POST';
-    const brandRes = await authedFetch(brandUrl, {
-      method: brandMethod,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(brandPayload),
-    });
-    const brandData = await brandRes.json().catch(() => ({}));
-    if (!brandRes.ok) {
-      console.error('BrandKB save failed:', brandData);
-      notify('Failed to save brand settings. Check console for details.', 'error');
-      return null;
-    }
-    const finalId = brandData?.brandKB?.brandKbId || brandKbId;
-    if (brandData?.brandKB?.brandKbId) {
-      setBrandKbId(brandData.brandKB.brandKbId);
-    }
-    setFormAnswerCache(formAnswer);
-    return finalId;
-  };
+  const {
+    brandKbId,
+    setBrandKbId,
+    brandPack,
+    setBrandPack,
+    brandCapability,
+    setBrandCapability,
+    emojiRule,
+    setEmojiRule,
+    systemInstruction,
+    setSystemInstruction,
+    aiWriterSystemPrompt,
+    setAiWriterSystemPrompt,
+    aiWriterUserPrompt,
+    setAiWriterUserPrompt,
+    brandSetupMode,
+    setBrandSetupMode,
+    brandSetupLevel,
+    setBrandSetupLevel,
+    brandSetupStep,
+    setBrandSetupStep,
+    brandIntelligenceReady,
+    isEditingBrandSetup,
+    setIsEditingBrandSetup,
+    brandEditingRef,
+    formAnswerCache,
+    brandBasicsName,
+    setBrandBasicsName,
+    brandBasicsIndustry,
+    setBrandBasicsIndustry,
+    brandBasicsType,
+    setBrandBasicsType,
+    brandBasicsOffer,
+    setBrandBasicsOffer,
+    brandBasicsGoal,
+    setBrandBasicsGoal,
+    audienceRole,
+    setAudienceRole,
+    audienceIndustry,
+    setAudienceIndustry,
+    audiencePainPoints,
+    setAudiencePainPoints,
+    audienceOutcome,
+    setAudienceOutcome,
+    toneFormal,
+    setToneFormal,
+    toneEnergy,
+    setToneEnergy,
+    toneBold,
+    setToneBold,
+    emojiUsage,
+    setEmojiUsage,
+    writingLength,
+    setWritingLength,
+    ctaStrength,
+    setCtaStrength,
+    absoluteTruths,
+    setAbsoluteTruths,
+    noSayRules,
+    setNoSayRules,
+    regulatedIndustry,
+    setRegulatedIndustry,
+    legalReview,
+    setLegalReview,
+    advancedPositioning,
+    setAdvancedPositioning,
+    advancedDifferentiators,
+    setAdvancedDifferentiators,
+    advancedPillars,
+    setAdvancedPillars,
+    advancedCompetitors,
+    setAdvancedCompetitors,
+    advancedProofPoints,
+    setAdvancedProofPoints,
+    advancedRequiredPhrases,
+    setAdvancedRequiredPhrases,
+    advancedForbiddenPhrases,
+    setAdvancedForbiddenPhrases,
+    advancedComplianceNotes,
+    setAdvancedComplianceNotes,
+    writerRulesUnlocked,
+    reviewerRulesUnlocked,
+    activeBrandRuleEdit,
+    brandRuleDraft,
+    setBrandRuleDraft,
+    isBrandWebhookCoolingDown,
+    brandWebhookCooldownSecondsLeft,
+    buildFormAnswer,
+    saveBrandSetup,
+    loadBrandKB,
+    sendBrandWebhook,
+    startBrandRuleEdit,
+    cancelBrandRuleEdit,
+    saveBrandRuleEdit,
+  } = useBrandIntelligence({
+    activeCompanyId,
+    session,
+    authedFetch,
+    backendBaseUrl,
+    notify,
+    pathname: location.pathname,
+  });
 
-  const applyFormAnswer = (formAnswer: any) => {
-    if (!formAnswer || typeof formAnswer !== 'object') return;
-    const basics = formAnswer.brandBasics || {};
-    const audience = formAnswer.audience || {};
-    const voice = formAnswer.voice || {};
-    const guardrails = formAnswer.guardrails || {};
-    const advanced = formAnswer.advanced || {};
+  const getStatusValue = useCallback((status: any): string => {
+    const columns = ((activeCompany as any)?.kanban_settings?.columns || []) as Array<{ id?: string; title?: string }>;
+    return getStatusValueForColumns(status, columns);
+  }, [activeCompany]);
 
-    const normalizeOptionValue = (
-      raw: unknown,
-      options: string[],
-      allowCustom = false,
-    ): string | null => {
-      if (typeof raw !== 'string') return null;
-      const trimmed = raw.trim();
-      if (!trimmed) return null;
-      const match = options.find((opt) => opt.toLowerCase() === trimmed.toLowerCase());
-      if (match) return match;
-      return allowCustom ? trimmed : null;
-    };
-
-    const normalizeFixedEnum = (raw: unknown, options: string[]): string | null => {
-      const normalized = normalizeOptionValue(raw, options, false);
-      return normalized;
-    };
-
-    if (typeof basics.name === 'string') setBrandBasicsName(basics.name);
-    {
-      const nextIndustry = normalizeOptionValue(basics.industry, industryOptions, true);
-      if (nextIndustry !== null) setBrandBasicsIndustry(nextIndustry);
-    }
-    if (typeof basics.type === 'string') setBrandBasicsType(basics.type);
-    if (typeof basics.offer === 'string') setBrandBasicsOffer(basics.offer);
-    if (typeof basics.goal === 'string') setBrandBasicsGoal(basics.goal);
-    if (typeof audience.role === 'string') setAudienceRole(audience.role);
-    if (typeof audience.industry === 'string') setAudienceIndustry(audience.industry);
-    if (Array.isArray(audience.painPoints)) setAudiencePainPoints(audience.painPoints);
-    if (typeof audience.outcome === 'string') setAudienceOutcome(audience.outcome);
-    if (typeof voice.formal === 'number') setToneFormal(voice.formal);
-    if (typeof voice.energy === 'number') setToneEnergy(voice.energy);
-    if (typeof voice.bold === 'number') setToneBold(voice.bold);
-    {
-      const nextEmojiUsage = normalizeFixedEnum(voice.emojiUsage, ['None', 'Light', 'Medium', 'Heavy']);
-      if (nextEmojiUsage !== null) setEmojiUsage(nextEmojiUsage);
-    }
-    {
-      const nextWritingLength = normalizeFixedEnum(voice.writingLength, ['Short', 'Balanced', 'Long']);
-      if (nextWritingLength !== null) setWritingLength(nextWritingLength);
-    }
-    {
-      const nextCtaStrength = normalizeFixedEnum(voice.ctaStrength, ['Soft', 'Medium', 'Strong']);
-      if (nextCtaStrength !== null) setCtaStrength(nextCtaStrength);
-    }
-    if (typeof guardrails.absoluteTruths === 'string') setAbsoluteTruths(guardrails.absoluteTruths);
-    if (Array.isArray(guardrails.noSay)) setNoSayRules(guardrails.noSay);
-    if (typeof guardrails.regulatedIndustry === 'string') setRegulatedIndustry(guardrails.regulatedIndustry);
-    if (typeof guardrails.legalReview === 'string') setLegalReview(guardrails.legalReview);
-    if (typeof advanced.positioning === 'string') setAdvancedPositioning(advanced.positioning);
-    if (typeof advanced.differentiators === 'string') setAdvancedDifferentiators(advanced.differentiators);
-    if (typeof advanced.pillars === 'string') setAdvancedPillars(advanced.pillars);
-    if (typeof advanced.competitors === 'string') setAdvancedCompetitors(advanced.competitors);
-    if (typeof advanced.proofPoints === 'string') setAdvancedProofPoints(advanced.proofPoints);
-    if (typeof advanced.requiredPhrases === 'string') setAdvancedRequiredPhrases(advanced.requiredPhrases);
-    if (typeof advanced.forbiddenPhrases === 'string') setAdvancedForbiddenPhrases(advanced.forbiddenPhrases);
-    if (typeof advanced.complianceNotes === 'string') setAdvancedComplianceNotes(advanced.complianceNotes);
-  };
-
-  const nowMs = Date.now() + brandWebhookCooldownTick * 0;
-  const isBrandWebhookCoolingDown = brandWebhookCooldownUntil > nowMs;
-  const brandWebhookCooldownSecondsLeft = isBrandWebhookCoolingDown
-    ? Math.max(1, Math.ceil((brandWebhookCooldownUntil - nowMs) / 1000))
-    : 0;
-
-  useEffect(() => {
-    if (!isBrandWebhookCoolingDown) return;
-    const id = window.setInterval(() => setBrandWebhookCooldownTick((v) => v + 1), 1000);
-    return () => clearInterval(id);
-  }, [isBrandWebhookCoolingDown]);
-
-  const sendBrandWebhook = async (formAnswer: ReturnType<typeof buildFormAnswer>) => {
-    if (brandSetupLevel === 'custom') return;
-    if (isBrandWebhookCoolingDown) {
-      notify(`Brand Intelligence generation is already running. Try again in ${brandWebhookCooldownSecondsLeft}s.`, 'info');
-      return;
-    }
-    if (!activeCompanyId) {
-      notify('Select a company before generating Brand Intelligence.', 'error');
-      return;
-    }
-    const nextCooldownUntil = Date.now() + 60_000;
-    setBrandWebhookCooldownUntil(nextCooldownUntil);
-    try {
-      let effectiveBrandKbId = brandKbId;
-      if (!effectiveBrandKbId) {
-        const resultId = await saveBrandSetup();
-        if (!resultId) {
-          throw new Error('Failed to save Brand Intelligence draft');
-        }
-        effectiveBrandKbId = resultId;
-      }
-      if (!effectiveBrandKbId) {
-        throw new Error('Missing brandKbId');
-      }
-
-      const res = await authedFetch(`${backendBaseUrl}/api/brandkb/${effectiveBrandKbId}/generate-rules`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formAnswer }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || `Generation returned ${res.status}`);
-      }
-
-      const nextKb = data?.brandKB;
-      if (nextKb && typeof nextKb === 'object') {
-        const preserveEdits = true;
-        await loadBrandKB(false, preserveEdits);
-      }
-    } catch (err) {
-      setBrandWebhookCooldownUntil(0);
-      console.error('Brand intelligence webhook failed:', err);
-      notify('Brand Intelligence generation failed. Check console for details.', 'error');
-    }
-  };
-
-  const startBrandRuleEdit = (key: 'pack' | 'capabilities' | 'writer' | 'reviewer' | 'visual') => {
-    const snapshot = {
-      pack: brandPack,
-      capabilities: brandCapability,
-      writer: aiWriterSystemPrompt,
-      reviewer: aiWriterUserPrompt,
-      visual: systemInstruction,
-    };
-    brandRuleSnapshotRef.current = snapshot;
-    setBrandRuleDraft(snapshot);
-    if (key === 'writer') setWriterRulesUnlocked(true);
-    if (key === 'reviewer') setReviewerRulesUnlocked(true);
-    setActiveBrandRuleEdit(key);
-  };
-
-  const closeBrandRuleEdit = () => {
-    setActiveBrandRuleEdit(null);
-  };
-
-  const cancelBrandRuleEdit = () => {
-    if (brandRuleSnapshotRef.current) {
-      setBrandRuleDraft(brandRuleSnapshotRef.current);
-    }
-    setActiveBrandRuleEdit(null);
-  };
-
-  const saveBrandRuleEdit = async () => {
-    if (!activeBrandRuleEdit) return;
-
-    const nextPack = activeBrandRuleEdit === 'pack' ? brandRuleDraft.pack : brandPack;
-    const nextCapabilities =
-      activeBrandRuleEdit === 'capabilities' ? brandRuleDraft.capabilities : brandCapability;
-    const nextWriter = activeBrandRuleEdit === 'writer' ? brandRuleDraft.writer : aiWriterSystemPrompt;
-    const nextReviewer = activeBrandRuleEdit === 'reviewer' ? brandRuleDraft.reviewer : aiWriterUserPrompt;
-    const nextVisual = activeBrandRuleEdit === 'visual' ? brandRuleDraft.visual : systemInstruction;
-
-    setBrandPack(nextPack);
-    setBrandCapability(nextCapabilities);
-    setAiWriterSystemPrompt(nextWriter);
-    setAiWriterUserPrompt(nextReviewer);
-    setSystemInstruction(nextVisual);
-
-    const saved = await saveBrandSetup({
-      brandPack: nextPack,
-      brandCapability: nextCapabilities,
-      writerAgent: nextWriter,
-      reviewPrompt1: nextReviewer,
-      systemInstruction: nextVisual,
-    });
-    if (saved) {
-      notify('Brand rules saved.', 'success');
-      setActiveBrandRuleEdit(null);
-    }
-  };
-
-  const industryOptions = [
-    'Marketing & Advertising',
-    'E-commerce',
-    'SaaS / Software',
-    'Finance',
-    'Healthcare',
-    'Real Estate',
-    'Education',
-    'Hospitality',
-    'Other',
-  ];
-  const audienceRoleOptions = [
-    'Founder / Owner',
-    'Marketing Lead',
-    'Sales Leader',
-    'Operations',
-    'HR / People',
-    'Creator / Influencer',
-    'Consumer',
-  ];
-  const painPointOptions = [
-    'Need consistent brand voice',
-    'Low engagement',
-    'Limited internal bandwidth',
-    'Hard to prove ROI',
-    'Long approval cycles',
-    'Need lead quality improvements',
-  ];
-  const noSayOptions = [
-    'No guarantees',
-    'No timelines',
-    'No income claims',
-    'No pricing',
-    'No competitor comparisons',
-    'No medical/legal promises',
-  ];
-
-  function getStatusValue(status: any): string {
-    if (status === null || status === undefined) return '';
-    let s: any = '';
-    if (typeof status === 'string') {
-      s = status;
-    } else if (typeof status === 'object') {
-      // Handle the case where the whole post object is passed
-      const actualStatus = status.status || status;
-      if (typeof actualStatus === 'string') {
-        s = actualStatus;
-      } else if (typeof actualStatus === 'object') {
-        s = actualStatus.state || actualStatus.value || actualStatus.status || '';
-      }
-    }
-
-    // Ensure we have a string before proceeding
-    if (typeof s !== 'string') {
-      try {
-        s = String(s || '');
-      } catch {
-        s = '';
-      }
-    }
-
-    if (!s || s === '[object Object]') return '';
-
-    // Try to find a match in company custom columns
-    const columns = (activeCompany as any)?.kanban_settings?.columns || [];
-    const match = columns.find((c: any) =>
-      String(c.id || '').toLowerCase() === s.toLowerCase() ||
-      String(c.title || '').toLowerCase() === s.toLowerCase()
-    );
-
-    if (match) return match.title;
-
-    // Fallback: Replace underscores and capitalize
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-  }
-
-  const getImageGeneratedUrl = (row: any | null): string | null => {
-    if (!row) return null;
-    // Check all possible field names for images
-    const ig = (row as any).imageGenerated ||
-      (row as any).imageGeneratedUrl ||
-      (row as any).imageUrl ||
-      (row as any).image ||
-      (row as any).generatedImage;
-
-    if (!ig) {
-      return null;
-    }
-
-    // If it's already a full URL, return as-is
-    if (typeof ig === 'string' && (ig.startsWith('http://') || ig.startsWith('https://'))) {
-      return ig;
-    }
-
-    const base = typeof supabaseBaseUrl === 'string' ? supabaseBaseUrl.replace(/\/$/, '') : '';
-
-    const normalize = (value: string): string => {
-      const v = value.trim();
-      if (!v) return v;
-      if (v.startsWith('http://') || v.startsWith('https://')) return v;
-      // If the DB stores a storage key/path instead of a full URL, build a public URL
-      // Supported examples:
-      // - generated-images/<path>
-      // - <path> (already within bucket)
-      if (!base) return v;
-      if (v.startsWith('storage/v1/object/public/')) return `${base}/${v}`;
-      if (v.startsWith('/storage/v1/object/public/')) return `${base}${v}`;
-      if (v.startsWith('generated-images/')) return `${base}/storage/v1/object/public/${v}`;
-      return `${base}/storage/v1/object/public/generated-images/${v}`;
-    };
-
-    if (typeof ig === 'string') {
-      const trimmed = ig.trim();
-      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-        try {
-          const parsed = JSON.parse(trimmed);
-          if (parsed && typeof parsed === 'object') {
-            if (typeof (parsed as any).url === 'string') return normalize((parsed as any).url);
-            if (typeof (parsed as any).imageUrl === 'string') return normalize((parsed as any).imageUrl);
-            if (typeof (parsed as any).path === 'string') return normalize((parsed as any).path);
-          }
-        } catch {
-          // fall through
-        }
-      }
-      const normalized = normalize(trimmed);
-      return normalized;
-    }
-    if (typeof ig === 'object') {
-      if (typeof (ig as any).url === 'string') return normalize((ig as any).url);
-      if (typeof (ig as any).imageUrl === 'string') return normalize((ig as any).imageUrl);
-      if (typeof (ig as any).path === 'string') return normalize((ig as any).path);
-    }
-    return null;
-  };
-
-  const getImageGeneratedSignature = (row: any | null): string | null => {
-    if (!row) return null;
-    const ig = (row as any).imageGenerated;
-    if (ig === null || ig === undefined) return null;
-    try {
-      return typeof ig === 'string' ? ig : JSON.stringify(ig);
-    } catch {
-      return String(ig);
-    }
-  };
-
-  const fetchLatestContentRow = async (rowId: any): Promise<any | null> => {
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/${rowId}?t=${Date.now()}`, {
-        cache: 'no-store' as RequestCache,
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const unwrapped = (data && (data.contentCalendar || data)) as any;
-        return Array.isArray(unwrapped) ? unwrapped[0] : unwrapped;
-      }
-    } catch (_) {
-      // ignore
-    }
-
-    // Fallback: fetch by company and find the row
-    try {
-      if (!activeCompanyId) return null;
-      const listRes = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`, {
-        cache: 'no-store' as RequestCache,
-      });
-      if (!listRes.ok) return null;
-      const listData = await listRes.json();
-      const unwrappedList = (listData && (listData.contentCalendars || listData)) as any;
-      const rows = Array.isArray(unwrappedList) ? unwrappedList : [];
-      return Array.isArray(rows) ? rows.find((r: any) => r.contentCalendarId === rowId) || null : null;
-    } catch (_) {
-      return null;
-    }
-  };
-
-  const startWaitingForImageUpdate = (baseSignature: string | null) => {
-    const rowId = selectedRow?.contentCalendarId;
-    if (!rowId) return;
-    setImagePollError(null);
-
-    if (imageModalPollRef.current) {
-      clearInterval(imageModalPollRef.current);
-      imageModalPollRef.current = null;
-    }
-
-    let canceled = false;
-    const startedAt = Date.now();
-
-    const tick = async () => {
-      try {
-        const latest = await fetchLatestContentRow(rowId);
-        if (canceled || !latest) return;
-
-        setSelectedRow((prev: any) => (prev ? { ...prev, ...latest } : latest));
-        setCalendarRows((prev) =>
-          prev.map((r) => (r.contentCalendarId === rowId ? { ...r, ...latest } : r)),
-        );
-
-        // Always refresh the preview URL while generating, even if the DB stores the same path.
-        // This forces the browser to re-fetch the image bytes when Make overwrites a file.
-        if (isGeneratingImage) {
-          setImagePreviewNonce(Date.now());
-        }
-
-        const sig = getImageGeneratedSignature(latest);
-        const hasNew = sig && sig !== baseSignature;
-        if (hasNew) {
-          if (imageModalPollRef.current) {
-            clearInterval(imageModalPollRef.current);
-            imageModalPollRef.current = null;
-          }
-          setImagePreviewNonce(Date.now());
-          setIsGeneratingImage(false);
-          reopenImageModalOnImageReadyRef.current = false;
-        }
-
-        // Timeout after 2 minutes to avoid infinite spinner
-        if (Date.now() - startedAt > 2 * 60 * 1000) {
-          if (imageModalPollRef.current) {
-            clearInterval(imageModalPollRef.current);
-            imageModalPollRef.current = null;
-          }
-          setIsGeneratingImage(false);
-          setImagePollError('Timed out waiting for image. Please try Refresh image.');
-        }
-      } catch (err) {
-        if (canceled) return;
-        setImagePollError('Error while waiting for image. Please try Refresh image.');
-      }
-    };
-
-    tick();
-    imageModalPollRef.current = window.setInterval(tick, VIEW_MODAL_POLL_MS);
-
-    // cleanup handled by modal close effect
-    return () => {
-      canceled = true;
-    };
-  };
+  const {
+    calendarRows,
+    setCalendarRows,
+    isLoadingCalendar,
+    calendarError,
+    isBackendWaking,
+    calendarSearch,
+    setCalendarSearch,
+    calendarStatusFilter,
+    setCalendarStatusFilter,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    selectedIds,
+    setSelectedIds,
+    isViewModalOpen,
+    setIsViewModalOpen,
+    selectedRow,
+    setSelectedRow,
+    isImageModalOpen,
+    setIsImageModalOpen,
+    imagePreviewNonce,
+    setImagePreviewNonce,
+    isGeneratingCaption,
+    setIsGeneratingCaption,
+    isGeneratingImage,
+    setIsGeneratingImage,
+    isDraftModalOpen,
+    setIsDraftModalOpen,
+    draftPublishIntent,
+    setDraftPublishIntent,
+    isUploadingDesigns,
+    imagePollError,
+    isEditingDmp,
+    setIsEditingDmp,
+    dmpDraft,
+    setDmpDraft,
+    handleUploadDesigns,
+    handleDraftPublishIntent,
+    fetchLatestContentRow,
+    startWaitingForImageUpdate,
+    loadCalendar,
+    filteredCalendarRows,
+    calendarStatusOptions,
+    currentPageRows,
+    isPageFullySelected,
+    toggleSelectAllOnPage,
+    toggleSelectOne,
+    recentStatusMoves,
+    imageModalPollRef,
+    suppressImageModalCloseCleanupRef,
+    reopenImageModalOnImageReadyRef,
+    imageModalReopenTimeoutRef,
+  } = useCalendarBoard({
+    session,
+    activeCompanyId,
+    activeCompany,
+    pathname: location.pathname,
+    authedFetch,
+    backendBaseUrl,
+    supabase,
+    getStatusValue,
+    notify,
+  });
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     setForm((prev) => ({ ...prev, date: today }));
   }, []);
-
-  useEffect(() => {
-    if (!isImageModalOpen) return;
-    setImagePreviewNonce(Date.now());
-  }, [isImageModalOpen]);
-
-  useEffect(() => {
-    if (!isImageModalOpen) return;
-    const rowId = selectedRow?.contentCalendarId;
-    if (!rowId) return;
-
-    (async () => {
-      const latest = await fetchLatestContentRow(rowId);
-      if (!latest) return;
-      setSelectedRow((prev: any) => (prev ? { ...prev, ...latest } : latest));
-      setCalendarRows((prev) =>
-        prev.map((r) => (r.contentCalendarId === rowId ? { ...r, ...latest } : r)),
-      );
-      setIsEditingDmp(false);
-      setDmpDraft(typeof (latest as any).dmp === 'string' ? (latest as any).dmp : '');
-      setImagePreviewNonce(Date.now());
-    })();
-  }, [isImageModalOpen, selectedRow?.contentCalendarId]);
-
-  useEffect(() => {
-    if (!selectedRow || !isImageModalOpen || isEditingDmp) return;
-    if (selectedRow.dmp !== dmpDraft) {
-      setDmpDraft(selectedRow.dmp || '');
-    }
-  }, [selectedRow?.dmp, isImageModalOpen, isEditingDmp, dmpDraft]);
-
-  useEffect(() => {
-    if (!isImageModalOpen) return;
-    if (!selectedRow) return;
-    setImagePreviewNonce(Date.now());
-  }, [isImageModalOpen, selectedRow?.imageGenerated]);
-
-  useEffect(() => {
-    if (isImageModalOpen) return;
-    if (suppressImageModalCloseCleanupRef.current) {
-      suppressImageModalCloseCleanupRef.current = false;
-      return;
-    }
-    if (imageModalPollRef.current) {
-      clearInterval(imageModalPollRef.current);
-      imageModalPollRef.current = null;
-    }
-    setIsGeneratingImage(false);
-    setImagePollError(null);
-  }, [isImageModalOpen]);
-
-  useEffect(() => {
-    return () => {
-      if (imageModalReopenTimeoutRef.current) {
-        clearTimeout(imageModalReopenTimeoutRef.current);
-        imageModalReopenTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-
-  // Ref to hold the current AbortController for calendar loads —
-  // allows us to cancel stale in-flight requests when activeCompanyId changes.
-  const calendarAbortRef = useRef<AbortController | null>(null);
-
-  const loadCalendar = useCallback(async () => {
-    if (!session || !activeCompanyId) return;
-
-    // Cancel any previous in-flight fetch for a different company
-    calendarAbortRef.current?.abort();
-    const controller = new AbortController();
-    calendarAbortRef.current = controller;
-
-    setIsLoadingCalendar(true);
-    setCalendarError(null);
-    try {
-      setIsBackendWaking(true);
-      const res = await authedFetch(
-        `${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}`,
-        { signal: controller.signal },
-      );
-      if (controller.signal.aborted) return; // stale response — ignore
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load content board');
-      }
-      setCalendarRows(data.contentCalendars || data);
-      setIsBackendWaking(false);
-    } catch (err: any) {
-      if (err?.name === 'AbortError') return; // intentionally cancelled — not an error
-      console.error('Error loading content board:', err);
-      setCalendarError(err.message || 'Failed to load content board');
-      setIsBackendWaking(true);
-    } finally {
-      if (!controller.signal.aborted) {
-        setIsLoadingCalendar(false);
-      }
-    }
-  }, [session, activeCompanyId, authedFetch, backendBaseUrl]);
-
   const refreshAppData = async () => {
     const promises: Promise<any>[] = [
       loadCalendar(),
@@ -1275,452 +500,6 @@ function App() {
   };
 
   // Load calendar when company changes — debounced 300ms so rapid
-  // company switches don't fire multiple simultaneous requests.
-  useEffect(() => {
-    const timer = setTimeout(() => { loadCalendar(); }, 300);
-    return () => {
-      clearTimeout(timer);
-      calendarAbortRef.current?.abort(); // cancel any in-flight fetch on cleanup
-    };
-  }, [activeCompanyId, session]);
-
-  // Track recently-moved card statuses so the poll doesn't overwrite them
-  const recentStatusMoves = useRef<Map<string, { status: string; originalStatus?: any; ts: number }>>(new Map());
-
-  // Auto-refresh the content board table periodically
-  useEffect(() => {
-    if (!activeCompanyId || !session) return;
-    let canceled = false;
-    const fetchList = async () => {
-      try {
-        const listRes = await authedFetch(
-          `${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`,
-          { cache: 'no-store' as RequestCache },
-        );
-        if (!listRes.ok) return;
-        const data = await listRes.json().catch(() => ({}));
-        const unwrapped = (data && (data.contentCalendars || data)) as any;
-        if (!canceled && Array.isArray(unwrapped)) {
-          // Smart merge: preserve status for rows moved within the last 30 seconds
-          const PRESERVE_MS = 30_000;
-          const now = Date.now();
-          // Purge stale entries
-          recentStatusMoves.current.forEach((v, k) => {
-            if (now - v.ts > PRESERVE_MS) recentStatusMoves.current.delete(k);
-          });
-          const updatedRows = unwrapped.map((incoming: any) => {
-            const id = incoming.contentCalendarId;
-            const recent = recentStatusMoves.current.get(id);
-            if (recent && now - recent.ts < PRESERVE_MS) {
-              const incomingStatus = getStatusValue(incoming.status);
-              const recentStatus = getStatusValue(recent.status);
-              const originalStatus = recent.originalStatus ? getStatusValue(recent.originalStatus) : null;
-
-              if (incomingStatus === recentStatus) {
-                recentStatusMoves.current.delete(id);
-                return incoming;
-              }
-              if (originalStatus && incomingStatus === originalStatus) {
-                return { ...incoming, status: recent.status };
-              }
-              recentStatusMoves.current.delete(id);
-              return incoming;
-            }
-            return incoming;
-          });
-
-          setCalendarRows(prev => {
-            if (JSON.stringify(prev) === JSON.stringify(updatedRows)) return prev;
-            return updatedRows;
-          });
-
-          // Sync selectedRow if modal is open to avoid stale status display
-          if (isViewModalOpen && selectedRow) {
-            const currentInList = updatedRows.find((r: any) => r.contentCalendarId === selectedRow.contentCalendarId);
-            if (currentInList) {
-              const hasChanged = currentInList.status !== selectedRow.status ||
-                currentInList.finalCaption !== selectedRow.finalCaption ||
-                currentInList.imageGenerated !== selectedRow.imageGenerated;
-              if (hasChanged) {
-                setSelectedRow((prev: any) => prev ? { ...prev, ...currentInList } : prev);
-              }
-            }
-          }
-        }
-      } catch (err) {
-        // ignore polling errors
-      }
-    };
-
-    const id = window.setInterval(fetchList, 10_000);
-    // initial tick
-    fetchList();
-    return () => {
-      canceled = true;
-      clearInterval(id);
-    };
-  }, [activeCompanyId, session]);
-
-  // Load company profile details
-  useEffect(() => {
-    const loadCompany = async () => {
-      if (!session) return;
-      if (!activeCompanyId) return;
-      const requestedCompanyId = activeCompanyId;
-      setCompanyName('');
-      setCompanyDescription('');
-      try {
-        const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`);
-        if (!res.ok) return;
-        const data = await res.json().catch(() => ({}));
-        const company = (data && (data.company || data)) as any;
-        if (requestedCompanyId !== activeCompanyId) return;
-        if (company && typeof company.companyName === 'string') {
-          setCompanyName(company.companyName);
-        }
-        if (company && typeof company.companyDescription === 'string') {
-          setCompanyDescription(company.companyDescription);
-        }
-      } catch (err) {
-        console.error('Error loading company profile:', err);
-      }
-    };
-
-    loadCompany();
-  }, [activeCompanyId, session]);
-
-  useEffect(() => {
-    brandEditingRef.current =
-      isEditingBrandSetup ||
-      brandSetupMode !== null ||
-      activeBrandRuleEdit !== null ||
-      writerRulesUnlocked ||
-      reviewerRulesUnlocked;
-  }, [
-    isEditingBrandSetup,
-    brandSetupMode,
-    activeBrandRuleEdit,
-    writerRulesUnlocked,
-    reviewerRulesUnlocked,
-  ]);
-
-  const loadBrandKB = async (resetDefaults = true, preserveEdits = false) => {
-    if (!session) return;
-    if (!activeCompanyId) return;
-    const requestedCompanyId = activeCompanyId;
-    if (resetDefaults) {
-      setBrandKbId(null);
-      setBrandPack('');
-      setBrandCapability('');
-      setEmojiRule('');
-      setSystemInstruction('');
-      setAiWriterSystemPrompt('');
-      setAiWriterUserPrompt('');
-      setBrandBasicsName('');
-      setBrandBasicsIndustry('');
-      setBrandBasicsType('B2B');
-      setBrandBasicsOffer('');
-      setBrandBasicsGoal('Leads');
-      setAudienceRole('');
-      setAudienceIndustry('');
-      setAudiencePainPoints([]);
-      setAudienceOutcome('');
-      setToneFormal(50);
-      setToneEnergy(50);
-      setToneBold(50);
-      setEmojiUsage('Light');
-      setWritingLength('Balanced');
-      setCtaStrength('Medium');
-      setAbsoluteTruths('');
-      setNoSayRules([]);
-      setRegulatedIndustry('No');
-      setLegalReview('No');
-      setAdvancedPositioning('');
-      setAdvancedDifferentiators('');
-      setAdvancedPillars('');
-      setAdvancedCompetitors('');
-      setAdvancedProofPoints('');
-      setAdvancedRequiredPhrases('');
-      setAdvancedForbiddenPhrases('');
-      setAdvancedComplianceNotes('');
-      setBrandSetupLevel(null);
-    }
-    try {
-      const res = await authedFetch(
-        `${backendBaseUrl}/api/brandkb/company/${activeCompanyId}?t=${Date.now()}`,
-        { cache: 'no-store' as RequestCache },
-      );
-      if (requestedCompanyId !== activeCompanyId) return;
-      const data = await res.json();
-      if (requestedCompanyId !== activeCompanyId) return;
-      const list = Array.isArray(data.brandKBs) ? data.brandKBs : data;
-      const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
-      const isEditing = preserveEdits && brandEditingRef.current;
-      if (first) {
-        if (typeof first.brandKbId === 'string') {
-          setBrandKbId(first.brandKbId);
-        }
-        if (!isEditing && typeof first.brandPack === 'string') {
-          setBrandPack(first.brandPack);
-        }
-        if (!isEditing && typeof first.brandCapability === 'string') {
-          setBrandCapability(first.brandCapability);
-        }
-        if (!isEditing && typeof first.emojiRule === 'string') {
-          setEmojiRule(first.emojiRule);
-        }
-        if (!isEditing && typeof first.systemInstruction === 'string') {
-          setSystemInstruction(first.systemInstruction);
-        }
-        if (!isEditing && typeof first.writerAgent === 'string') {
-          setAiWriterSystemPrompt(first.writerAgent);
-        }
-        if (!isEditing && typeof first.reviewPrompt1 === 'string') {
-          setAiWriterUserPrompt(first.reviewPrompt1);
-        }
-        const hasGeneratedRules =
-          !!first.brandPack ||
-          !!first.brandCapability ||
-          !!first.writerAgent ||
-          !!first.reviewPrompt1;
-        const rawFormAnswer = first.form_answer as any;
-        let normalizedFormAnswer = rawFormAnswer;
-        if (typeof rawFormAnswer === 'string') {
-          try {
-            normalizedFormAnswer = JSON.parse(rawFormAnswer);
-          } catch (err) {
-            console.warn('Unable to parse form_answer JSON string', err);
-            normalizedFormAnswer = null;
-          }
-        }
-        const hasFormAnswer = normalizedFormAnswer && typeof normalizedFormAnswer === 'object';
-        if (hasFormAnswer) {
-          setFormAnswerCache(normalizedFormAnswer);
-        }
-        if (hasGeneratedRules && !isEditing) {
-          setBrandIntelligenceReady(true);
-          setBrandSetupMode(null);
-          setIsEditingBrandSetup(false);
-        }
-        if (!isEditing) {
-          applyFormAnswer(normalizedFormAnswer);
-        }
-      }
-    } catch (err) {
-      console.error('Error loading brandKB/company settings:', err);
-    }
-  };
-
-  // Load existing brand knowledge base (company settings) for this company
-  useEffect(() => {
-    loadBrandKB();
-  }, [activeCompanyId, session]);
-
-  useEffect(() => {
-    setBrandIntelligenceReady(false);
-    setBrandSetupMode(null);
-    setIsEditingBrandSetup(false);
-    setFormAnswerCache(null);
-    setBrandKbId(null);
-    setBrandPack('');
-    setBrandCapability('');
-    setEmojiRule('');
-    setSystemInstruction('');
-    setAiWriterSystemPrompt('');
-    setAiWriterUserPrompt('');
-    setAdvancedPositioning('');
-    setAdvancedDifferentiators('');
-    setAdvancedPillars('');
-    setAdvancedCompetitors('');
-    setAdvancedProofPoints('');
-    setAdvancedRequiredPhrases('');
-    setAdvancedForbiddenPhrases('');
-    setAdvancedComplianceNotes('');
-    setBrandSetupLevel(null);
-    setBrandSetupStep(0);
-    setWriterRulesUnlocked(false);
-    setReviewerRulesUnlocked(false);
-    setActiveBrandRuleEdit(null);
-  }, [activeCompanyId]);
-
-  // Live refresh brand intelligence while on the Brand Intelligence page
-  useEffect(() => {
-    const isBrandIntelligenceRoute =
-      /^\/company\/[^/]+\/(brand-intelligence|brand)\/?$/.test(location.pathname) ||
-      /^\/company\/[^/]+\/settings/.test(location.pathname); // Match all settings routes
-    if (!isBrandIntelligenceRoute) return;
-    if (!activeCompanyId || !session) return;
-    if (brandEditingRef.current) return;
-    // Only auto-refresh when brand intelligence is actively being generated (during cooldown)
-    // This prevents form interference when users are just filling out settings
-    // if (!isBrandWebhookCoolingDown && (brandIntelligenceReady && !brandSetupMode)) return; // Original line
-    if (!isBrandWebhookCoolingDown && (brandIntelligenceReady && !brandSetupMode) && !activeBrandRuleEdit) return;
-    let canceled = false;
-    const poll = async () => {
-      if (canceled) return;
-      if (brandEditingRef.current) return;
-      await loadBrandKB(false, true);
-    };
-    const id = window.setInterval(poll, 4000);
-    poll();
-    return () => {
-      canceled = true;
-      clearInterval(id);
-    };
-  }, [
-    activeCompanyId,
-    session,
-    location.pathname,
-    brandIntelligenceReady,
-    brandSetupMode,
-    isEditingBrandSetup,
-    activeBrandRuleEdit,
-    writerRulesUnlocked,
-    reviewerRulesUnlocked,
-  ]);
-
-  const filteredCalendarRows = useMemo(() => {
-    // Detect mode from URL
-    const isArchivesTab = location.pathname.includes('/calendar/published');
-    const search = calendarSearch.trim().toLowerCase();
-    const statusFilter = calendarStatusFilter.toLowerCase();
-
-    const kanbanCols = (activeCompany as any)?.kanban_settings?.columns || SOKMED_COLUMNS;
-
-    const filtered = calendarRows.filter((row) => {
-      const statusValue = getStatusValue(row.status).toLowerCase();
-      const rawId = typeof row.status === 'string' ? row.status.toLowerCase() : (row.status?.state?.toLowerCase() || "");
-      const isArchived = statusValue === 'archived' || rawId === 'archived';
-
-      // Map dynamic status ID to title for consistent filtering
-      const colMatch = kanbanCols.find((c: any) =>
-        c.id.toLowerCase() === statusValue ||
-        c.title.toLowerCase() === statusValue
-      );
-      const displayStatus = colMatch ? colMatch.title.toLowerCase() : statusValue;
-
-      // Filter by tab mode
-      if (isArchivesTab) {
-        if (!isArchived) return false;
-      } else {
-        // Pipeline tab - exclude archived
-        if (isArchived) return false;
-      }
-
-      // Filter by status dropdown
-      if (statusFilter !== 'all' && displayStatus !== statusFilter) return false;
-
-      // Filter by search
-      if (!search) return true;
-      const haystack = [
-        row.brandHighlight,
-        row.crossPromo,
-        row.theme,
-        row.contentType,
-        row.channels,
-        row.targetAudience,
-        row.primaryGoal,
-        row.cta,
-        row.promoType,
-        row.date,
-        row.finalCaption,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(search);
-    });
-
-    // Sort by date chronologically (earliest first)
-    return filtered.sort((a, b) => {
-      const parseDate = (row: any): number => {
-        if (row.date) {
-          const dateStr = row.date.toString().trim();
-          let parsedDate = new Date(dateStr);
-          if (!isNaN(parsedDate.getTime())) return parsedDate.getTime();
-          const currentYear = new Date().getFullYear();
-          parsedDate = new Date(`${dateStr} ${currentYear}`);
-          if (!isNaN(parsedDate.getTime())) return parsedDate.getTime();
-        }
-        if (row.created_at) {
-          const createdDate = new Date(row.created_at);
-          if (!isNaN(createdDate.getTime())) return createdDate.getTime();
-        }
-        return 0;
-      };
-      return parseDate(a) - parseDate(b);
-    });
-  }, [calendarRows, calendarSearch, calendarStatusFilter, location.pathname, activeCompany]);
-
-  const calendarStatusOptions = useMemo(() => {
-    const columns = (activeCompany as any)?.kanban_settings?.columns || SOKMED_COLUMNS;
-    return ['all', ...columns.map((c: any) => c.title)];
-  }, [activeCompany]);
-
-  // Clamp current page if data length changes
-  useEffect(() => {
-    const effectivePageSize = pageSize === 'all' ? filteredCalendarRows.length || 1 : pageSize;
-    const totalPages = Math.max(1, Math.ceil(filteredCalendarRows.length / effectivePageSize));
-    if (page > totalPages) setPage(totalPages);
-  }, [filteredCalendarRows.length, pageSize, page]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [calendarSearch, calendarStatusFilter]);
-
-  const currentPageRows = useMemo(() => {
-    if (pageSize === 'all') return filteredCalendarRows;
-    const start = (page - 1) * pageSize;
-    return filteredCalendarRows.slice(start, start + pageSize);
-  }, [filteredCalendarRows, page, pageSize]);
-
-  const isPageFullySelected = useMemo(() => {
-    const ids = currentPageRows.map((r) => r.contentCalendarId);
-    return ids.length > 0 && ids.every((id) => selectedIds.includes(id));
-  }, [currentPageRows, selectedIds]);
-
-  const toggleSelectAllOnPage = (checked: boolean) => {
-    const ids = currentPageRows.map((r) => r.contentCalendarId).filter(Boolean);
-    setSelectedIds((prev) => {
-      const set = new Set(prev);
-      if (checked) {
-        ids.forEach((id) => set.add(id));
-      } else {
-        ids.forEach((id) => set.delete(id));
-      }
-      return Array.from(set);
-    });
-  };
-
-  const notify = (message: string, tone: 'success' | 'error' | 'info' = 'info') => {
-    setToast({ message, tone });
-  };
-
-  const requestConfirm = (config: {
-    title: string;
-    description: string;
-    confirmLabel: string;
-    cancelLabel: string;
-    thirdLabel?: string;
-    confirmVariant?: 'primary' | 'danger';
-    thirdVariant?: 'primary' | 'danger' | 'ghost';
-  }): Promise<boolean | 'third'> => {
-    setConfirmConfig({ confirmVariant: 'primary', ...config });
-    setIsConfirmOpen(true);
-    return new Promise((resolve) => {
-      confirmResolverRef.current = resolve;
-    });
-  };
-
-  const resolveConfirm = (value: boolean | 'third') => {
-    if (confirmResolverRef.current) {
-      confirmResolverRef.current(value);
-      confirmResolverRef.current = null;
-    }
-    setIsConfirmOpen(false);
-    setConfirmConfig(null);
-  };
-
   useEffect(() => {
     if (!toast) return;
     const id = window.setTimeout(() => setToast(null), 2600);
@@ -1771,17 +550,6 @@ function App() {
 
   // Wrapper so callers that pass no args still work (form is closed-over from App state)
   const handleAdd = () => handleAddRow(form);
-
-  const toggleSelectOne = (id: string, checked: boolean) => {
-    setSelectedIds((prev) => {
-      const set = new Set(prev);
-      if (checked) set.add(id);
-      else set.delete(id);
-      return Array.from(set);
-    });
-  };
-
-
 
   const activeNavKey = useMemo(() => {
     const path = location.pathname;
@@ -1842,112 +610,134 @@ function App() {
     return { ...counts, approvalRate };
   }, [calendarRows]);
 
+  const settingsPageSharedProps: Omit<CompanySettingsShellProps, 'tab'> = {
+    notify,
+    authedFetch,
+    setActiveCompanyIdWithPersistence,
+    brandIntelligenceReady,
+    brandSetupMode,
+    setBrandSetupMode,
+    brandSetupLevel,
+    setBrandSetupLevel,
+    brandSetupStep,
+    setBrandSetupStep,
+    setIsEditingBrandSetup,
+    collaborators,
+    companyName,
+    setCompanyName,
+    companyDescription,
+    setCompanyDescription,
+    loadBrandKB,
+    brandKbId,
+    onDeleteCompany: () => handleDeleteCompany(activeCompanyId!),
+    onSaveCompanyDetails: handleUpdateCompany,
+    brandPack,
+    setBrandPack,
+    brandCapability,
+    setBrandCapability,
+    emojiRule,
+    setEmojiRule,
+    systemInstruction,
+    setSystemInstruction,
+    aiWriterSystemPrompt,
+    setAiWriterSystemPrompt,
+    aiWriterUserPrompt,
+    setAiWriterUserPrompt,
+    activeBrandRuleEdit,
+    brandRuleDraft,
+    setBrandRuleDraft,
+    startBrandRuleEdit,
+    cancelBrandRuleEdit,
+    saveBrandRuleEdit,
+    saveBrandSetup,
+    sendBrandWebhook,
+    buildFormAnswer,
+    industryOptions,
+    audienceRoleOptions,
+    painPointOptions,
+    noSayOptions,
+    brandBasicsName,
+    setBrandBasicsName,
+    brandBasicsIndustry,
+    setBrandBasicsIndustry,
+    brandBasicsType,
+    setBrandBasicsType,
+    brandBasicsOffer,
+    setBrandBasicsOffer,
+    brandBasicsGoal,
+    setBrandBasicsGoal,
+    audienceRole,
+    setAudienceRole,
+    audienceIndustry,
+    setAudienceIndustry,
+    audiencePainPoints,
+    setAudiencePainPoints,
+    audienceOutcome,
+    setAudienceOutcome,
+    toneFormal,
+    setToneFormal,
+    toneEnergy,
+    setToneEnergy,
+    toneBold,
+    setToneBold,
+    emojiUsage,
+    setEmojiUsage,
+    writingLength,
+    setWritingLength,
+    ctaStrength,
+    setCtaStrength,
+    absoluteTruths,
+    setAbsoluteTruths,
+    noSayRules,
+    setNoSayRules,
+    regulatedIndustry,
+    setRegulatedIndustry,
+    legalReview,
+    setLegalReview,
+    advancedPositioning,
+    setAdvancedPositioning,
+    advancedDifferentiators,
+    setAdvancedDifferentiators,
+    advancedPillars,
+    setAdvancedPillars,
+    advancedCompetitors,
+    setAdvancedCompetitors,
+    advancedProofPoints,
+    setAdvancedProofPoints,
+    advancedRequiredPhrases,
+    setAdvancedRequiredPhrases,
+    advancedForbiddenPhrases,
+    setAdvancedForbiddenPhrases,
+    advancedComplianceNotes,
+    setAdvancedComplianceNotes,
+    writerRulesUnlocked,
+    reviewerRulesUnlocked,
+    newCollaboratorEmail,
+    setNewCollaboratorEmail,
+    onAddCollaborator: handleAddCollaborator,
+    onRemoveCollaborator: handleRemoveCollaborator,
+    onTransferOwnership: handleTransferOwnership,
+    userPermissions,
+    customRoles,
+    onUpdateCustomRoles: handleUpdateCustomRoles,
+    onAssignRole: handleAssignRole,
+    isBrandWebhookCoolingDown,
+    brandWebhookCooldownSecondsLeft,
+    isEditingBrandSetup,
+    brandEditingRef,
+    formAnswerCache,
+    connectedAccounts,
+    onConnectLinkedIn: handleConnectLinkedIn,
+    onConnectFacebook: handleConnectFacebook,
+    onDisconnectAccount: handleDisconnectAccount,
+    backendBaseUrl,
+  };
 
-
-  // Auto-refresh currently viewed row while modal is open
-  useEffect(() => {
-    const rowId = selectedRow?.contentCalendarId;
-    if (!isViewModalOpen || !rowId) {
-      if (viewModalPollRef.current) {
-        clearInterval(viewModalPollRef.current);
-        viewModalPollRef.current = null;
-      }
-      return;
-    }
-
-    let canceled = false;
-
-    const fetchLatest = async () => {
-      try {
-        let latest: any | null = null;
-        const res = await authedFetch(
-          `${backendBaseUrl}/api/content-calendar/${rowId}?t=${Date.now()}`,
-          { cache: 'no-store' as RequestCache },
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const unwrapped = (data && (data.contentCalendar || data)) as any;
-          latest = Array.isArray(unwrapped) ? unwrapped[0] : unwrapped;
-        }
-
-        if (!latest && activeCompanyId) {
-          const listRes = await authedFetch(
-            `${backendBaseUrl}/api/content-calendar/company/${activeCompanyId}?t=${Date.now()}`,
-            { cache: 'no-store' as RequestCache },
-          );
-          if (listRes.ok) {
-            const listData = await listRes.json();
-            const unwrappedList = (listData && (listData.contentCalendars || listData)) as any;
-            const rows = Array.isArray(unwrappedList) ? unwrappedList : [];
-            latest = rows.find((r: any) => r.contentCalendarId === rowId) || null;
-          }
-        }
-
-        if (canceled || !latest) return;
-
-        // Check if status changed from "Generate" to something else
-        const prevStatus = selectedRow ? getStatusValue(selectedRow.status) : null;
-        const newStatus = getStatusValue(latest.status);
-
-        console.log('Status check:', { prevStatus, newStatus, isGeneratingCaption });
-
-        setSelectedRow((prev: any) => (prev ? { ...prev, ...latest } : latest));
-        setCalendarRows((prev) =>
-          prev.map((r) => (r.contentCalendarId === rowId ? { ...r, ...latest } : r)),
-        );
-
-        // Stop loading if status changed from "Generate" to something else
-        if (isGeneratingCaption && prevStatus === 'Generate' && newStatus !== 'Generate') {
-          console.log('Stopping generate caption loading');
-          setIsGeneratingCaption(false);
-        }
-
-      } catch (_) {
-        // ignore polling errors
-      }
-    };
-
-    fetchLatest();
-    viewModalPollRef.current = window.setInterval(fetchLatest, VIEW_MODAL_POLL_MS);
-
-    return () => {
-      canceled = true;
-      if (viewModalPollRef.current) {
-        clearInterval(viewModalPollRef.current);
-        viewModalPollRef.current = null;
-      }
-    };
-  }, [isViewModalOpen, selectedRow?.contentCalendarId, activeCompanyId]);
-
-  // Stop image modal polling when modal closes
-  useEffect(() => {
-    if (isImageModalOpen) return;
-    if (imageModalPollRef.current) {
-      clearInterval(imageModalPollRef.current);
-      imageModalPollRef.current = null;
-    }
-    setIsGeneratingImage(false);
-    setImagePollError(null);
-  }, [isImageModalOpen]);
-
-  // When image modal opens, fetch the latest row once so the preview uses fresh DB data
-  useEffect(() => {
-    if (!isImageModalOpen) return;
-    const rowId = selectedRow?.contentCalendarId;
-    if (!rowId) return;
-    let canceled = false;
-    (async () => {
-      const latest = await fetchLatestContentRow(rowId);
-      if (canceled || !latest) return;
-      setSelectedRow((prev: any) => (prev ? { ...prev, ...latest } : latest));
-      setCalendarRows((prev) =>
-        prev.map((r) => (r.contentCalendarId === rowId ? { ...r, ...latest } : r)),
-      );
-    })();
-    return () => {
-      canceled = true;
-    };
-  }, [isImageModalOpen, selectedRow?.contentCalendarId]);
+  const adminDashboardSharedProps: Omit<React.ComponentProps<typeof AdminDashboardPage>, 'tab'> = {
+    authedFetch,
+    backendBaseUrl,
+    notify,
+  };
 
   const handleChange: React.ChangeEventHandler<HTMLInputElement | HTMLSelectElement> = (e) => {
     const { name, value } = e.target;
@@ -1959,341 +749,13 @@ function App() {
     setForm((prev) => ({ ...prev, channels: values }));
   };
 
+  const handleModalCopy = useCallback((fieldKey: string, text?: string | null) => {
+    handleCopy(text ?? '', fieldKey);
+  }, [handleCopy]);
 
-
-
-
-  const handleAddCompany = async () => {
-    if (!newCompanyName.trim()) {
-      notify('Company name is required.', 'error');
-      return;
-    }
-    if (isCreatingCompany) return;
-
-    setIsCreatingCompany(true);
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/company`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyName: newCompanyName.trim(),
-          companyDescription: newCompanyDescription.trim(),
-          kanban_settings: {
-            columns: SOKMED_COLUMNS,
-            automations: [],
-            studio_settings: {
-              schedulingStatus: 'Scheduled',
-              postedStatus: 'Published',
-              unscheduledStatus: 'Drafts'
-            }
-          }
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        notify(data.error || 'Failed to create company.', 'error');
-        return;
-      }
-      notify('Company created.', 'success');
-      setIsAddCompanyModalOpen(false);
-      await new Promise((r) => setTimeout(r, 200));
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
-      if (data.company?.companyId) {
-        setActiveCompanyIdWithPersistence(data.company.companyId);
-      }
-    } catch (err) {
-      console.error('Failed to create company', err);
-      notify('Failed to create company. Check console for details.', 'error');
-    } finally {
-      // Add a small delay before allowing another creation attempt to prevent double-clicks
-      setTimeout(() => setIsCreatingCompany(false), 2000);
-    }
-  };
-
-
-
-  const handleOnboardingComplete = async (data: OnboardingData | null) => {
-    if (isCreatingCompany) return;
-    setIsCreatingCompany(true);
-    try {
-      // Handle skip
-      if (!data) {
-        // Just mark onboarding as complete without creating company
-        const profileRes = await authedFetch(`${backendBaseUrl}/api/profile`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            onboarding_completed: true,
-          }),
-        });
-
-        if (profileRes.ok) {
-          setIsOnboardingOpen(false);
-          setUserProfile((prev: any) => ({ ...prev, onboarding_completed: true }));
-          notify('You can create a company anytime from the sidebar!', 'info');
-        }
-        return;
-      }
-
-      // 1. Update profile with role and mark onboarding as complete
-      // Check if user is already an ADMIN to avoid overwriting it
-      const roleToUpdate = userProfile?.role === 'ADMIN' ? undefined : data.role;
-
-      const profileRes = await authedFetch(`${backendBaseUrl}/api/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...(roleToUpdate && { role: roleToUpdate }),
-          onboarding_completed: true,
-        }),
-      });
-
-      if (!profileRes.ok) {
-        notify('Failed to save profile. Please try again.', 'error');
-        return;
-      }
-
-      // 2. Check if company with same name already exists
-      const existingCompany = companies.find(
-        (c) => c.companyName?.toLowerCase() === data.companyName.toLowerCase()
-      );
-
-      if (existingCompany) {
-        // Company already exists, just close onboarding and navigate
-        setIsOnboardingOpen(false);
-        setUserProfile((prev: any) => ({ ...prev, onboarding_completed: true }));
-        setActiveCompanyIdWithPersistence(existingCompany.companyId);
-        notify('Welcome back! Using your existing company.', 'success');
-        navigate(`/company/${encodeURIComponent(existingCompany.companyId)}/dashboard`);
-        return;
-      }
-
-      // 3. Create company
-      const companyRes = await authedFetch(`${backendBaseUrl}/api/company`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyName: data.companyName,
-          companyDescription: data.companyDescription,
-        }),
-      });
-
-      const companyData = await companyRes.json().catch(() => ({}));
-      if (!companyRes.ok) {
-        notify(companyData.error || 'Failed to create company.', 'error');
-        return;
-      }
-
-      const newCompanyId = companyData.company?.companyId;
-
-      // 4. Initialize Brand Intelligence
-      if (newCompanyId) {
-        if (!data.skipBrandSetup) {
-          const brandPayload = {
-            companyId: newCompanyId,
-            form_answer: {
-              brandBasics: {
-                name: data.companyName,
-                industry: data.industry,
-                type: data.businessType,
-                offer: data.companyDescription,
-                goal: data.primaryGoal,
-              },
-              // Audience data from onboarding
-              audience: {
-                role: data.audienceRole || '',
-                industry: data.audienceIndustry || '',
-                painPoints: data.audiencePainPoints?.join(', ') || '',
-                outcome: data.audienceOutcome || '',
-              },
-              // Tone data from onboarding
-              tone: {
-                formal: data.toneFormal || 5,
-                energy: data.toneEnergy || 5,
-                bold: data.toneBold || 5,
-                emojiUsage: data.emojiUsage || 'Sometimes',
-                writingLength: data.writingLength || 'Medium',
-                ctaStrength: data.ctaStrength || 'Moderate',
-              },
-              // Include enhanced brand data if extracted from website (for additional context)
-              ...(data.targetAudience && {
-                extractedAudience: {
-                  role: data.targetAudience.role,
-                  painPoints: data.targetAudience.painPoints?.join(', ') || '',
-                  outcomes: data.targetAudience.outcomes?.join(', ') || '',
-                },
-              }),
-              ...(data.brandVoice && {
-                extractedTone: {
-                  formality: data.brandVoice.formality,
-                  energy: data.brandVoice.energy,
-                  confidence: data.brandVoice.confidence,
-                },
-              }),
-              ...(data.visualIdentity && {
-                visualIdentity: {
-                  colors: data.visualIdentity.primaryColors?.join(', ') || '',
-                },
-              }),
-            },
-          };
-
-          await authedFetch(`${backendBaseUrl}/api/brandkb`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(brandPayload),
-          });
-        }
-
-        // Update local state - only add if not already in list
-        queryClient.invalidateQueries({ queryKey: ['companies'] });
-        setActiveCompanyIdWithPersistence(newCompanyId);
-      }
-
-      // 5. Close onboarding and update profile state
-      setIsOnboardingOpen(false);
-      setUserProfile((prev: any) => ({ ...prev, onboarding_completed: true }));
-      notify('Welcome to Moonshot Generator! 🎉', 'success');
-
-      // Mark that user just completed onboarding to trigger tour
-      sessionStorage.setItem('justCompletedOnboarding', 'true');
-
-      // Navigate to dashboard
-      if (newCompanyId) {
-        navigate(`/company/${encodeURIComponent(newCompanyId)}/dashboard`);
-      }
-    } catch (err) {
-      notify('Failed to complete onboarding. Please try again.', 'error');
-    } finally {
-      // Add a small delay before allowing another attempt
-      setTimeout(() => setIsCreatingCompany(false), 2000);
-    }
-  };
-
-  const handleLogout = async () => {
-    sessionStorage.removeItem('impersonateUserId');
-    setActiveCompanyIdWithPersistence(undefined);
-    await supabase?.auth.signOut();
-    navigate('/');
-  };
-
-  const handleUpdateCompany = async () => {
-    if (!activeCompanyId) return;
-    try {
-      const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyName: companyName.trim(),
-          companyDescription: companyDescription.trim(),
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to update company');
-      }
-
-      notify('Company updated successfully', 'success');
-
-      // Update local companies list
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
-
-    } catch (err: any) {
-      console.error('Error updating company:', err);
-      notify(err.message || 'Failed to update company', 'error');
-    }
-  };
-
-  const handleDeleteCompany = async (companyId: string) => {
-    try {
-      const companyToDelete = companies.find((c) => c.companyId === companyId);
-      const confirmed = await requestConfirm({
-        title: 'Delete Company?',
-        description: `Are you sure you want to delete "${companyToDelete?.companyName}"? This action cannot be undone and all data will be lost.`,
-        confirmLabel: 'Delete Company',
-        cancelLabel: 'Cancel',
-        confirmVariant: 'danger',
-      });
-
-      if (!confirmed) return;
-
-      const res = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete company');
-      }
-
-      notify('Company deleted successfully', 'success');
-
-      // Update local state
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
-      const updatedCompanies = companies.filter((c) => c.companyId !== companyId);
-
-      // If deleted company was active, switch to another or clear
-      if (activeCompanyId === companyId) {
-        if (updatedCompanies.length > 0) {
-          const nextCompanyId = updatedCompanies[0].companyId;
-          setActiveCompanyIdWithPersistence(nextCompanyId);
-          navigate(`/company/${encodeURIComponent(nextCompanyId)}/dashboard`);
-        } else {
-          setActiveCompanyIdWithPersistence('');
-          navigate('/');
-        }
-      }
-    } catch (err: any) {
-      console.error('Error deleting company:', err);
-      notify(err.message || 'Failed to delete company', 'error');
-    }
-  };
-
-  const handleTransferOwnership = async (newOwnerId: string) => {
-    if (!activeCompanyId) return;
-
-    try {
-      const company = companies.find((c) => c.companyId === activeCompanyId);
-      const collaborator = collaborators.find((c: any) => c.id === newOwnerId);
-
-      const confirmed = await requestConfirm({
-        title: 'Transfer Ownership?',
-        description: `Are you sure you want to transfer ownership of "${company?.companyName}" to ${collaborator?.email || 'this user'}? You will become a collaborator with limited permissions.`,
-        confirmLabel: 'Transfer Ownership',
-        cancelLabel: 'Cancel',
-        confirmVariant: 'danger',
-      });
-
-      if (!confirmed) return;
-
-      const res = await authedFetch(`${backendBaseUrl}/api/company/${activeCompanyId}/transfer-ownership`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newOwnerId }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to transfer ownership');
-      }
-
-      const responseData = await res.json();
-      notify(responseData.message || 'Ownership transferred successfully', 'success');
-
-      // Navigate to dashboard to trigger natural reload of companies and collaborators
-      navigate(`/company/${encodeURIComponent(activeCompanyId)}/dashboard`);
-      // Force a page refresh to ensure all state updates
-      window.location.reload();
-
-    } catch (err: any) {
-      console.error('Error transferring ownership:', err);
-      notify(err.message || 'Failed to transfer ownership', 'error');
-    }
-  };
-
-
-
+  const handleModalUploadDesigns = useCallback((files: FileList | null) => (
+    Promise.resolve(handleUploadDesigns(files))
+  ), [handleUploadDesigns]);
 
   if (authLoading) {
     return (
@@ -2884,802 +1346,73 @@ function App() {
                   path="/company/:companyId/settings"
                   element={<Navigate to="brand-intelligence" replace />}
                 />
-                <Route
-                  path="/company/:companyId/settings/brand-intelligence"
-                  element={
-                    <SettingsPage
-                      tab="brand-intelligence"
-                      notify={notify}
-                      authedFetch={authedFetch}
-                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                      brandIntelligenceReady={brandIntelligenceReady}
-                      brandSetupMode={brandSetupMode}
-                      setBrandSetupMode={setBrandSetupMode}
-                      brandSetupLevel={brandSetupLevel}
-                      setBrandSetupLevel={setBrandSetupLevel}
-                      brandSetupStep={brandSetupStep}
-                      setBrandSetupStep={setBrandSetupStep}
-                      setIsEditingBrandSetup={setIsEditingBrandSetup}
-                      collaborators={collaborators}
-                      customRoles={customRoles}
-                      onUpdateCustomRoles={handleUpdateCustomRoles}
-                      onAssignRole={handleAssignRole}
-                      companyName={companyName}
-                      setCompanyName={setCompanyName}
-                      companyDescription={companyDescription}
-                      setCompanyDescription={setCompanyDescription}
-                      loadBrandKB={loadBrandKB}
-                      brandKbId={brandKbId}
-                      onSaveCompanyDetails={handleUpdateCompany}
-                      brandPack={brandPack}
-                      setBrandPack={setBrandPack}
-                      brandCapability={brandCapability}
-                      setBrandCapability={setBrandCapability}
-                      emojiRule={emojiRule}
-                      setEmojiRule={setEmojiRule}
-                      systemInstruction={systemInstruction}
-                      setSystemInstruction={setSystemInstruction}
-                      aiWriterSystemPrompt={aiWriterSystemPrompt}
-                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                      aiWriterUserPrompt={aiWriterUserPrompt}
-                      setAiWriterUserPrompt={setAiWriterUserPrompt}
-                      activeBrandRuleEdit={activeBrandRuleEdit}
-                      brandRuleDraft={brandRuleDraft}
-                      setBrandRuleDraft={setBrandRuleDraft}
-                      startBrandRuleEdit={startBrandRuleEdit}
-                      cancelBrandRuleEdit={cancelBrandRuleEdit}
-                      saveBrandRuleEdit={saveBrandRuleEdit}
-                      saveBrandSetup={saveBrandSetup}
-                      sendBrandWebhook={sendBrandWebhook}
-                      buildFormAnswer={buildFormAnswer}
-                      brandBasicsGoal={brandBasicsGoal}
-                      setBrandBasicsGoal={setBrandBasicsGoal}
-                      regulatedIndustry={regulatedIndustry}
-                      setRegulatedIndustry={setRegulatedIndustry}
-                      legalReview={legalReview}
-                      setLegalReview={setLegalReview}
-                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
-                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
-                      industryOptions={industryOptions}
-                      audienceRoleOptions={audienceRoleOptions}
-                      painPointOptions={painPointOptions}
-                      noSayOptions={noSayOptions}
-                      brandBasicsName={brandBasicsName}
-                      setBrandBasicsName={setBrandBasicsName}
-                      brandBasicsIndustry={brandBasicsIndustry}
-                      setBrandBasicsIndustry={setBrandBasicsIndustry}
-                      brandBasicsType={brandBasicsType}
-                      setBrandBasicsType={setBrandBasicsType}
-                      brandBasicsOffer={brandBasicsOffer}
-                      setBrandBasicsOffer={setBrandBasicsOffer}
-                      audienceRole={audienceRole}
-                      setAudienceRole={setAudienceRole}
-                      audienceIndustry={audienceIndustry}
-                      setAudienceIndustry={setAudienceIndustry}
-                      audiencePainPoints={audiencePainPoints}
-                      setAudiencePainPoints={setAudiencePainPoints}
-                      audienceOutcome={audienceOutcome}
-                      setAudienceOutcome={setAudienceOutcome}
-                      toneFormal={toneFormal}
-                      setToneFormal={setToneFormal}
-                      toneEnergy={toneEnergy}
-                      setToneEnergy={setToneEnergy}
-                      toneBold={toneBold}
-                      setToneBold={setToneBold}
-                      emojiUsage={emojiUsage}
-                      setEmojiUsage={setEmojiUsage}
-                      writingLength={writingLength}
-                      setWritingLength={setWritingLength}
-                      ctaStrength={ctaStrength}
-                      setCtaStrength={setCtaStrength}
-                      absoluteTruths={absoluteTruths}
-                      setAbsoluteTruths={setAbsoluteTruths}
-                      noSayRules={noSayRules}
-                      setNoSayRules={setNoSayRules}
-                      advancedPositioning={advancedPositioning}
-                      setAdvancedPositioning={setAdvancedPositioning}
-                      advancedDifferentiators={advancedDifferentiators}
-                      setAdvancedDifferentiators={setAdvancedDifferentiators}
-                      advancedPillars={advancedPillars}
-                      setAdvancedPillars={setAdvancedPillars}
-                      advancedCompetitors={advancedCompetitors}
-                      setAdvancedCompetitors={setAdvancedCompetitors}
-                      advancedProofPoints={advancedProofPoints}
-                      setAdvancedProofPoints={setAdvancedProofPoints}
-                      advancedRequiredPhrases={advancedRequiredPhrases}
-                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
-                      advancedForbiddenPhrases={advancedForbiddenPhrases}
-                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
-                      advancedComplianceNotes={advancedComplianceNotes}
-                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
-                      writerRulesUnlocked={writerRulesUnlocked}
-                      reviewerRulesUnlocked={reviewerRulesUnlocked}
-                      newCollaboratorEmail={newCollaboratorEmail}
-                      setNewCollaboratorEmail={setNewCollaboratorEmail}
-                      onAddCollaborator={handleAddCollaborator}
-                      onRemoveCollaborator={handleRemoveCollaborator}
-                      onTransferOwnership={handleTransferOwnership}
-                      userPermissions={userPermissions}
-                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
-                      connectedAccounts={connectedAccounts}
-                      onConnectLinkedIn={handleConnectLinkedIn}
-                      onConnectFacebook={handleConnectFacebook}
-                      isEditingBrandSetup={isEditingBrandSetup}
-                      brandEditingRef={brandEditingRef}
-                      onDisconnectAccount={handleDisconnectAccount}
-                      formAnswerCache={formAnswerCache}
-                      backendBaseUrl={backendBaseUrl}
-                    />
-                  }
-                />
-                <Route
-                  path="/company/:companyId/settings/workflow"
-                  element={
-                    <SettingsPage
-                      tab="workflow"
-                      notify={notify}
-                      authedFetch={authedFetch}
-                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                      brandIntelligenceReady={brandIntelligenceReady}
-                      brandSetupMode={brandSetupMode}
-                      setBrandSetupMode={setBrandSetupMode}
-                      brandSetupLevel={brandSetupLevel}
-                      setBrandSetupLevel={setBrandSetupLevel}
-                      brandSetupStep={brandSetupStep}
-                      setBrandSetupStep={setBrandSetupStep}
-                      setIsEditingBrandSetup={setIsEditingBrandSetup}
-                      collaborators={collaborators}
-                      customRoles={customRoles}
-                      onUpdateCustomRoles={handleUpdateCustomRoles}
-                      onAssignRole={handleAssignRole}
-                      companyName={companyName}
-                      setCompanyName={setCompanyName}
-                      companyDescription={companyDescription}
-                      setCompanyDescription={setCompanyDescription}
-                      loadBrandKB={loadBrandKB}
-                      brandKbId={brandKbId}
-                      onSaveCompanyDetails={handleUpdateCompany}
-                      brandPack={brandPack}
-                      setBrandPack={setBrandPack}
-                      brandCapability={brandCapability}
-                      setBrandCapability={setBrandCapability}
-                      emojiRule={emojiRule}
-                      setEmojiRule={setEmojiRule}
-                      systemInstruction={systemInstruction}
-                      setSystemInstruction={setSystemInstruction}
-                      aiWriterSystemPrompt={aiWriterSystemPrompt}
-                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                      aiWriterUserPrompt={aiWriterUserPrompt}
-                      setAiWriterUserPrompt={setAiWriterUserPrompt}
-                      activeBrandRuleEdit={activeBrandRuleEdit}
-                      brandRuleDraft={brandRuleDraft}
-                      setBrandRuleDraft={setBrandRuleDraft}
-                      startBrandRuleEdit={startBrandRuleEdit}
-                      cancelBrandRuleEdit={cancelBrandRuleEdit}
-                      saveBrandRuleEdit={saveBrandRuleEdit}
-                      saveBrandSetup={saveBrandSetup}
-                      sendBrandWebhook={sendBrandWebhook}
-                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
-                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
-                      buildFormAnswer={buildFormAnswer}
-                      industryOptions={industryOptions}
-                      audienceRoleOptions={audienceRoleOptions}
-                      painPointOptions={painPointOptions}
-                      noSayOptions={noSayOptions}
-                      brandBasicsName={brandBasicsName}
-                      setBrandBasicsName={setBrandBasicsName}
-                      brandBasicsIndustry={brandBasicsIndustry}
-                      setBrandBasicsIndustry={setBrandBasicsIndustry}
-                      brandBasicsType={brandBasicsType}
-                      setBrandBasicsType={setBrandBasicsType}
-                      brandBasicsOffer={brandBasicsOffer}
-                      setBrandBasicsOffer={setBrandBasicsOffer}
-                      brandBasicsGoal={brandBasicsGoal}
-                      setBrandBasicsGoal={setBrandBasicsGoal}
-                      audienceRole={audienceRole}
-                      setAudienceRole={setAudienceRole}
-                      audienceIndustry={audienceIndustry}
-                      setAudienceIndustry={setAudienceIndustry}
-                      audiencePainPoints={audiencePainPoints}
-                      setAudiencePainPoints={setAudiencePainPoints}
-                      audienceOutcome={audienceOutcome}
-                      setAudienceOutcome={setAudienceOutcome}
-                      toneFormal={toneFormal}
-                      setToneFormal={setToneFormal}
-                      toneEnergy={toneEnergy}
-                      setToneEnergy={setToneEnergy}
-                      toneBold={toneBold}
-                      setToneBold={setToneBold}
-                      emojiUsage={emojiUsage}
-                      setEmojiUsage={setEmojiUsage}
-                      writingLength={writingLength}
-                      setWritingLength={setWritingLength}
-                      ctaStrength={ctaStrength}
-                      setCtaStrength={setCtaStrength}
-                      absoluteTruths={absoluteTruths}
-                      setAbsoluteTruths={setAbsoluteTruths}
-                      noSayRules={noSayRules}
-                      setNoSayRules={setNoSayRules}
-                      regulatedIndustry={regulatedIndustry}
-                      setRegulatedIndustry={setRegulatedIndustry}
-                      legalReview={legalReview}
-                      setLegalReview={setLegalReview}
-                      advancedPositioning={advancedPositioning}
-                      setAdvancedPositioning={setAdvancedPositioning}
-                      advancedDifferentiators={advancedDifferentiators}
-                      setAdvancedDifferentiators={setAdvancedDifferentiators}
-                      advancedPillars={advancedPillars}
-                      setAdvancedPillars={setAdvancedPillars}
-                      advancedCompetitors={advancedCompetitors}
-                      setAdvancedCompetitors={setAdvancedCompetitors}
-                      advancedProofPoints={advancedProofPoints}
-                      setAdvancedProofPoints={setAdvancedProofPoints}
-                      advancedRequiredPhrases={advancedRequiredPhrases}
-                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
-                      advancedForbiddenPhrases={advancedForbiddenPhrases}
-                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
-                      advancedComplianceNotes={advancedComplianceNotes}
-                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
-                      writerRulesUnlocked={writerRulesUnlocked}
-                      reviewerRulesUnlocked={reviewerRulesUnlocked}
-                      newCollaboratorEmail={newCollaboratorEmail}
-                      setNewCollaboratorEmail={setNewCollaboratorEmail}
-                      onAddCollaborator={handleAddCollaborator}
-                      onRemoveCollaborator={handleRemoveCollaborator}
-                      onTransferOwnership={handleTransferOwnership}
-                      userPermissions={userPermissions}
-                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
-                      connectedAccounts={connectedAccounts}
-                      onConnectLinkedIn={handleConnectLinkedIn}
-                      onConnectFacebook={handleConnectFacebook}
-                      isEditingBrandSetup={isEditingBrandSetup}
-                      brandEditingRef={brandEditingRef}
-                      onDisconnectAccount={handleDisconnectAccount}
-                      formAnswerCache={formAnswerCache}
-                      backendBaseUrl={backendBaseUrl}
-                    />
-                  }
-                />
-                <Route
-                  path="/company/:companyId/settings/team"
-                  element={
-                    <SettingsPage
-                      tab="team"
-                      notify={notify}
-                      authedFetch={authedFetch}
-                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                      brandIntelligenceReady={brandIntelligenceReady}
-                      brandSetupMode={brandSetupMode}
-                      setBrandSetupMode={setBrandSetupMode}
-                      brandSetupLevel={brandSetupLevel}
-                      setBrandSetupLevel={setBrandSetupLevel}
-                      brandSetupStep={brandSetupStep}
-                      setBrandSetupStep={setBrandSetupStep}
-                      setIsEditingBrandSetup={setIsEditingBrandSetup}
-                      collaborators={collaborators}
-                      customRoles={customRoles}
-                      onUpdateCustomRoles={handleUpdateCustomRoles}
-                      onAssignRole={handleAssignRole}
-                      companyName={companyName}
-                      setCompanyName={setCompanyName}
-                      companyDescription={companyDescription}
-                      setCompanyDescription={setCompanyDescription}
-                      loadBrandKB={loadBrandKB}
-                      brandKbId={brandKbId}
-                      onSaveCompanyDetails={handleUpdateCompany}
-                      brandPack={brandPack}
-                      setBrandPack={setBrandPack}
-                      brandCapability={brandCapability}
-                      setBrandCapability={setBrandCapability}
-                      emojiRule={emojiRule}
-                      setEmojiRule={setEmojiRule}
-                      systemInstruction={systemInstruction}
-                      setSystemInstruction={setSystemInstruction}
-                      aiWriterSystemPrompt={aiWriterSystemPrompt}
-                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                      aiWriterUserPrompt={aiWriterUserPrompt}
-                      setAiWriterUserPrompt={setAiWriterUserPrompt}
-                      activeBrandRuleEdit={activeBrandRuleEdit}
-                      brandRuleDraft={brandRuleDraft}
-                      setBrandRuleDraft={setBrandRuleDraft}
-                      startBrandRuleEdit={startBrandRuleEdit}
-                      cancelBrandRuleEdit={cancelBrandRuleEdit}
-                      saveBrandRuleEdit={saveBrandRuleEdit}
-                      saveBrandSetup={saveBrandSetup}
-                      sendBrandWebhook={sendBrandWebhook}
-                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
-                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
-                      buildFormAnswer={buildFormAnswer}
-                      industryOptions={industryOptions}
-                      audienceRoleOptions={audienceRoleOptions}
-                      painPointOptions={painPointOptions}
-                      noSayOptions={noSayOptions}
-                      brandBasicsName={brandBasicsName}
-                      setBrandBasicsName={setBrandBasicsName}
-                      brandBasicsIndustry={brandBasicsIndustry}
-                      setBrandBasicsIndustry={setBrandBasicsIndustry}
-                      brandBasicsType={brandBasicsType}
-                      setBrandBasicsType={setBrandBasicsType}
-                      brandBasicsOffer={brandBasicsOffer}
-                      setBrandBasicsOffer={setBrandBasicsOffer}
-                      brandBasicsGoal={brandBasicsGoal}
-                      setBrandBasicsGoal={setBrandBasicsGoal}
-                      audienceRole={audienceRole}
-                      setAudienceRole={setAudienceRole}
-                      audienceIndustry={audienceIndustry}
-                      setAudienceIndustry={setAudienceIndustry}
-                      audiencePainPoints={audiencePainPoints}
-                      setAudiencePainPoints={setAudiencePainPoints}
-                      audienceOutcome={audienceOutcome}
-                      setAudienceOutcome={setAudienceOutcome}
-                      toneFormal={toneFormal}
-                      setToneFormal={setToneFormal}
-                      toneEnergy={toneEnergy}
-                      setToneEnergy={setToneEnergy}
-                      toneBold={toneBold}
-                      setToneBold={setToneBold}
-                      emojiUsage={emojiUsage}
-                      setEmojiUsage={setEmojiUsage}
-                      writingLength={writingLength}
-                      setWritingLength={setWritingLength}
-                      ctaStrength={ctaStrength}
-                      setCtaStrength={setCtaStrength}
-                      absoluteTruths={absoluteTruths}
-                      setAbsoluteTruths={setAbsoluteTruths}
-                      noSayRules={noSayRules}
-                      setNoSayRules={setNoSayRules}
-                      regulatedIndustry={regulatedIndustry}
-                      setRegulatedIndustry={setRegulatedIndustry}
-                      legalReview={legalReview}
-                      setLegalReview={setLegalReview}
-                      advancedPositioning={advancedPositioning}
-                      setAdvancedPositioning={setAdvancedPositioning}
-                      advancedDifferentiators={advancedDifferentiators}
-                      setAdvancedDifferentiators={setAdvancedDifferentiators}
-                      advancedPillars={advancedPillars}
-                      setAdvancedPillars={setAdvancedPillars}
-                      advancedCompetitors={advancedCompetitors}
-                      setAdvancedCompetitors={setAdvancedCompetitors}
-                      advancedProofPoints={advancedProofPoints}
-                      setAdvancedProofPoints={setAdvancedProofPoints}
-                      advancedRequiredPhrases={advancedRequiredPhrases}
-                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
-                      advancedForbiddenPhrases={advancedForbiddenPhrases}
-                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
-                      advancedComplianceNotes={advancedComplianceNotes}
-                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
-                      writerRulesUnlocked={writerRulesUnlocked}
-                      reviewerRulesUnlocked={reviewerRulesUnlocked}
-                      newCollaboratorEmail={newCollaboratorEmail}
-                      setNewCollaboratorEmail={setNewCollaboratorEmail}
-                      onAddCollaborator={handleAddCollaborator}
-                      onRemoveCollaborator={handleRemoveCollaborator}
-                      onTransferOwnership={handleTransferOwnership}
-                      userPermissions={userPermissions}
-                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
-                      connectedAccounts={connectedAccounts}
-                      onConnectLinkedIn={handleConnectLinkedIn}
-                      onConnectFacebook={handleConnectFacebook}
-                      isEditingBrandSetup={isEditingBrandSetup}
-                      brandEditingRef={brandEditingRef}
-                      onDisconnectAccount={handleDisconnectAccount}
-                      formAnswerCache={formAnswerCache}
-                      backendBaseUrl={backendBaseUrl}
-                    />}
-                />
-                <Route
-                  path="/company/:companyId/settings/integrations"
-                  element={
-                    <SettingsPage
-                      tab="integrations"
-                      notify={notify}
-                      authedFetch={authedFetch}
-                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                      brandIntelligenceReady={brandIntelligenceReady}
-                      brandSetupMode={brandSetupMode}
-                      setBrandSetupMode={setBrandSetupMode}
-                      brandSetupLevel={brandSetupLevel}
-                      setBrandSetupLevel={setBrandSetupLevel}
-                      brandSetupStep={brandSetupStep}
-                      setBrandSetupStep={setBrandSetupStep}
-                      setIsEditingBrandSetup={setIsEditingBrandSetup}
-                      collaborators={collaborators}
-                      customRoles={customRoles}
-                      onUpdateCustomRoles={handleUpdateCustomRoles}
-                      onAssignRole={handleAssignRole}
-                      companyName={companyName}
-                      setCompanyName={setCompanyName}
-                      companyDescription={companyDescription}
-                      setCompanyDescription={setCompanyDescription}
-                      loadBrandKB={loadBrandKB}
-                      brandKbId={brandKbId}
-                      onSaveCompanyDetails={handleUpdateCompany}
-                      brandPack={brandPack}
-                      setBrandPack={setBrandPack}
-                      brandCapability={brandCapability}
-                      setBrandCapability={setBrandCapability}
-                      emojiRule={emojiRule}
-                      setEmojiRule={setEmojiRule}
-                      systemInstruction={systemInstruction}
-                      setSystemInstruction={setSystemInstruction}
-                      aiWriterSystemPrompt={aiWriterSystemPrompt}
-                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                      aiWriterUserPrompt={aiWriterUserPrompt}
-                      setAiWriterUserPrompt={setAiWriterUserPrompt}
-                      activeBrandRuleEdit={activeBrandRuleEdit}
-                      brandRuleDraft={brandRuleDraft}
-                      setBrandRuleDraft={setBrandRuleDraft}
-                      startBrandRuleEdit={startBrandRuleEdit}
-                      cancelBrandRuleEdit={cancelBrandRuleEdit}
-                      saveBrandRuleEdit={saveBrandRuleEdit}
-                      saveBrandSetup={saveBrandSetup}
-                      sendBrandWebhook={sendBrandWebhook}
-                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
-                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
-                      buildFormAnswer={buildFormAnswer}
-                      industryOptions={industryOptions}
-                      audienceRoleOptions={audienceRoleOptions}
-                      painPointOptions={painPointOptions}
-                      noSayOptions={noSayOptions}
-                      brandBasicsName={brandBasicsName}
-                      setBrandBasicsName={setBrandBasicsName}
-                      brandBasicsIndustry={brandBasicsIndustry}
-                      setBrandBasicsIndustry={setBrandBasicsIndustry}
-                      brandBasicsType={brandBasicsType}
-                      setBrandBasicsType={setBrandBasicsType}
-                      brandBasicsOffer={brandBasicsOffer}
-                      setBrandBasicsOffer={setBrandBasicsOffer}
-                      brandBasicsGoal={brandBasicsGoal}
-                      setBrandBasicsGoal={setBrandBasicsGoal}
-                      audienceRole={audienceRole}
-                      setAudienceRole={setAudienceRole}
-                      audienceIndustry={audienceIndustry}
-                      setAudienceIndustry={setAudienceIndustry}
-                      audiencePainPoints={audiencePainPoints}
-                      setAudiencePainPoints={setAudiencePainPoints}
-                      audienceOutcome={audienceOutcome}
-                      setAudienceOutcome={setAudienceOutcome}
-                      toneFormal={toneFormal}
-                      setToneFormal={setToneFormal}
-                      toneEnergy={toneEnergy}
-                      setToneEnergy={setToneEnergy}
-                      toneBold={toneBold}
-                      setToneBold={setToneBold}
-                      emojiUsage={emojiUsage}
-                      setEmojiUsage={setEmojiUsage}
-                      writingLength={writingLength}
-                      setWritingLength={setWritingLength}
-                      ctaStrength={ctaStrength}
-                      setCtaStrength={setCtaStrength}
-                      absoluteTruths={absoluteTruths}
-                      setAbsoluteTruths={setAbsoluteTruths}
-                      noSayRules={noSayRules}
-                      setNoSayRules={setNoSayRules}
-                      regulatedIndustry={regulatedIndustry}
-                      setRegulatedIndustry={setRegulatedIndustry}
-                      legalReview={legalReview}
-                      setLegalReview={setLegalReview}
-                      advancedPositioning={advancedPositioning}
-                      setAdvancedPositioning={setAdvancedPositioning}
-                      advancedDifferentiators={advancedDifferentiators}
-                      setAdvancedDifferentiators={setAdvancedDifferentiators}
-                      advancedPillars={advancedPillars}
-                      setAdvancedPillars={setAdvancedPillars}
-                      advancedCompetitors={advancedCompetitors}
-                      setAdvancedCompetitors={setAdvancedCompetitors}
-                      advancedProofPoints={advancedProofPoints}
-                      setAdvancedProofPoints={setAdvancedProofPoints}
-                      advancedRequiredPhrases={advancedRequiredPhrases}
-                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
-                      advancedForbiddenPhrases={advancedForbiddenPhrases}
-                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
-                      advancedComplianceNotes={advancedComplianceNotes}
-                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
-                      writerRulesUnlocked={writerRulesUnlocked}
-                      reviewerRulesUnlocked={reviewerRulesUnlocked}
-                      newCollaboratorEmail={newCollaboratorEmail}
-                      setNewCollaboratorEmail={setNewCollaboratorEmail}
-                      onAddCollaborator={handleAddCollaborator}
-                      onRemoveCollaborator={handleRemoveCollaborator}
-                      onTransferOwnership={handleTransferOwnership}
-                      userPermissions={userPermissions}
-                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
-                      connectedAccounts={connectedAccounts}
-                      onConnectLinkedIn={handleConnectLinkedIn}
-                      onConnectFacebook={handleConnectFacebook}
-                      isEditingBrandSetup={isEditingBrandSetup}
-                      brandEditingRef={brandEditingRef}
-                      onDisconnectAccount={handleDisconnectAccount}
-                      formAnswerCache={formAnswerCache}
-                      backendBaseUrl={backendBaseUrl}
-                    />}
-                />
-                <Route
-                  path="/company/:companyId/settings/audit"
-                  element={
-                    <SettingsPage
-                      tab="audit"
-                      notify={notify}
-                      authedFetch={authedFetch}
-                      setActiveCompanyIdWithPersistence={setActiveCompanyIdWithPersistence}
-                      brandIntelligenceReady={brandIntelligenceReady}
-                      brandSetupMode={brandSetupMode}
-                      setBrandSetupMode={setBrandSetupMode}
-                      brandSetupLevel={brandSetupLevel}
-                      setBrandSetupLevel={setBrandSetupLevel}
-                      brandSetupStep={brandSetupStep}
-                      setBrandSetupStep={setBrandSetupStep}
-                      setIsEditingBrandSetup={setIsEditingBrandSetup}
-                      collaborators={collaborators}
-                      customRoles={customRoles}
-                      onUpdateCustomRoles={handleUpdateCustomRoles}
-                      onAssignRole={handleAssignRole}
-                      companyName={companyName}
-                      setCompanyName={setCompanyName}
-                      companyDescription={companyDescription}
-                      setCompanyDescription={setCompanyDescription}
-                      loadBrandKB={loadBrandKB}
-                      brandKbId={brandKbId}
-                      onSaveCompanyDetails={handleUpdateCompany}
-                      brandPack={brandPack}
-                      setBrandPack={setBrandPack}
-                      brandCapability={brandCapability}
-                      setBrandCapability={setBrandCapability}
-                      emojiRule={emojiRule}
-                      setEmojiRule={setEmojiRule}
-                      systemInstruction={systemInstruction}
-                      setSystemInstruction={setSystemInstruction}
-                      aiWriterSystemPrompt={aiWriterSystemPrompt}
-                      setAiWriterSystemPrompt={setAiWriterSystemPrompt}
-                      aiWriterUserPrompt={aiWriterUserPrompt}
-                      setAiWriterUserPrompt={setAiWriterUserPrompt}
-                      activeBrandRuleEdit={activeBrandRuleEdit}
-                      brandRuleDraft={brandRuleDraft}
-                      setBrandRuleDraft={setBrandRuleDraft}
-                      startBrandRuleEdit={startBrandRuleEdit}
-                      cancelBrandRuleEdit={cancelBrandRuleEdit}
-                      saveBrandRuleEdit={saveBrandRuleEdit}
-                      saveBrandSetup={saveBrandSetup}
-                      sendBrandWebhook={sendBrandWebhook}
-                      isBrandWebhookCoolingDown={isBrandWebhookCoolingDown}
-                      brandWebhookCooldownSecondsLeft={brandWebhookCooldownSecondsLeft}
-                      buildFormAnswer={buildFormAnswer}
-                      industryOptions={industryOptions}
-                      audienceRoleOptions={audienceRoleOptions}
-                      painPointOptions={painPointOptions}
-                      noSayOptions={noSayOptions}
-                      brandBasicsName={brandBasicsName}
-                      setBrandBasicsName={setBrandBasicsName}
-                      brandBasicsIndustry={brandBasicsIndustry}
-                      setBrandBasicsIndustry={setBrandBasicsIndustry}
-                      brandBasicsType={brandBasicsType}
-                      setBrandBasicsType={setBrandBasicsType}
-                      brandBasicsOffer={brandBasicsOffer}
-                      setBrandBasicsOffer={setBrandBasicsOffer}
-                      brandBasicsGoal={brandBasicsGoal}
-                      setBrandBasicsGoal={setBrandBasicsGoal}
-                      audienceRole={audienceRole}
-                      setAudienceRole={setAudienceRole}
-                      audienceIndustry={audienceIndustry}
-                      setAudienceIndustry={setAudienceIndustry}
-                      audiencePainPoints={audiencePainPoints}
-                      setAudiencePainPoints={setAudiencePainPoints}
-                      audienceOutcome={audienceOutcome}
-                      setAudienceOutcome={setAudienceOutcome}
-                      toneFormal={toneFormal}
-                      setToneFormal={setToneFormal}
-                      toneEnergy={toneEnergy}
-                      setToneEnergy={setToneEnergy}
-                      toneBold={toneBold}
-                      setToneBold={setToneBold}
-                      emojiUsage={emojiUsage}
-                      setEmojiUsage={setEmojiUsage}
-                      writingLength={writingLength}
-                      setWritingLength={setWritingLength}
-                      ctaStrength={ctaStrength}
-                      setCtaStrength={setCtaStrength}
-                      absoluteTruths={absoluteTruths}
-                      setAbsoluteTruths={setAbsoluteTruths}
-                      noSayRules={noSayRules}
-                      setNoSayRules={setNoSayRules}
-                      regulatedIndustry={regulatedIndustry}
-                      setRegulatedIndustry={setRegulatedIndustry}
-                      legalReview={legalReview}
-                      setLegalReview={setLegalReview}
-                      advancedPositioning={advancedPositioning}
-                      setAdvancedPositioning={setAdvancedPositioning}
-                      advancedDifferentiators={advancedDifferentiators}
-                      setAdvancedDifferentiators={setAdvancedDifferentiators}
-                      advancedPillars={advancedPillars}
-                      setAdvancedPillars={setAdvancedPillars}
-                      advancedCompetitors={advancedCompetitors}
-                      setAdvancedCompetitors={setAdvancedCompetitors}
-                      advancedProofPoints={advancedProofPoints}
-                      setAdvancedProofPoints={setAdvancedProofPoints}
-                      advancedRequiredPhrases={advancedRequiredPhrases}
-                      setAdvancedRequiredPhrases={setAdvancedRequiredPhrases}
-                      advancedForbiddenPhrases={advancedForbiddenPhrases}
-                      setAdvancedForbiddenPhrases={setAdvancedForbiddenPhrases}
-                      advancedComplianceNotes={advancedComplianceNotes}
-                      setAdvancedComplianceNotes={setAdvancedComplianceNotes}
-                      writerRulesUnlocked={writerRulesUnlocked}
-                      reviewerRulesUnlocked={reviewerRulesUnlocked}
-                      newCollaboratorEmail={newCollaboratorEmail}
-                      setNewCollaboratorEmail={setNewCollaboratorEmail}
-                      onAddCollaborator={handleAddCollaborator}
-                      onRemoveCollaborator={handleRemoveCollaborator}
-                      onTransferOwnership={handleTransferOwnership}
-                      userPermissions={userPermissions}
-                      onDeleteCompany={() => handleDeleteCompany(activeCompanyId!)}
-                      connectedAccounts={connectedAccounts}
-                      onConnectLinkedIn={handleConnectLinkedIn}
-                      onConnectFacebook={handleConnectFacebook}
-                      isEditingBrandSetup={isEditingBrandSetup}
-                      brandEditingRef={brandEditingRef}
-                      onDisconnectAccount={handleDisconnectAccount}
-                      formAnswerCache={formAnswerCache}
-                      backendBaseUrl={backendBaseUrl}
-                    />}
-                />
-
+                {COMPANY_SETTINGS_ROUTES.map(({ path, tab }) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={<SettingsPage {...buildSettingsPageProps(tab, settingsPageSharedProps)} />}
+                  />
+                ))}
                 <Route
                   path="/admin"
                   element={<Navigate to="/admin/overview" replace />}
                 />
-                <Route
-                  path="/admin/overview"
-                  element={
-                    <AdminDashboardPage
-                      tab="overview"
-                      authedFetch={authedFetch}
-                      backendBaseUrl={backendBaseUrl}
-                      notify={notify}
-                    />
-                  }
-                />
-                <Route
-                  path="/admin/users"
-                  element={
-                    <AdminDashboardPage
-                      tab="users"
-                      authedFetch={authedFetch}
-                      backendBaseUrl={backendBaseUrl}
-                      notify={notify}
-                    />
-                  }
-                />
-                <Route
-                  path="/admin/companies"
-                  element={
-                    <AdminDashboardPage
-                      tab="companies"
-                      authedFetch={authedFetch}
-                      backendBaseUrl={backendBaseUrl}
-                      notify={notify}
-                    />
-                  }
-                />
-                <Route
-                  path="/admin/health"
-                  element={
-                    <AdminDashboardPage
-                      tab="health"
-                      authedFetch={authedFetch}
-                      backendBaseUrl={backendBaseUrl}
-                      notify={notify}
-                    />
-                  }
-                />
-                <Route
-                  path="/admin/logs"
-                  element={
-                    <AdminDashboardPage
-                      tab="logs"
-                      authedFetch={authedFetch}
-                      backendBaseUrl={backendBaseUrl}
-                      notify={notify}
-                    />
-                  }
-                />
-                <Route
-                  path="/admin/settings"
-                  element={
-                    <AdminDashboardPage
-                      tab="toolbox"
-                      authedFetch={authedFetch}
-                      backendBaseUrl={backendBaseUrl}
-                      notify={notify}
-                    />
-                  }
-                />
-                <Route
-                  path="/admin/prompts"
-                  element={
-                    <AdminDashboardPage
-                      tab="prompts"
-                      authedFetch={authedFetch}
-                      backendBaseUrl={backendBaseUrl}
-                      notify={notify}
-                    />
-                  }
-                />
+                {ADMIN_ROUTES.map(({ path, tab }) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={<AdminDashboardPage {...buildAdminDashboardProps(tab, adminDashboardSharedProps)} />}
+                  />
+                ))}
                 <Route path="/profile" element={<ProfilePage session={session} supabase={supabase} notify={notify} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
           </div>
         </div>
-
-
-
-        <OnboardingModal
-          isOpen={isOnboardingOpen}
-          onComplete={handleOnboardingComplete}
+        <AppOverlays
+          isOnboardingOpen={isOnboardingOpen}
+          handleOnboardingComplete={handleOnboardingComplete}
           notify={notify}
           isAiAssistantOpen={isAiAssistantOpen}
-          isLoading={isCreatingCompany}
-        />
-
-        <AddCompanyModal
-          isOpen={isAddCompanyModalOpen}
-          onClose={() => setIsAddCompanyModalOpen(false)}
+          isCreatingCompany={isCreatingCompany}
+          isAddCompanyModalOpen={isAddCompanyModalOpen}
+          setIsAddCompanyModalOpen={setIsAddCompanyModalOpen}
           newCompanyName={newCompanyName}
           setNewCompanyName={setNewCompanyName}
           newCompanyDescription={newCompanyDescription}
           setNewCompanyDescription={setNewCompanyDescription}
-          onSubmit={handleAddCompany}
-          notify={notify}
-          isAiAssistantOpen={isAiAssistantOpen}
-          isLoading={isCreatingCompany}
-        />
-
-        <CsvExportModal
-          isOpen={isCsvModalOpen}
-          onClose={() => setIsCsvModalOpen(false)}
+          handleAddCompany={handleAddCompany}
+          isCsvModalOpen={isCsvModalOpen}
+          setIsCsvModalOpen={setIsCsvModalOpen}
           csvScope={csvScope}
           setCsvScope={setCsvScope}
           csvFieldSelection={csvFieldSelection}
           setCsvFieldSelection={setCsvFieldSelection}
           csvFieldDefinitions={csvFieldDefinitions}
           handleExportCsv={handleExportCsv}
-          isAiAssistantOpen={isAiAssistantOpen}
-        />
-
-        <CopyModal
-          isOpen={isCopyModalOpen}
-          onClose={() => {
-            setIsCopyModalOpen(false);
-            setCopySuccessMessage('');
-          }}
+          isCopyModalOpen={isCopyModalOpen}
+          setIsCopyModalOpen={setIsCopyModalOpen}
+          setCopySuccessMessage={setCopySuccessMessage}
           copyFieldSelection={copyFieldSelection}
           setCopyFieldSelection={setCopyFieldSelection}
           copyFieldDefinitions={copyFieldDefinitions}
           copySuccessMessage={copySuccessMessage}
           handleCopySpreadsheet={handleCopySpreadsheet}
-          isAiAssistantOpen={isAiAssistantOpen}
-        />
-
-        <DraftPublishModal
-          isOpen={isDraftModalOpen}
-          onClose={() => setIsDraftModalOpen(false)}
+          isDraftModalOpen={isDraftModalOpen}
+          setIsDraftModalOpen={setIsDraftModalOpen}
           selectedRow={selectedRow}
           activeCompany={activeCompany}
           draftPublishIntent={draftPublishIntent}
           setDraftPublishIntent={setDraftPublishIntent}
           handleDraftPublishIntent={handleDraftPublishIntent}
-          getAttachedDesignUrls={getAttachedDesignUrls}
-          getImageGeneratedUrl={getImageGeneratedUrl}
           imagePreviewNonce={imagePreviewNonce}
-          handleCopy={handleCopy}
+          handleCopy={handleModalCopy}
           copiedField={copiedField}
-          handleUploadDesigns={handleUploadDesigns}
+          handleUploadDesigns={handleModalUploadDesigns}
           isUploadingDesigns={isUploadingDesigns}
-          isAiAssistantOpen={isAiAssistantOpen}
-        />
-
-        <BulkImportModal
-          isOpen={isBulkModalOpen}
-          onClose={() => setIsBulkModalOpen(false)}
+          isBulkModalOpen={isBulkModalOpen}
+          setIsBulkModalOpen={setIsBulkModalOpen}
           bulkText={bulkText}
           setBulkText={setBulkText}
           bulkPreview={bulkPreview}
@@ -3689,21 +1422,9 @@ function App() {
           isImporting={isImporting}
           parseBulkText={parseBulkText}
           handleBulkImport={handleBulkImport}
-          isAiAssistantOpen={isAiAssistantOpen}
-        />
-
-        <ViewContentModal
-          isOpen={isViewModalOpen}
-          onClose={() => setIsViewModalOpen(false)}
-          selectedRow={selectedRow}
+          isViewModalOpen={isViewModalOpen}
+          setIsViewModalOpen={setIsViewModalOpen}
           getStatusValue={getStatusValue}
-          getImageGeneratedUrl={getImageGeneratedUrl}
-          imagePreviewNonce={imagePreviewNonce}
-          handleCopy={handleCopy}
-          copiedField={copiedField}
-          notify={notify}
-          setIsDraftModalOpen={setIsDraftModalOpen}
-          setDraftPublishIntent={setDraftPublishIntent}
           requestConfirm={requestConfirm}
           isGeneratingCaption={isGeneratingCaption}
           setIsGeneratingCaption={setIsGeneratingCaption}
@@ -3711,111 +1432,39 @@ function App() {
           backendBaseUrl={backendBaseUrl}
           refreshCalendarRow={refreshCalendarRow}
           setIsImageModalOpen={setIsImageModalOpen}
-          setIsViewModalOpen={setIsViewModalOpen}
           activeCompanyId={activeCompanyId}
-          activeCompany={activeCompany}
           setBrandKbId={setBrandKbId}
           setSystemInstruction={setSystemInstruction}
-          isAiAssistantOpen={isAiAssistantOpen}
           collaborators={collaborators}
           automations={automations}
           userPermissions={userPermissions}
-          allRows={filteredCalendarRows}
-          onNavigate={(row) => setSelectedRow(row)}
-        />
-
-        <ImageGenerationModal
-          isOpen={isImageModalOpen}
-          onClose={() => setIsImageModalOpen(false)}
-          selectedRow={selectedRow}
+          filteredCalendarRows={filteredCalendarRows}
+          setSelectedRow={setSelectedRow}
+          isImageModalOpen={isImageModalOpen}
           isEditingDmp={isEditingDmp}
           setIsEditingDmp={setIsEditingDmp}
           dmpDraft={dmpDraft}
           setDmpDraft={setDmpDraft}
           isGeneratingImage={isGeneratingImage}
           setIsGeneratingImage={setIsGeneratingImage}
-          getImageGeneratedUrl={getImageGeneratedUrl}
-          imagePreviewNonce={imagePreviewNonce}
           imagePollError={imagePollError}
-          notify={notify}
-          authedFetch={authedFetch}
-          backendBaseUrl={backendBaseUrl}
-          setSelectedRow={setSelectedRow}
           setCalendarRows={setCalendarRows}
-          setIsImageModalOpen={setIsImageModalOpen}
-          activeCompanyId={activeCompanyId}
           brandKbId={brandKbId}
           systemInstruction={systemInstruction}
-          requestConfirm={requestConfirm}
           reopenImageModalOnImageReadyRef={reopenImageModalOnImageReadyRef}
           imageModalReopenTimeoutRef={imageModalReopenTimeoutRef}
-          getImageGeneratedSignature={getImageGeneratedSignature}
           startWaitingForImageUpdate={startWaitingForImageUpdate}
-          isAiAssistantOpen={isAiAssistantOpen}
-        />
-
-        {
-          toast && (
-            <div
-              className={`fixed bottom-24 ${isAiAssistantOpen ? 'right-[424px]' : 'right-6'} transition-all duration-300 flex items-center gap-3 px-5 py-3.5 rounded-xl bg-white border shadow-premium-lg z-[9999] animate-[toast-slide-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md max-w-[400px] ${toast.tone === 'success' ? 'border-emerald-500/30 bg-emerald-50/95 text-emerald-800' :
-                toast.tone === 'error' ? 'border-rose-500/30 bg-rose-50/95 text-rose-800' :
-                  'border-brand-primary/30 bg-sky-50/95 text-brand-dark'
-                }`}
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              {toast.tone === 'success' && <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-500" aria-hidden />}
-              {toast.tone === 'error' && <XCircle className="w-5 h-5 flex-shrink-0 text-rose-500" aria-hidden />}
-              {(toast.tone === 'info' || !toast.tone) && <Info className="w-5 h-5 flex-shrink-0 text-brand-primary" aria-hidden />}
-              <span className="text-sm font-semibold leading-tight">{toast.message}</span>
-            </div>
-          )
-        }
-
-        <ConfirmModal
-          isOpen={isConfirmOpen}
-          config={confirmConfig}
-          onResolve={resolveConfirm}
-          isAiAssistantOpen={isAiAssistantOpen}
-        />
-
-        {/* Product Tour */}
-        {showProductTour && (
-          <ProductTour
-            companyId={activeCompanyId || ''}
-            onComplete={() => {
-              setShowProductTour(false);
-              if (userProfile?.id) {
-                localStorage.setItem(`productTourCompleted_${userProfile.id}`, 'true');
-              }
-            }}
-            onSkip={() => {
-              setShowProductTour(false);
-              if (userProfile?.id) {
-                localStorage.setItem(`productTourCompleted_${userProfile.id}`, 'true');
-              }
-            }}
-          />
-        )}
-
-        <AIAssistant
-          activeCompanyId={activeCompanyId}
-          authedFetch={authedFetch}
+          toast={toast}
+          isConfirmOpen={isConfirmOpen}
+          confirmConfig={confirmConfig}
+          resolveConfirm={resolveConfirm}
+          showProductTour={showProductTour}
+          setShowProductTour={setShowProductTour}
+          userProfile={userProfile}
           navigate={navigate}
-          notify={notify}
-          extraContext={{ selectedRow }}
-          onRefresh={refreshAppData}
-          isOpen={isAiAssistantOpen}
-          setIsOpen={setIsAiAssistantOpen}
-          onApplyPlan={(plan: any[]) => {
-            setPreDefinedPlan(plan);
-            if (activeCompanyId) {
-              navigate(`/company/${activeCompanyId}/plan`);
-              notify("Strategy applied to planner. Review and push to calendar!", "success");
-            }
-          }}
-          backendBaseUrl={backendBaseUrl}
+          setPreDefinedPlan={setPreDefinedPlan}
+          refreshAppData={refreshAppData}
+          setIsAiAssistantOpen={setIsAiAssistantOpen}
         />
       </div >
     </NotificationProvider >
@@ -3823,3 +1472,6 @@ function App() {
 }
 
 export default App;
+
+
+

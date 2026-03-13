@@ -5,6 +5,15 @@ export const supabaseBaseUrl = (import.meta.env as any).VITE_SUPABASE_URL || '';
 export const revisionWebhookUrl = (import.meta.env as any).VITE_MAKE_REVISION_WEBHOOK || '';
 export const defaultCompanyId = import.meta.env.VITE_COMPANY_ID || '';
 export const VIEW_MODAL_POLL_MS = 1500;
+export const CALENDAR_POLL_MS = 10000;
+export const statusOptions = [
+  '',
+  'Generate',
+  'Ready',
+  'Revisioned',
+  'Design Completed',
+  'Scheduled',
+];
 
 // ── Brand Setup Option Arrays ─────────────────────────────────────────────────
 export const industryOptions = [
