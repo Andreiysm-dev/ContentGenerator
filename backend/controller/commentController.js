@@ -1,5 +1,34 @@
 import db from '../database/db.js';
 
+async function verifyCommentAccess(userId, contentCalendarId) {
+    const { data: contentRow, error: contentError } = await db
+        .from('contentCalendar')
+        .select('companyId')
+        .eq('contentCalendarId', contentCalendarId)
+        .single();
+
+    if (contentError || !contentRow?.companyId) {
+        return { ok: false, status: 404, error: 'Content calendar not found' };
+    }
+
+    const { data: company, error: companyError } = await db
+        .from('company')
+        .select('user_id, collaborator_ids')
+        .eq('companyId', contentRow.companyId)
+        .single();
+
+    if (companyError || !company) {
+        return { ok: false, status: 404, error: 'Company not found' };
+    }
+
+    const hasAccess = company.user_id === userId || (company.collaborator_ids || []).includes(userId);
+    if (!hasAccess) {
+        return { ok: false, status: 403, error: 'Forbidden' };
+    }
+
+    return { ok: true, companyId: contentRow.companyId };
+}
+
 export const getContentComments = async (req, res) => {
     try {
         const { contentCalendarId } = req.params;
@@ -10,6 +39,11 @@ export const getContentComments = async (req, res) => {
         const userId = req.user?.id;
 
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const access = await verifyCommentAccess(userId, contentCalendarId);
+        if (!access.ok) {
+            return res.status(access.status).json({ error: access.error });
+        }
 
         const { data: comments, count, error } = await db
             .from('content_comments')
@@ -57,6 +91,11 @@ export const createContentComment = async (req, res) => {
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
         if (!text) return res.status(400).json({ error: 'Comment text is required' });
 
+        const access = await verifyCommentAccess(userId, contentCalendarId);
+        if (!access.ok) {
+            return res.status(access.status).json({ error: access.error });
+        }
+
         const { data: comment, error } = await db
             .from('content_comments')
             .insert({
@@ -88,11 +127,17 @@ export const deleteContentComment = async (req, res) => {
 
         const { data: existing } = await db
             .from('content_comments')
-            .select('user_id')
+            .select('user_id, content_calendar_id')
             .eq('id', commentId)
             .single();
 
         if (!existing) return res.status(404).json({ error: 'Comment not found' });
+
+        const access = await verifyCommentAccess(userId, existing.content_calendar_id);
+        if (!access.ok) {
+            return res.status(access.status).json({ error: access.error });
+        }
+
         if (existing.user_id !== userId) return res.status(403).json({ error: 'Forbidden' });
 
         const { error } = await db

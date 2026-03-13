@@ -1,5 +1,6 @@
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
+import db from '../database/db.js';
 
 const router = express.Router();
 
@@ -24,9 +25,14 @@ if (supabaseUrl && supabaseServiceKey) {
 router.delete('/storage/delete/:filename', async (req, res) => {
   try {
     const { filename } = req.params;
+    const userId = req.user?.id;
     
     if (!filename) {
       return res.status(400).json({ error: 'Filename is required' });
+    }
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Check if Supabase client is available
@@ -34,14 +40,52 @@ router.delete('/storage/delete/:filename', async (req, res) => {
       return res.status(500).json({ error: 'Storage service not configured' });
     }
 
+    const decodedFilename = decodeURIComponent(filename).trim();
+
     // Validate filename to prevent directory traversal
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    if (!decodedFilename || decodedFilename.includes('..') || decodedFilename.includes('/') || decodedFilename.includes('\\')) {
       return res.status(400).json({ error: 'Invalid filename' });
+    }
+
+    const { data: matchingRows, error: rowError } = await db
+      .from('contentCalendar')
+      .select('contentCalendarId, companyId, imageGenerated, imageGeneratedUrl')
+      .or(`imageGenerated.eq.${decodedFilename},imageGeneratedUrl.ilike.%${decodedFilename}`);
+
+    if (rowError) {
+      console.error('Storage delete lookup error:', rowError);
+      return res.status(500).json({ error: 'Failed to verify file ownership' });
+    }
+
+    if (!matchingRows || matchingRows.length === 0) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const authorizedRow = [];
+    for (const row of matchingRows) {
+      const { data: company, error: companyError } = await db
+        .from('company')
+        .select('user_id, collaborator_ids')
+        .eq('companyId', row.companyId)
+        .single();
+
+      if (companyError || !company) {
+        continue;
+      }
+
+      const hasAccess = company.user_id === userId || (company.collaborator_ids || []).includes(userId);
+      if (hasAccess) {
+        authorizedRow.push(row);
+      }
+    }
+
+    if (authorizedRow.length === 0) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const { error } = await supabase.storage
       .from('generated-images')
-      .remove([filename]);
+      .remove([decodedFilename]);
 
     if (error) {
       console.error('Supabase storage delete error:', error);

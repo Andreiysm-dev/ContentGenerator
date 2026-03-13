@@ -303,8 +303,8 @@ export const searchUsers = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Require at least 3 characters to reduce enumeration surface
-    if (!email || email.length < 3) {
+    // Require at least 6 characters to reduce enumeration surface
+    if (!email || email.length < 6) {
       return res.json({ users: [] });
     }
 

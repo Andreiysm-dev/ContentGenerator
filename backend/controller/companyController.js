@@ -1,6 +1,34 @@
 import db from '../database/db.js';
 import { logAudit } from '../services/auditService.js';
 
+async function verifyCompanySettingsAccess(userId, companyId) {
+    const { data: company, error } = await db
+        .from('company')
+        .select('user_id, collaborator_ids, collaborator_roles, custom_roles')
+        .eq('companyId', companyId)
+        .single();
+
+    if (error || !company) {
+        return { ok: false, status: 404, error: 'Company not found' };
+    }
+
+    if (company.user_id === userId) {
+        return { ok: true, company, isOwner: true };
+    }
+
+    if (!(company.collaborator_ids || []).includes(userId)) {
+        return { ok: false, status: 403, error: 'Forbidden' };
+    }
+
+    const roleName = company.collaborator_roles?.[userId];
+    const roleDef = company.custom_roles?.find((role) => role.name === roleName);
+    if (roleDef?.permissions?.canEditSettings) {
+        return { ok: true, company, isOwner: false };
+    }
+
+    return { ok: false, status: 403, error: 'Forbidden: You do not have permission to edit company settings' };
+}
+
 // CREATE - Add a new company
 export const createCompany = async (req, res) => {
     try {
@@ -130,11 +158,15 @@ export const getCompanyById = async (req, res) => {
 export const updateCompany = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("UPDATE_COMPANY BODY:", req.body);
         const { companyName, companyDescription } = req.body;
         const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const access = await verifyCompanySettingsAccess(userId, id);
+        if (!access.ok) {
+            return res.status(access.status).json({ error: access.error });
         }
 
         // Build update object with only provided fields
@@ -154,7 +186,6 @@ export const updateCompany = async (req, res) => {
             .from('company')
             .update(updateData)
             .eq('companyId', id)
-            .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .select();
 
         if (companyError) {
