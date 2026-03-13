@@ -176,7 +176,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     };
 
     // Use the calendar query for posts
-    const { data: rawPosts = [], isLoading: isLoadingQuery } = useCalendarQuery(
+    const { data: rawPosts = [], isLoading: isLoadingQuery, refetch: fetchPosts } = useCalendarQuery(
         authedFetch,
         backendBaseUrl,
         companyId,
