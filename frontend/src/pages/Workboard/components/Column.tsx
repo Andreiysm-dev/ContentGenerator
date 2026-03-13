@@ -148,10 +148,10 @@ export function Column({ column, posts, onCardClick, generatingPostIds, onRename
                 /* Column Content — scrollable droppable area */
                 <div
                     ref={setDropRef}
-                    className="flex-1 min-h-[600px] overflow-y-auto bg-slate-100/50 rounded-2xl p-2 border-2 border-dashed border-transparent hover:border-slate-200 transition-all"
+                    className="flex-1 min-h-[600px] overflow-y-auto bg-slate-100/50 rounded-2xl p-3 border-2 border-dashed border-transparent hover:border-slate-200 transition-all"
                 >
                     <SortableContext items={posts.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-3 pb-20">
                             {posts.map((post) => (
                                 <TaskCard
                                     key={post.id}

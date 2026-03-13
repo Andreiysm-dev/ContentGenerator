@@ -4,6 +4,10 @@ import { generateImageForCalendarRow } from '../services/imageGenerationService.
 import { logAudit } from '../services/auditService.js';
 import * as notificationService from '../services/notificationService.js';
 
+// Bandwidth optimization: only fetch fields needed for the Kanban/Calendar list views.
+// Excludes large JSON/Text fields like dmp, captionOutput, attachedDesign, etc.
+const CALENDAR_SUMMARY_FIELDS = 'contentCalendarId, companyId, status, theme, contentType, imageGenerated, scheduled_at, date, channels, post_status, card_name, tags, checklist, collaborators, kanban_column_id, kanban_order, user_id';
+
 // Helper to verify user has access to company and specific permissions
 async function verifyCompanyAccess(userId, companyId, requiredPermission = null) {
     const { data: company, error } = await db
@@ -187,7 +191,7 @@ export const getContentCalendarsByCompanyId = async (req, res) => {
 
         const { data: rows, error } = await db
             .from('contentCalendar')
-            .select('*')
+            .select(CALENDAR_SUMMARY_FIELDS)
             .eq('companyId', companyId)
             .order('scheduled_at', { ascending: true });
 

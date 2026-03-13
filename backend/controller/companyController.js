@@ -64,7 +64,7 @@ export const getCompany = async (req, res) => {
         }
         const { data: companies, error: companyError } = await db
             .from('company')
-            .select('*')
+            .select('companyId, companyName, companyDescription, user_id, collaborator_ids, collaborator_roles, custom_roles, created_at, kanban_settings, dashboard_settings')
             .or(`user_id.eq.${userId},collaborator_ids.cs.{${userId}}`)
             .order('created_at', { ascending: false });
 

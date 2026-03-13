@@ -212,7 +212,7 @@ export function KanbanView({
             >
                 {/* Wrap columns in SortableContext for column drag-reorder */}
                 <SortableContext items={columns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
-                    <div className="inline-flex items-stretch gap-6 h-full min-w-full pb-4">
+                    <div className="inline-flex items-stretch gap-6 h-full min-w-full pb-10">
                         {columns.map((column) => (
                             <Column
                                 key={column.id}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import type { UserProfile } from './useAuth';
+import { useCompaniesQuery } from './useCompaniesQuery';
 
 const DEFAULT_COMPANY_ID = import.meta.env.VITE_COMPANY_ID || '';
 
@@ -33,15 +34,13 @@ interface UseCompanyOptions {
     }>;
     isOnboardingOpen: boolean;
     setShowProductTour: (show: boolean) => void;
+    authedFetch: any;
+    backendBaseUrl: string;
 }
 
 /**
  * Manages the active company selection, recent companies list (persisted to
  * localStorage), and derives userPermissions + automations from company data.
- *
- * Also owns the product tour trigger (needs both userProfile and activeCompanyId).
- *
- * Extracted from App.tsx — Batch 3.
  */
 export function useCompany({
     session,
@@ -50,16 +49,20 @@ export function useCompany({
     customRoles,
     isOnboardingOpen,
     setShowProductTour,
+    authedFetch,
+    backendBaseUrl,
 }: UseCompanyOptions) {
     const location = useLocation();
 
     // ── Active company selection ──────────────────────────────────────────────
 
-    const [companies, setCompanies] = useState<any[]>([]);
+    const { data: companies = [] } = useCompaniesQuery(authedFetch, backendBaseUrl, !!session);
+
     const [activeCompanyId, setActiveCompanyId] = useState<string | undefined>(() => {
         const saved = localStorage.getItem('activeCompanyId');
         return saved || DEFAULT_COMPANY_ID || undefined;
     });
+
     const [recentCompanyIds, setRecentCompanyIds] = useState<string[]>(() => {
         try {
             const saved = localStorage.getItem('recentCompanyIds');
@@ -69,8 +72,6 @@ export function useCompany({
         }
     });
 
-    /** Persists the active company to localStorage so it survives a refresh.
-     *  Accepts either a direct value or a functional updater (just like setState). */
     const setActiveCompanyIdWithPersistence = useCallback(
         (companyIdOrUpdater: string | undefined | ((current: string | undefined) => string | undefined)) => {
             setActiveCompanyId((current) => {
@@ -89,7 +90,14 @@ export function useCompany({
         [],
     );
 
-    // Sync active company from the current URL path (e.g. /company/:id/...)
+    // Sync fallback company if none selected
+    useEffect(() => {
+        if (companies.length > 0 && !activeCompanyId) {
+            setActiveCompanyIdWithPersistence(companies[0].companyId);
+        }
+    }, [companies, activeCompanyId, setActiveCompanyIdWithPersistence]);
+
+    // Sync active company from the current URL path
     const routeCompanyId = useMemo(() => {
         const match = location.pathname.match(/^\/company\/([^/]+)(?:\/|$)/);
         return match?.[1] ? decodeURIComponent(match[1]) : undefined;
@@ -101,12 +109,11 @@ export function useCompany({
         setActiveCompanyIdWithPersistence(routeCompanyId);
     }, [routeCompanyId, activeCompanyId, setActiveCompanyIdWithPersistence]);
 
-    // Keep the recent-companies list up to date (max 3 entries, most recent first)
     useEffect(() => {
         if (!activeCompanyId) return;
         setRecentCompanyIds((prev) => {
             const filtered = prev.filter((id) => id !== activeCompanyId);
-            const next = [activeCompanyId, ...filtered].slice(0, 3);
+            const next = [activeCompanyId, ...filtered].slice(0, 3).filter(Boolean);
             localStorage.setItem('recentCompanyIds', JSON.stringify(next));
             return next;
         });
@@ -115,7 +122,7 @@ export function useCompany({
     // ── Derived values ────────────────────────────────────────────────────────
 
     const activeCompany = useMemo(
-        () => companies.find((c) => c.companyId === activeCompanyId) || null,
+        () => companies.find((c: any) => c.companyId === activeCompanyId) || null,
         [companies, activeCompanyId],
     );
 
@@ -129,7 +136,6 @@ export function useCompany({
         if (!session?.user || !activeCompany) return noAccess;
         const userId = session.user.id;
 
-        // Owner gets full access
         if (activeCompany.user_id === userId) {
             return {
                 canApprove: true, canGenerate: true, canCreate: true,
@@ -138,7 +144,6 @@ export function useCompany({
             };
         }
 
-        // Collaborator — derive from role definition
         const collaboratorEntry = collaborators.find((c) => c.id === userId);
         if (!collaboratorEntry) return { ...noAccess, roleName: null };
 
@@ -162,9 +167,6 @@ export function useCompany({
         [activeCompany],
     );
 
-    // ── Product tour trigger ──────────────────────────────────────────────────
-    // Show the tour for new users who haven't seen it and aren't mid-onboarding.
-
     useEffect(() => {
         if (!userProfile?.id || !activeCompanyId) return;
 
@@ -183,7 +185,6 @@ export function useCompany({
 
     return {
         companies,
-        setCompanies,
         activeCompanyId,
         setActiveCompanyId: setActiveCompanyIdWithPersistence,
         recentCompanyIds,

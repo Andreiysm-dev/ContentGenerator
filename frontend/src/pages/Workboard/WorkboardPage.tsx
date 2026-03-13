@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import {
     DndContext,
     DragOverlay,
@@ -9,6 +9,8 @@ import {
     useSensors,
     closestCorners
 } from '@dnd-kit/core';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCalendarQuery } from '@/hooks/useCalendarQuery';
 import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
 import { useRef } from 'react';
 import {
@@ -68,6 +70,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
     // Guards against overlapping API calls when cards are moved rapidly.
     const isMovingRef = useRef<Set<string>>(new Set());
     const lastLoadedCompanyIdRef = useRef<string | null>(null);
+    const recentStatusMoves = useRef<Map<string, { status: string; ts: number; originalStatus?: string }>>(new Map());
 
     // Automation state
     const [automations, setAutomations] = useState<any[]>([]);
@@ -172,72 +175,79 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
         localStorage.setItem(prefKey, JSON.stringify(newPrefs));
     };
 
-    // Fetch real data from backend
-    const fetchPosts = async () => {
+    // Use the calendar query for posts
+    const { data: rawPosts = [], isLoading: isLoadingQuery } = useCalendarQuery(
+        authedFetch,
+        backendBaseUrl,
+        companyId,
+        true,
+        recentStatusMoves,
+        getStatusValue
+    );
+
+    // Map raw posts to Workboard Post type
+    useEffect(() => {
+        if (!rawPosts) return;
+
+        const currentColumns = columns.length > 0 ? columns : SOKMED_COLUMNS;
+        const mappedPosts: Post[] = rawPosts
+            .filter((row: any) => {
+                const statusStr = getStatusValue(row.status).toLowerCase();
+                return statusStr !== 'archived';
+            })
+            .map((row: any) => {
+                const statusStr = getStatusValue(row.status).trim();
+                const match = currentColumns.find(c =>
+                    c.id === statusStr ||
+                    c.title === statusStr ||
+                    String(c.id || '').toLowerCase() === String(statusStr || '').toLowerCase() ||
+                    String(c.title || '').toLowerCase() === String(statusStr || '').toLowerCase()
+                );
+
+                return {
+                    id: row.contentCalendarId,
+                    theme: row.card_name || row.theme || row.topic || 'Untitled Post',
+                    contentType: row.contentType || 'Social Post',
+                    status: match ? match.id : statusStr,
+                    postDate: row.scheduled_at ? new Date(row.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Draft',
+                    brandName: row.brandName || '',
+                    cardName: row.card_name,
+                    imageUrl: row.imageGenerated || row.imageGeneratedUrl,
+                    content_deadline: row.content_deadline || row.scheduled_at,
+                    design_deadline: row.design_deadline || row.scheduled_at,
+                    organization_id: companyId,
+                    tags: row.tags,
+                    collaborators: row.collaborators,
+                    checklist: row.checklist,
+                };
+            });
+
+        setPosts(mappedPosts);
+    }, [rawPosts, columns, companyId]);
+
+    // Only fetch kanban settings if we haven't already.
+    useEffect(() => {
         if (!companyId) return;
-        try {
-            const res = await authedFetch(`${backendBaseUrl}/api/content-calendar/company/${companyId}`);
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to fetch posts');
-
-            const unwrapped = data.contentCalendars || data;
-
-            // Only fetch kanban settings if we haven't already.
-            let currentColumns = columns.length > 0 ? columns : SOKMED_COLUMNS;
+        const fetchSettings = async () => {
             if (columns.length === 0) {
                 const compRes = await authedFetch(`${backendBaseUrl}/api/company/${companyId}`);
                 if (compRes.ok) {
                     const compData = await compRes.json();
                     if (compData.company?.kanban_settings?.columns?.length > 0) {
-                        currentColumns = compData.company.kanban_settings.columns;
-                        setColumns(currentColumns);
+                        setColumns(compData.company.kanban_settings.columns);
                         if (compData.company.kanban_settings.automations) {
                             setAutomations(compData.company.kanban_settings.automations);
                         }
+                    } else {
+                        setColumns(SOKMED_COLUMNS);
                     }
                 }
             }
+        };
+        fetchSettings();
+    }, [companyId, authedFetch, backendBaseUrl]);
 
-            const mappedPosts: Post[] = unwrapped
-                .filter((row: any) => {
-                    const statusStr = getStatusValue(row.status).toLowerCase();
-                    return statusStr !== 'archived';
-                })
-                .map((row: any) => {
-                    const statusStr = getStatusValue(row.status).trim();
-                    // Find matching column ID if DB status is a title
-                    const match = currentColumns.find(c =>
-                        c.id === statusStr ||
-                        c.title === statusStr ||
-                        String(c.id || '').toLowerCase() === String(statusStr || '').toLowerCase() ||
-                        String(c.title || '').toLowerCase() === String(statusStr || '').toLowerCase()
-                    );
-
-                    return {
-                        id: row.contentCalendarId,
-                        theme: row.card_name || row.theme || row.topic || 'Untitled Post',
-                        contentType: row.contentType || 'Social Post',
-                        status: match ? match.id : statusStr,
-                        postDate: row.scheduled_at ? new Date(row.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Draft',
-                        brandName: row.brandName || '',
-                        cardName: row.card_name,
-                        imageUrl: row.imageGenerated || row.imageGeneratedUrl,
-                        content_deadline: row.content_deadline || row.scheduled_at,
-                        design_deadline: row.design_deadline || row.scheduled_at,
-                        organization_id: companyId,
-                        tags: row.tags,
-                        collaborators: row.collaborators,
-                        checklist: row.checklist,
-                    };
-                });
-
-            setPosts(mappedPosts);
-        } catch (err: any) {
-            notify(err.message || 'Error loading workboard', 'error');
-        } finally {
-            // Managed by loadAll
-        }
-    };
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         if (!companyId) return;
@@ -252,15 +262,36 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                 setAutomations([]);
             }
 
-            await Promise.all([
-                fetchPosts(),
-                fetchNotificationSettings()
-            ]);
+            await fetchNotificationSettings();
             setLoading(false);
             lastLoadedCompanyIdRef.current = companyId;
         };
         loadAll();
-    }, [companyId]);
+
+        // Realtime sync
+        const channel = supabase
+            ?.channel(`workboard-changes-${companyId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'contentCalendar',
+                    filter: `companyId=eq.${companyId}`
+                },
+                () => {
+                    // Invalidate query to trigger refresh
+                    queryClient.invalidateQueries({ queryKey: ['calendar', companyId] });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            if (channel) {
+                supabase?.removeChannel(channel);
+            }
+        };
+    }, [companyId, queryClient]);
 
     const fetchNotificationSettings = async () => {
         if (!companyId) return;
@@ -308,8 +339,6 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
 
     const executeStatusChange = async (postId: string, newStatus: string, skipAutomation = false) => {
         // In-flight guard: if this card already has a pending API call, skip.
-        // This prevents rapid drags from firing overlapping requests that can
-        // race each other and corrupt local state.
         if (isMovingRef.current.has(postId)) return;
         isMovingRef.current.add(postId);
 
@@ -317,6 +346,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
         const originalStatus = row?.status;
 
         // Optimistic UI update
+        recentStatusMoves.current.set(postId, { status: newStatus, ts: Date.now(), originalStatus });
         setPosts(prev => prev.map(p => p.id === postId ? { ...p, status: newStatus } : p));
 
         try {
@@ -353,8 +383,8 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                         .then(async r => {
                             if (r.ok) {
                                 notify(`${rule.action.replace('_', ' ')} complete!`, 'success');
-                                // Refetch to get the final status from the server
-                                await fetchPosts();
+                                // Invalidate query to get final status
+                                queryClient.invalidateQueries({ queryKey: ['calendar', companyId] });
                             } else {
                                 const d = await r.json().catch(() => ({}));
                                 notify(d.error || 'Automation failed', 'error');
@@ -370,8 +400,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
         } catch (err: any) {
             console.error('Error in executeStatusChange:', err);
             notify(err.message || 'Error moving card', 'error');
-            // Revert to original status using local state only — avoids a fetchPosts()
-            // call mid-drag which can race with ongoing drag state updates.
+            // Revert to original status
             if (originalStatus !== undefined) {
                 setPosts(prev => prev.map(p => p.id === postId ? { ...p, status: originalStatus } : p));
             }
@@ -882,7 +911,7 @@ export function WorkboardPage({ authedFetch, backendBaseUrl, notify, onStatusMov
                     onDragOver={onDragOver}
                     onDragEnd={onDragEnd}
                 >
-                    <div className="inline-flex gap-6 h-full min-w-full">
+                    <div className="inline-flex gap-6 h-full min-w-full pb-20">
                         {columns.map((column) => (
                             <Column
                                 key={column.id}
