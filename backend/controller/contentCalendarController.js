@@ -673,6 +673,7 @@ export const batchGenerateImages = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden' });
         }
 
+        const updatedRows = [];
         let successCount = 0;
         for (const row of allowedRows) {
             if (!row.companyId) continue;
@@ -687,6 +688,9 @@ export const batchGenerateImages = async (req, res) => {
 
                 if (result.ok) {
                     successCount += 1;
+                    if (result.contentCalendar) {
+                        updatedRows.push(result.contentCalendar);
+                    }
                 } else {
                     console.error('Image generation failed:', row.contentCalendarId, result.status, result.error);
                 }
@@ -696,8 +700,9 @@ export const batchGenerateImages = async (req, res) => {
         }
 
         return res.status(200).json({
-            message: 'Image generation triggered.',
+            message: 'Image generation completed.',
             successCount,
+            updatedRows,
         });
     } catch (error) {
         console.error('Unexpected error:', error);

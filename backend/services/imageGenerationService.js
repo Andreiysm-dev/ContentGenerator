@@ -7,6 +7,63 @@ import { callReplicatePredict } from './replicateService.js';
 import { callFalAiPredict } from './falService.js';
 import { logApiUsage } from './apiUsageService.js';
 
+const callOpenAIImagePredict = async ({ prompt, model = 'dall-e-3', companyId, userId, aspectRatio }) => {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return { ok: false, error: 'Missing OPENAI_API_KEY' };
+  }
+
+  // Model and size mapping
+  let size = '1024x1024';
+  if (aspectRatio === '16:9' || aspectRatio === 'landscape') size = '1792x1024';
+  if (aspectRatio === '9:16' || aspectRatio === 'portrait') size = '1024x1792';
+
+  const res = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      prompt,
+      n: 1,
+      size,
+      quality: 'hd', 
+    }),
+  });
+
+  const raw = await res.text().catch(() => '');
+  if (!res.ok) {
+    const detail = typeof raw === 'string' && raw.trim() ? `: ${raw.slice(0, 500)}` : '';
+    return { ok: false, error: `OpenAI Image error ${res.status}${detail}`, raw };
+  }
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'OpenAI returned non-JSON response environment', raw };
+  }
+
+  const url = data?.data?.[0]?.url;
+  if (!url) {
+    return { ok: false, error: 'No image URL returned by OpenAI', raw: data };
+  }
+
+  // Log Usage
+  await logApiUsage({
+    companyId,
+    userId,
+    provider: 'openai',
+    model,
+    type: 'image_generation',
+    metadata: { size, quality: 'hd' }
+  });
+
+  return { ok: true, url, raw: data };
+};
+
 const callOpenAIText = async ({ systemPrompt, userPrompt, images = [], temperature = 1, companyId, userId }) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -366,7 +423,7 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
   const fullPrompt = negative ? `${mega}\n\nNEGATIVE: ${negative}` : mega;
 
   const provider = opts.provider || 'google';
-  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : (provider === 'fal' ? 'fal-ai/flux-pro/v1.1' : 'black-forest-labs/flux-dev'));
+  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : (provider === 'fal' ? 'fal-ai/flux-pro/v1.1' : (provider === 'openai' ? 'dall-e-3' : 'black-forest-labs/flux-dev')));
 
   let bytes;
   let extension = 'png';
@@ -414,6 +471,27 @@ export async function generateImageForCalendarRow(contentCalendarId, opts = {}) 
     bytes = Buffer.from(arrayBuffer);
     extension = falRes.url.split('.').pop().split('?')[0] || 'jpg';
     if (extension === 'jpeg') extension = 'jpg';
+  } else if (provider === 'openai') {
+    const openaiRes = await callOpenAIImagePredict({
+      prompt: fullPrompt,
+      model: model,
+      aspectRatio: opts.aspectRatio || '1:1',
+      companyId: row.companyId,
+      userId: userId
+    });
+
+    if (!openaiRes.ok) {
+      return { ok: false, status: 500, error: openaiRes.error };
+    }
+
+    // Fetch the image from OpenAI URL
+    const imageFetch = await fetch(openaiRes.url);
+    if (!imageFetch.ok) {
+      return { ok: false, status: 500, error: 'Failed to download image from OpenAI' };
+    }
+    const arrayBuffer = await imageFetch.arrayBuffer();
+    bytes = Buffer.from(arrayBuffer);
+    extension = 'png'; // OpenAI DALL-E 3 usually returns PNG
   } else {
     // Default to Google Imagen
     const imagenRes = await callImagenPredict({
@@ -520,7 +598,7 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
   }
 
   const provider = opts.provider || 'google';
-  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : (provider === 'fal' ? 'fal-ai/flux-pro/v1.1' : 'black-forest-labs/flux-dev'));
+  const model = opts.model || (provider === 'google' ? 'imagen-4.0-generate-001' : (provider === 'fal' ? 'fal-ai/flux-pro/v1.1' : (provider === 'openai' ? 'dall-e-3' : 'black-forest-labs/flux-dev')));
 
   let bytes;
   let extension = 'png';
@@ -566,6 +644,26 @@ export async function generateImageFromCustomDmp(contentCalendarId, dmp, opts = 
     bytes = Buffer.from(arrayBuffer);
     extension = falRes.url.split('.').pop().split('?')[0] || 'jpg';
     if (extension === 'jpeg') extension = 'jpg';
+  } else if (provider === 'openai') {
+    const openaiRes = await callOpenAIImagePredict({
+      prompt: dmp.trim(),
+      model: model,
+      aspectRatio: opts.aspectRatio || '1:1',
+      companyId: row.companyId,
+      userId: userId
+    });
+
+    if (!openaiRes.ok) {
+      return { ok: false, status: 500, error: openaiRes.error };
+    }
+
+    const imageFetch = await fetch(openaiRes.url);
+    if (!imageFetch.ok) {
+      return { ok: false, status: 500, error: 'Failed to download image from OpenAI' };
+    }
+    const arrayBuffer = await imageFetch.arrayBuffer();
+    bytes = Buffer.from(arrayBuffer);
+    extension = 'png';
   } else {
     const imagenRes = await callImagenPredict({
       model: model,

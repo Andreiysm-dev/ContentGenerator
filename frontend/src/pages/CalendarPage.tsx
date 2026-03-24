@@ -137,10 +137,10 @@ function statusBadgeClasses(key: string) {
     case "published":
       return "bg-[#3fa9f5]/10 text-[#3fa9f5] border-[#3fa9f5]/20";
     case "archived":
-      return "bg-slate-400/10 text-slate-500 border-slate-400/20";
+      return "bg-slate-400/10 text-slate-500 dark:text-slate-400 dark:text-slate-500 border-slate-400/20";
     case "draft":
     default:
-      return "bg-slate-300/20 text-slate-600 border-slate-300/30";
+      return "bg-slate-300/20 text-slate-600 dark:text-slate-300 border-slate-300/30";
   }
 }
 
@@ -204,7 +204,7 @@ export function CalendarPage(props: CalendarPageProps) {
         {channels.includes('instagram') && <Instagram className="w-4 h-4 text-[#E4405F]" />}
         {channels.includes('twitter') && <Twitter className="w-4 h-4 text-[#1DA1F2]" />}
         {channels.includes('facebook') && <Facebook className="w-4 h-4 text-[#1877F2]" />}
-        {!channels.match(/linkedin|instagram|twitter|facebook/) && <Share2 className="w-4 h-4 text-slate-400" />}
+        {!channels.match(/linkedin|instagram|twitter|facebook/) && <Share2 className="w-4 h-4 text-slate-400 dark:text-slate-500" />}
       </div>
     );
   };
@@ -213,14 +213,14 @@ export function CalendarPage(props: CalendarPageProps) {
     <button
       onClick={onClick}
       className={`relative flex items-center gap-2.5 px-6 py-5 text-sm font-bold transition-all border-b-2 z-10 ${active
-        ? "text-blue-600 border-blue-600 bg-white"
-        : "text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-50/50"
+        ? "text-blue-600 border-blue-600 bg-white dark:bg-slate-900"
+        : "text-slate-500 dark:text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:bg-slate-800/50/50"
         }`}
     >
-      <Icon className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400"}`} />
+      <Icon className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400 dark:text-slate-500"}`} />
       {label}
       {count !== undefined && (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] ${active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] ${active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 dark:text-slate-400 dark:text-slate-500"}`}>
           {count}
         </span>
       )}
@@ -541,17 +541,20 @@ export function CalendarPage(props: CalendarPageProps) {
   };
 
   return (
-    <main className="h-full flex flex-col overflow-hidden bg-gray-50/50 p-2.5 md:p-6 min-w-0 relative">
+    <main className="h-full flex flex-col overflow-hidden bg-gray-50 dark:bg-slate-950/50 p-2.5 md:p-6 min-w-0 relative">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-gradient-to-br from-[#3fa9f5]/20 to-[#6fb6e8]/15 rounded-full blur-[100px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-gradient-to-tr from-[#a78bfa]/15 to-[#e5a4e6]/12 rounded-full blur-[100px] animate-pulse" />
       </div>
 
-      <section className="w-full bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full min-h-[850px] relative z-10">
+      <section className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/60 rounded-2xl shadow-sm overflow-hidden flex flex-col h-full min-h-[850px] relative z-10">
         <header className="px-8 py-4 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">Workflow Planner</div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Content Board</h2>
+            <h2 className="text-2xl font-black text-white tracking-tight">Board</h2>
+            <p className="mt-2 max-w-2xl text-sm font-medium text-slate-300">
+              Manage content by workflow status, review progress, and open items in Studio when they are ready for publishing.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             {userPermissions.canCreate && (
@@ -560,16 +563,28 @@ export function CalendarPage(props: CalendarPageProps) {
               </button>
             )}
             <div className="relative group">
-              <button className="p-3 bg-white/5 border border-white/10 rounded-xl text-white/70 hover:bg-white/10 transition"><MoreVertical className="w-4 h-4" /></button>
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-all z-50 overflow-hidden pointer-events-none group-hover:pointer-events-auto">
-                <button onClick={openCsvModal} className="w-full px-4 py-3 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2 border-b border-slate-50"><Download className="w-4 h-4" /> Export CSV</button>
-                <button onClick={openCopyModal} className="w-full px-4 py-3 text-left text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2"><CopyIcon className="w-4 h-4" /> Copy to Sheets</button>
+              <button className="p-3 bg-white dark:bg-slate-900/5 border border-white/10 rounded-xl text-white/70 hover:bg-white dark:bg-slate-900/10 transition">
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-all z-50 overflow-hidden pointer-events-none group-hover:pointer-events-auto">
+                <button onClick={openCsvModal} className="w-full px-4 py-3 text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800/50 flex items-center gap-2 border-b border-slate-50"><Download className="w-4 h-4" /> Export CSV</button>
+                <button onClick={openCopyModal} className="w-full px-4 py-3 text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800/50 flex items-center gap-2"><CopyIcon className="w-4 h-4" /> Copy to Sheets</button>
               </div>
             </div>
           </div>
         </header>
 
         <div className="flex-1 flex flex-col min-h-0">
+          <div className="border-b border-slate-100 bg-slate-50 px-8 py-3">
+            <div className="flex flex-col gap-2 text-sm font-medium text-slate-600 lg:flex-row lg:items-center lg:justify-between">
+              <span>
+                Use <span className="font-bold text-slate-900">Pipeline</span> to manage workflow status and <span className="font-bold text-slate-900">Archives</span> to review completed items.
+              </span>
+              <span>
+                Final publishing still happens in <span className="font-bold text-blue-600">Studio</span>.
+              </span>
+            </div>
+          </div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 bg-white relative z-20">
             <div className="flex items-center min-w-fit">
               <div className="flex border-r border-slate-100">
@@ -587,13 +602,13 @@ export function CalendarPage(props: CalendarPageProps) {
 
               <div className="px-4 py-3 min-w-[200px] md:min-w-[320px]">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                   <input
                     type="text"
                     value={calendarSearch}
                     onChange={e => setCalendarSearch(e.target.value)}
                     placeholder="Search content..."
-                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs font-semibold outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500/50"
+                    className="w-full bg-slate-50 dark:bg-slate-800/50/50 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs font-semibold outline-none transition-all focus:bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500/50"
                   />
                 </div>
               </div>
@@ -604,17 +619,17 @@ export function CalendarPage(props: CalendarPageProps) {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-4 py-2 bg-slate-100/50 hover:bg-slate-100 rounded-xl transition-all border border-slate-200/50 group">
-                    <Filter className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
-                    <span className="text-[10px] font-black uppercase tracking-tight text-slate-600">
+                  <button className="flex items-center gap-2 px-4 py-2 bg-slate-100/50 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 dark:border-slate-800/50 group">
+                    <Filter className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-blue-500 transition-colors" />
+                    <span className="text-[10px] font-black uppercase tracking-tight text-slate-600 dark:text-slate-300">
                       Status: <span className="text-blue-600 ml-1">{calendarStatusFilter}</span>
                     </span>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-transform duration-200" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:text-slate-300 transition-transform duration-200" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 p-2 bg-white/95 backdrop-blur-xl border-slate-200/60 rounded-2xl shadow-2xl">
+                <DropdownMenuContent align="end" className="w-56 p-2 bg-white dark:bg-slate-900/95 backdrop-blur-xl border-slate-200 dark:border-slate-800/60 rounded-2xl shadow-2xl">
                   <div className="px-2 py-1.5 mb-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter by Status</p>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Filter by Status</p>
                   </div>
                   {calendarStatusOptions.map((f: string) => (
                     <DropdownMenuItem
@@ -622,7 +637,7 @@ export function CalendarPage(props: CalendarPageProps) {
                       onClick={() => setCalendarStatusFilter(f)}
                       className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all mb-0.5 ${calendarStatusFilter === f
                         ? "bg-blue-50 text-blue-600"
-                        : "text-slate-600 hover:bg-slate-50"
+                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800/50"
                         }`}
                     >
                       {f}
@@ -648,8 +663,8 @@ export function CalendarPage(props: CalendarPageProps) {
 
               <div className="flex items-center gap-1.5">
                 <div className="flex bg-slate-100/50 p-1 rounded-xl gap-1">
-                  <button title="List view" onClick={() => setDisplayType('list')} className={`p-1.5 rounded-lg transition-all ${displayType === 'list' ? 'bg-white text-blue-600 shadow-sm border border-blue-500/10' : 'text-slate-400 hover:text-slate-600'}`}><ListIcon className="w-3.5 h-3.5" /></button>
-                  <button title="Board view" onClick={() => setDisplayType('kanban')} className={`p-1.5 rounded-lg transition-all ${displayType === 'kanban' ? 'bg-white text-blue-600 shadow-sm border border-blue-500/10' : 'text-slate-400 hover:text-slate-600'}`}><ColumnsIcon className="w-3.5 h-3.5" /></button>
+                  <button title="List view" onClick={() => setDisplayType('list')} className={`p-1.5 rounded-lg transition-all ${displayType === 'list' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm border border-blue-500/10' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300'}`}><ListIcon className="w-3.5 h-3.5" /></button>
+                  <button title="Board view" onClick={() => setDisplayType('kanban')} className={`p-1.5 rounded-lg transition-all ${displayType === 'kanban' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm border border-blue-500/10' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300'}`}><ColumnsIcon className="w-3.5 h-3.5" /></button>
                 </div>
 
                 <div className="relative">
@@ -658,15 +673,15 @@ export function CalendarPage(props: CalendarPageProps) {
                     onClick={() => setShowAddColumn(v => !v)}
                     className={`p-2 rounded-xl transition-all border ${showAddColumn
                       ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
-                      : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-slate-300 hover:text-slate-600 dark:text-slate-300'
                       }`}
                   >
                     <Plus className="w-4 h-4" />
                   </button>
 
                   {showAddColumn && (
-                    <div className="absolute right-0 top-full mt-2 z-50 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 animate-in zoom-in-95 fade-in duration-150">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">New Column</p>
+                    <div className="absolute right-0 top-full mt-2 z-50 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 animate-in zoom-in-95 fade-in duration-150">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">New Column</p>
                       <input
                         autoFocus
                         type="text"
@@ -674,9 +689,9 @@ export function CalendarPage(props: CalendarPageProps) {
                         value={newColName}
                         onChange={e => setNewColName(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAddColumn()}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-400 mb-3"
+                        className="w-full border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-400 mb-3"
                       />
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Colour</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Colour</p>
                       <div className="flex gap-2 flex-wrap mb-4">
                         {PRESET_COLORS.map(c => (
                           <button
@@ -698,7 +713,7 @@ export function CalendarPage(props: CalendarPageProps) {
                         </button>
                         <button
                           onClick={() => { setShowAddColumn(false); setNewColName(''); }}
-                          className="px-3 py-2 bg-slate-100 text-slate-600 text-xs font-black rounded-xl hover:bg-slate-200 transition-all"
+                          className="px-3 py-2 bg-slate-100 text-slate-600 dark:text-slate-300 text-xs font-black rounded-xl hover:bg-slate-200 transition-all"
                         >
                           Cancel
                         </button>
@@ -717,21 +732,21 @@ export function CalendarPage(props: CalendarPageProps) {
                     }}
                     className={`p-2 rounded-xl transition-all border ${showAutomations
                       ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
-                      : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-slate-300 hover:text-slate-600 dark:text-slate-300'
                       }`}
                   >
                     <Zap className="w-4 h-4" />
                   </button>
 
                   {showAutomations && (
-                    <div className="absolute right-0 top-full mt-2 z-50 w-96 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100">
+                    <div className="absolute right-0 top-full mt-2 z-50 w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
                           <Zap size={16} />
                         </div>
                         <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Automation Controls</h4>
                       </div>
-                      <p className="text-[11px] text-slate-500 mb-8 font-medium leading-relaxed">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-8 font-medium leading-relaxed">
                         Manage how automations trigger when moving cards between columns.
                       </p>
 
@@ -747,7 +762,7 @@ export function CalendarPage(props: CalendarPageProps) {
                           const currentLockPref = automationPrefs[`lock_${col.id}`] || 'ask';
 
                           return (
-                            <div key={col.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50 hover:bg-white hover:border-blue-100 transition-all group">
+                            <div key={col.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:border-blue-100 transition-all group">
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: col.color }} />
@@ -834,47 +849,47 @@ export function CalendarPage(props: CalendarPageProps) {
                     }}
                     className={`p-2 rounded-xl transition-all border ${showNotifications
                       ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
-                      : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-slate-300 hover:text-slate-600 dark:text-slate-300'
                       }`}
                   >
                     <Bell className="w-4 h-4" />
                   </button>
 
                   {showNotifications && (
-                    <div className="absolute right-0 top-full mt-2 z-50 w-80 bg-white border border-slate-200 rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100">
+                    <div className="absolute right-0 top-full mt-2 z-50 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl p-8 animate-in zoom-in-95 fade-in duration-200 border-2 border-slate-100 dark:border-slate-800">
                       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-2">Notification Preferences</h4>
-                      <p className="text-[11px] text-slate-500 mb-6 font-medium leading-relaxed">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-6 font-medium leading-relaxed">
                         Select columns you want to monitor. You'll be notified when new cards arrive.
                       </p>
 
                       <div className="mb-6 p-5 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center justify-between group hover:bg-blue-50 transition-all">
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] font-black uppercase tracking-widest text-blue-700">Email Digest</span>
-                          <span className="text-[10px] text-slate-500 font-medium">Send summary email every minute</span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 dark:text-slate-500 font-medium">Send summary email every minute</span>
                         </div>
                         <button
                           onClick={() => setEmailNotificationsEnabled(!emailNotificationsEnabled)}
                           className={`w-10 h-6 rounded-full transition-all relative ${emailNotificationsEnabled ? 'bg-blue-600' : 'bg-slate-200'}`}
                         >
-                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${emailNotificationsEnabled ? 'right-1' : 'left-1'}`} />
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white dark:bg-slate-900 shadow-sm transition-all ${emailNotificationsEnabled ? 'right-1' : 'left-1'}`} />
                         </button>
                       </div>
 
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Watch Columns</h4>
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 mb-3">Watch Columns</h4>
                       <br />
 
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-2 mb-8 custom-scrollbar">
                         {kanbanColumns.map(col => (
-                          <label key={col.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group">
+                          <label key={col.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:bg-blue-50/50 transition-all border border-transparent hover:border-blue-100 group">
                             <div className="flex items-center gap-3">
                               <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: col.color }} />
-                              <span className="text-xs font-bold text-slate-700">{col.title}</span>
+                              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{col.title}</span>
                             </div>
                             <input
                               type="checkbox"
                               checked={watchedColumns[col.id] || false}
                               onChange={() => toggleWatchColumn(col.id)}
-                              className="w-5 h-5 rounded-lg border-slate-200 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+                              className="w-5 h-5 rounded-lg border-slate-200 dark:border-slate-800 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
                             />
                           </label>
                         ))}
@@ -891,27 +906,36 @@ export function CalendarPage(props: CalendarPageProps) {
                   )}
                 </div>
 
-                <button title="Configure workflow" onClick={() => navigate(`/company/${companyId}/settings/workflow`)} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:border-slate-300 hover:text-slate-600 transition-all"><SettingsIcon className="w-4 h-4" /></button>
+                <button title="Configure workflow" onClick={() => navigate(`/company/${companyId}/settings/workflow`)} className="p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 dark:text-slate-500 hover:border-slate-300 hover:text-slate-600 dark:text-slate-300 transition-all"><SettingsIcon className="w-4 h-4" /></button>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-hidden relative bg-white">
+          <div className="flex-1 overflow-hidden relative bg-white dark:bg-slate-900">
             {isLoadingCalendar ? <div className="p-10"><CalendarTableSkeleton /></div> : filteredCalendarRows.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full p-12 text-center">
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight">No results found</h3>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                  {showClear ? 'No matching content found' : viewMode === 'published' ? 'No archived posts yet' : 'No posts in the board yet'}
+                </h3>
+                <p className="mt-2 max-w-xl text-sm font-medium text-slate-500">
+                  {showClear
+                    ? 'Try clearing your search or status filter to bring posts back into view.'
+                    : viewMode === 'published'
+                      ? 'Archived items will appear here after they are moved out of the active workflow.'
+                      : 'Create your first post to start moving work through the board, then finish publishing in Studio.'}
+                </p>
               </div>
             ) : viewMode === 'published' ? (
-              <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50/30">
+              <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50 dark:bg-slate-800/50/30">
                 {currentPageRows.map(row => (
-                  <div key={row.contentCalendarId} className="group bg-white border border-slate-200 rounded-3xl overflow-hidden hover:shadow-xl transition-all cursor-pointer flex flex-col shadow-sm relative">
+                  <div key={row.contentCalendarId} className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden hover:shadow-xl transition-all cursor-pointer flex flex-col shadow-sm relative">
                     <div className="aspect-square bg-slate-100 relative" onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}>
                       {getImageGeneratedUrl(row) ? <img src={getImageGeneratedUrl(row)!} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt="" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><ImageIcon className="w-10 h-10" /></div>}
-                      <div className="absolute top-3 right-3 px-2 py-1 bg-white/90 backdrop-blur rounded-full text-[9px] font-black flex items-center gap-1.5 shadow-sm text-slate-500 border border-slate-200"><CheckCircle2 className="w-3 h-3 text-slate-400" /> Archived</div>
+                      <div className="absolute top-3 right-3 px-2 py-1 bg-white dark:bg-slate-900/90 backdrop-blur rounded-full text-[9px] font-black flex items-center gap-1.5 shadow-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800"><CheckCircle2 className="w-3 h-3 text-slate-400 dark:text-slate-500" /> Archived</div>
                     </div>
                     <div className="p-5 flex-1 flex flex-col" onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}>
-                      <div className="flex items-center gap-2 mb-3">{renderChannelIcons(row.channels)} <span className="text-[10px] text-slate-400 font-bold">{row.date}</span></div>
-                      <p className="text-xs font-semibold text-slate-700 line-clamp-2 leading-relaxed mb-4">{row.finalCaption || row.captionOutput || 'No caption'}</p>
+                      <div className="flex items-center gap-2 mb-3">{renderChannelIcons(row.channels)} <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{row.date}</span></div>
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed mb-4">{row.finalCaption || row.captionOutput || 'No caption'}</p>
                     </div>
                     <div className="px-5 pb-5 mt-auto">
                       <button
@@ -931,7 +955,7 @@ export function CalendarPage(props: CalendarPageProps) {
                             notify(err.message, 'error');
                           }
                         }}
-                        className="w-full py-2.5 bg-slate-100 hover:bg-white border border-slate-200 hover:border-blue-500 rounded-xl text-[10px] font-black uppercase text-slate-600 hover:text-blue-600 transition-all flex items-center justify-center gap-2 group/btn"
+                        className="w-full py-2.5 bg-slate-100 hover:bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-500 rounded-xl text-[10px] font-black uppercase text-slate-600 dark:text-slate-300 hover:text-blue-600 transition-all flex items-center justify-center gap-2 group/btn"
                       >
                         <Rocket className="w-3 h-3 group-hover/btn:animate-bounce" />
                         Unarchive
@@ -1014,13 +1038,13 @@ export function CalendarPage(props: CalendarPageProps) {
             ) : (
               <div className="overflow-auto h-full">
                 <table className="w-full text-left border-collapse min-w-[1000px]">
-                  <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 z-10">
                     <tr>
                       <th className="w-12 px-6 py-4"><input type="checkbox" checked={isPageFullySelected} onChange={e => toggleSelectAllOnPage(e.target.checked)} className="rounded border-slate-300 text-blue-600" /></th>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase text-slate-400">Content</th>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase text-slate-400">Strategy</th>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase text-slate-400">Team</th>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase text-slate-400 text-center">Status</th>
+                      <th className="px-4 py-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">Content</th>
+                      <th className="px-4 py-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">Strategy</th>
+                      <th className="px-4 py-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">Team</th>
+                      <th className="px-4 py-4 text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 text-center">Status</th>
                       <th className="w-32 px-6 py-4"></th>
                     </tr>
                   </thead>
@@ -1029,15 +1053,15 @@ export function CalendarPage(props: CalendarPageProps) {
                       const status = getStatusValue(row.status) || "Draft";
                       const isSelected = selectedIds.includes(row.contentCalendarId);
                       return (
-                        <tr key={row.contentCalendarId} className={`group hover:bg-slate-50/80 transition-all ${isSelected ? "bg-blue-50/30" : ""}`}>
+                        <tr key={row.contentCalendarId} className={`group hover:bg-slate-50 dark:bg-slate-800/50/80 transition-all ${isSelected ? "bg-blue-50/30" : ""}`}>
                           <td className="px-6 py-5"><input type="checkbox" checked={isSelected} onChange={e => toggleSelectOne(row.contentCalendarId, e.target.checked)} className="rounded border-slate-300 text-blue-600" /></td>
                           <td className="px-4 py-5" onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }}>
                             <div className="flex gap-4">
-                              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">{row.attachedDesign ? <Share2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />}</div>
+                              <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500">{row.attachedDesign ? <Share2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />}</div>
                               <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-bold text-slate-900 truncate">{row.card_name || row.theme || row.topic || "Untitled Post"}</span>
+                                <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{row.card_name || row.theme || row.topic || "Untitled Post"}</span>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-[10px] text-slate-400 uppercase font-bold">{row.contentType}</span>
+                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">{row.contentType}</span>
                                   {row.tags && row.tags.length > 0 && (
                                     <div className="flex gap-1 items-center ml-1">
                                       {row.tags.slice(0, 3).map((tag: any) => (
@@ -1055,7 +1079,7 @@ export function CalendarPage(props: CalendarPageProps) {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-5"><div className="flex flex-col gap-1">{row.primaryGoal && <div className="flex items-center gap-1.5"><Target className="w-3 h-3 text-blue-500" /><span className="text-[11px] font-bold text-slate-600">{row.primaryGoal}</span></div>}</div></td>
+                          <td className="px-4 py-5"><div className="flex flex-col gap-1">{row.primaryGoal && <div className="flex items-center gap-1.5"><Target className="w-3 h-3 text-blue-500" /><span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">{row.primaryGoal}</span></div>}</div></td>
                           <td className="px-4 py-5 font-bold">
                             {row.collaborators && row.collaborators.length > 0 ? (
                               <div className="flex -space-x-1.5 overflow-hidden">
@@ -1069,7 +1093,7 @@ export function CalendarPage(props: CalendarPageProps) {
                                   </div>
                                 ))}
                                 {row.collaborators.length > 3 && (
-                                  <div className="flex items-center justify-center h-6 w-6 rounded-full ring-2 ring-white bg-slate-100 text-[8px] font-bold text-slate-500 shadow-sm">
+                                  <div className="flex items-center justify-center h-6 w-6 rounded-full ring-2 ring-white bg-slate-100 text-[8px] font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 shadow-sm">
                                     +{row.collaborators.length - 3}
                                   </div>
                                 )}
@@ -1100,12 +1124,12 @@ export function CalendarPage(props: CalendarPageProps) {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleArchiveOrDelete(row.contentCalendarId, { stopPropagation: () => { } })}
-                                className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                                className="p-2 text-slate-400 dark:text-slate-500 hover:text-blue-600 transition-colors"
                                 title="Archive or Delete"
                               >
                                 <Archive className="w-4 h-4" />
                               </button>
-                              <button onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><ExternalLink className="w-4 h-4" /></button>
+                              <button onClick={() => { setSelectedRow(row); setIsViewModalOpen(true); }} className="p-2 text-slate-400 dark:text-slate-500 hover:text-blue-600 transition-colors"><ExternalLink className="w-4 h-4" /></button>
                             </div>
                           </td>
                         </tr>
@@ -1118,19 +1142,19 @@ export function CalendarPage(props: CalendarPageProps) {
           </div>
 
           {!(viewMode === 'drafts' && displayType === 'kanban') && (
-            <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between">
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-black text-slate-400 uppercase">Size</span>
-                <select value={pageSize} onChange={e => { setPage(1); setPageSize(e.target.value === "all" ? "all" : Number(e.target.value)); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold outline-none shadow-inner">
+                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">Size</span>
+                <select value={pageSize} onChange={e => { setPage(1); setPageSize(e.target.value === "all" ? "all" : Number(e.target.value)); }} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-xs font-bold outline-none shadow-inner">
                   {[10, 25, 50, "all"].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <span className="text-[11px] font-bold text-slate-500">{currentPageRows.length} of {filteredCalendarRows.length}</span>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500">{currentPageRows.length} of {filteredCalendarRows.length}</span>
               </div>
               {pageSize !== "all" && (
                 <div className="flex items-center gap-2">
-                  <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
-                  <div className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-black"><span className="text-blue-600">{page}</span> / {Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1)))}</div>
-                  <button disabled={page >= Math.ceil(filteredCalendarRows.length / (pageSize || 1))} onClick={() => setPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+                  <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
+                  <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-lg text-[11px] font-black"><span className="text-blue-600">{page}</span> / {Math.max(1, Math.ceil(filteredCalendarRows.length / (pageSize || 1)))}</div>
+                  <button disabled={page >= Math.ceil(filteredCalendarRows.length / (pageSize || 1))} onClick={() => setPage(p => p + 1)} className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
                 </div>
               )}
             </div>
@@ -1142,36 +1166,41 @@ export function CalendarPage(props: CalendarPageProps) {
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in zoom-in slide-in-from-bottom-5 duration-300">
           <div className="bg-slate-900 border border-white/10 shadow-2xl rounded-3xl p-3 flex items-center gap-6 text-white min-w-[400px]">
             <div className="flex items-center gap-3 px-3"><div className="w-9 h-9 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg"><Zap className="w-4 h-4" /></div><span className="text-xs font-black uppercase">{selectedIds.length} Selected</span></div>
-            <div className="h-10 w-[1px] bg-white/10" />
+            <div className="h-10 w-[1px] bg-white dark:bg-slate-900/10" />
             <div className="flex gap-2 pr-2">
-              <button onClick={handleBatchGenerate} disabled={isBatchGenerating || !userPermissions.canGenerate} className="px-5 py-2 bg-white text-slate-900 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2">
+              <button onClick={handleBatchGenerate} disabled={isBatchGenerating || !userPermissions.canGenerate} className="px-5 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-2xl text-[10px] font-black uppercase flex items-center gap-2">
                 {isBatchGenerating ? <Activity className="w-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} Generate
               </button>
               <button onClick={handleDeleteSelected} disabled={isBatchDeleting} className="p-2.5 text-rose-500 hover:bg-rose-500 hover:text-white transition-all rounded-xl border border-rose-500/20"><Trash2 className="w-4 h-4" /></button>
             </div>
+            {!userPermissions.canGenerate && (
+              <div className="rounded-2xl border border-amber-200/30 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-amber-100">
+                Generation needs a role with create or generate access
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {pendingMove && (
         <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-8 text-center animate-in zoom-in-95 duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-8 text-center animate-in zoom-in-95 duration-300">
             <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-6 mx-auto"><Zap className="w-7 h-7" /></div>
-            <h3 className="text-xl font-black text-slate-900 mb-2 tracking-tight">Automation Triggered</h3>
-            <p className="text-sm text-slate-500 font-medium mb-8">Moving to <span className="text-slate-900 font-bold">"{kanbanColumns.find(c => c.id === pendingMove.status)?.title}"</span> has automations. Run them?</p>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Automation Triggered</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 font-medium mb-8">Moving to <span className="text-slate-900 dark:text-white font-bold">"{kanbanColumns.find(c => c.id === pendingMove.status)?.title}"</span> has automations. Run them?</p>
             <div className="space-y-2 mb-8 text-left">
               {pendingMove.rules.map((rule, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100"><Wand2 className="w-4 h-4 text-blue-500" /><span className="text-[10px] font-black text-slate-700 uppercase">{rule.action.replace('_', ' ')}</span></div>
+                <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800"><Wand2 className="w-4 h-4 text-blue-500" /><span className="text-[10px] font-black text-slate-700 dark:text-slate-200 uppercase">{rule.action.replace('_', ' ')}</span></div>
               ))}
             </div>
-            <label className="flex items-center gap-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 mb-8 cursor-pointer">
+            <label className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50/50 rounded-2xl border border-slate-100 dark:border-slate-800 mb-8 cursor-pointer">
               <input type="checkbox" checked={rememberChoice} onChange={e => setRememberChoice(e.target.checked)} className="w-5 h-5 rounded border-slate-300 text-blue-600" />
-              <span className="text-[10px] font-black uppercase text-slate-600">Remember for this column</span>
+              <span className="text-[10px] font-black uppercase text-slate-600 dark:text-slate-300">Remember for this column</span>
             </label>
             <div className="flex flex-col gap-3">
               <button onClick={() => onConfirmMoveAction(true)} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-sm shadow-lg shadow-blue-200">Yes, Run Automation</button>
-              <button onClick={() => onConfirmMoveAction(false)} className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-sm">No, Just Move</button>
-              <button onClick={() => setPendingMove(null)} className="w-full py-2 text-[10px] font-black text-slate-400 uppercase">Cancel Move</button>
+              <button onClick={() => onConfirmMoveAction(false)} className="w-full py-4 bg-slate-100 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase text-sm">No, Just Move</button>
+              <button onClick={() => setPendingMove(null)} className="w-full py-2 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">Cancel Move</button>
             </div>
           </div>
         </div>
@@ -1179,23 +1208,23 @@ export function CalendarPage(props: CalendarPageProps) {
 
       {pendingApprovalMove && (
         <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-8 text-center animate-in zoom-in-95 duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-8 text-center animate-in zoom-in-95 duration-300">
             <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 mb-6 mx-auto">
               <Lock className="w-8 h-8" />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Submit for Approval?</h3>
-            <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
-              Moving this card to <span className="text-slate-900 font-bold">"{kanbanColumns.find(c => c.id === pendingApprovalMove.status)?.title}"</span> will lock it.
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Submit for Approval?</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 font-medium mb-8 leading-relaxed">
+              Moving this card to <span className="text-slate-900 dark:text-white font-bold">"{kanbanColumns.find(c => c.id === pendingApprovalMove.status)?.title}"</span> will lock it.
               A notification will be sent to the <span className="text-blue-600 font-bold">{pendingApprovalMove.roleName}</span> role for review.
             </p>
-            <label className="flex items-center justify-center gap-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 mb-8 cursor-pointer group hover:bg-white hover:border-amber-200 transition-all">
+            <label className="flex items-center justify-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50/50 rounded-2xl border border-slate-100 dark:border-slate-800 mb-8 cursor-pointer group hover:bg-white dark:bg-slate-900 hover:border-amber-200 transition-all">
               <input
                 type="checkbox"
                 checked={rememberChoice}
                 onChange={e => setRememberChoice(e.target.checked)}
                 className="w-5 h-5 rounded-lg border-slate-300 text-amber-600 focus:ring-amber-500 transition-all cursor-pointer"
               />
-              <span className="text-[11px] font-black uppercase text-slate-600 tracking-wide">Remember my choice for this column</span>
+              <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-300 tracking-wide">Remember my choice for this column</span>
             </label>
             <div className="flex flex-col gap-3">
               <button
@@ -1216,12 +1245,12 @@ export function CalendarPage(props: CalendarPageProps) {
                   // Refresh rows to ensure card snaps back
                   setCalendarRows([...calendarRows]);
                 }}
-                className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-sm hover:bg-slate-200 transition-all"
+                className="w-full py-4 bg-slate-100 text-slate-600 dark:text-slate-300 rounded-2xl font-black uppercase text-sm hover:bg-slate-200 transition-all"
               >
                 Cancel Move
               </button>
             </div>
-            <p className="mt-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
+            <p className="mt-6 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center justify-center gap-2">
               <span className="w-1 h-1 rounded-full bg-slate-300" />
               Once moved, you may lose edit access
               <span className="w-1 h-1 rounded-full bg-slate-300" />

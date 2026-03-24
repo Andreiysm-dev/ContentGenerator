@@ -220,6 +220,12 @@ export const StatusPill = ({ tone, children }: { tone: "positive" | "warning" | 
   return <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cls}`}>{children}</span>;
 };
 
+export const PermissionNote = ({ children }: { children: React.ReactNode }) => (
+  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+    {children}
+  </div>
+);
+
 
 
 export function SettingsPage(props: CompanySettingsShellProps) {
@@ -551,7 +557,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                   <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <div>
                       <div className="text-md md:text-xl font-bold">Overview</div>
-                      <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Key configuration signals for this company. Review Brand Intelligence before generating content at scale.</p>
+                      <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Use this control center to review setup health, route teammates to the right area, and spot anything that could block publishing.</p>
                     </div>
                   </div>
 
@@ -596,7 +602,44 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         </div>
                       )}
 
+                      <Card title="Quick setup path" subtitle="The fastest way to get this workspace ready for planning, creation, and publishing." className="bg-white border-slate-200/60 shadow-sm">
+                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`${companyUrlBase}/brand-intelligence`)}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition-all hover:border-[#3fa9f5]/40 hover:bg-white hover:shadow-sm"
+                          >
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Step 1</div>
+                            <div className="mt-2 text-sm font-extrabold text-slate-900">Brand Core</div>
+                            <p className="mt-1 text-sm font-medium text-slate-600">Define voice, audience, and AI guardrails before generating at scale.</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`${companyUrlBase}/team`)}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition-all hover:border-[#3fa9f5]/40 hover:bg-white hover:shadow-sm"
+                          >
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Step 2</div>
+                            <div className="mt-2 text-sm font-extrabold text-slate-900">Team Roles</div>
+                            <p className="mt-1 text-sm font-medium text-slate-600">Invite collaborators and give the right people approval or settings access.</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`${companyUrlBase}/integrations`)}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition-all hover:border-[#3fa9f5]/40 hover:bg-white hover:shadow-sm"
+                          >
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Step 3</div>
+                            <div className="mt-2 text-sm font-extrabold text-slate-900">Integrations</div>
+                            <p className="mt-1 text-sm font-medium text-slate-600">Connect publishing accounts so Studio and Analytics can use live provider data later.</p>
+                          </button>
+                        </div>
+                      </Card>
+
                       <Card title="Company profile" subtitle="Used across AI outputs and collaboration surfaces." className="bg-slate-50/60">
+                        {!canEditSettings && (
+                          <div className="mb-4">
+                            <PermissionNote>Only owners and roles with Settings access can edit company details.</PermissionNote>
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-700">Company Name</label>
@@ -691,9 +734,18 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                     <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Manage collaborators with access to this company.</p>
                   </div>
 
+                  {!(canEditSettings || canAddCollaborators) && (
+                    <div className="mb-4">
+                      <PermissionNote>Only owners, roles with Settings access, or roles with teammate invite access can manage this area.</PermissionNote>
+                    </div>
+                  )}
+
                   {/* Invite Teammates Card */}
                   <Card className={`bg-white border-slate-200/60 shadow-sm ${!(canEditSettings || canAddCollaborators) ? 'opacity-60 pointer-events-none' : ''}`} title="Invite Teammates" subtitle="Add coworkers to collaborate on content and branding.">
                     <div className="space-y-4">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
+                        Type at least 6 characters to safely search registered users, or paste the full email and click Invite.
+                      </div>
                       <div className="space-y-2 relative">
                         <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider ml-1">New Teammate Email</label>
                         <div className="flex gap-2">
@@ -746,7 +798,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                       {collaborators.length === 0 ? (
                         <div className="text-center py-12 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                           <Users className="mx-auto text-slate-300 mb-3" size={32} />
-                          <p className="text-sm font-medium text-slate-500">No collaborators added yet.</p>
+                          <p className="text-sm font-semibold text-slate-700">No collaborators added yet.</p>
+                          <p className="mt-2 text-sm font-medium text-slate-500">Invite teammates so approvals, content creation, and settings responsibilities are easier to split.</p>
                         </div>
                       ) : (
                         <div className="grid gap-3">
@@ -1153,7 +1206,7 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                       <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Track permission changes and team modifications.</p>
                     </div>
                   </div>
-                  {(isOwner || canEditSettings) && (
+                  {(isOwner || canEditSettings) ? (
                     <Card className="bg-white border-slate-200/60 shadow-sm overflow-hidden p-0" title="" subtitle="">
                       <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
                         <div>
@@ -1208,6 +1261,8 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                         </table>
                       </div>
                     </Card>
+                  ) : (
+                    <PermissionNote>Only owners and roles with Settings access can review security and audit activity.</PermissionNote>
                   )}
                 </div>
               )}
@@ -1218,11 +1273,20 @@ export function SettingsPage(props: CompanySettingsShellProps) {
                     <div className="text-md md:text-xl font-bold">Integrations</div>
                     <p className="mt-1 text-sm md:text-[0.875rem] font-medium text-slate-600">Connect services used for publishing, approvals, and automation.</p>
                   </div>
+                  {!canEditSettings && (
+                    <div className="mb-4">
+                      <PermissionNote>Only owners and roles with Settings access can connect or disconnect social accounts.</PermissionNote>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 gap-4">
                     <Card title="Social Accounts" subtitle="Connect your social media profiles to enable auto-publishing.">
                       <div className="space-y-4">
                         {(localAccounts.length === 0 && !loadingAccounts) ? (
-                          <p className="text-sm text-slate-500 italic">No accounts connected yet.</p>
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+                            <Link2 className="mx-auto mb-3 text-slate-300" size={28} />
+                            <p className="text-sm font-semibold text-slate-700">No accounts connected yet.</p>
+                            <p className="mt-2 text-sm font-medium text-slate-500">Connect LinkedIn or Facebook Pages here so Studio can publish and Analytics can later surface real account performance.</p>
+                          </div>
                         ) : loadingAccounts ? (
                           <p className="text-sm text-slate-500 animate-pulse">Loading accounts...</p>
                         ) : (

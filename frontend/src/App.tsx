@@ -23,6 +23,8 @@ import {
   Download,
   ShieldCheck,
   Megaphone,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LegalPage } from './pages/LegalPage';
@@ -104,6 +106,23 @@ function BrandRedirect() {
 import { supabase } from '@/lib/supabase';
 
 function App() {
+  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('app-theme') : 'light') || 'light');
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('app-theme', next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
   const navigate = useNavigate();
   const location = useLocation();
   // --- Auth: session, profile, onboarding, product tour ---
@@ -784,7 +803,7 @@ function App() {
   return (
     <NotificationProvider>
 
-      <div className="flex flex-col h-screen w-full bg-[#FAFBFC] text-brand-dark transition-colors duration-300">
+      <div className="flex flex-col h-screen w-full bg-[#FAFBFC] dark:bg-slate-950 text-brand-dark dark:text-slate-100 transition-colors duration-300">
         <Header
           isNavDrawerOpen={isNavDrawerOpen}
           setIsNavDrawerOpen={setIsNavDrawerOpen}
@@ -834,7 +853,7 @@ function App() {
             />
           )}
 
-          <div className={`flex-1 ml-0 lg:ml-[280px] transition-all duration-300 ${isAiAssistantOpen ? 'lg:mr-[400px]' : 'mr-0'} overflow-hidden h-full flex flex-col bg-gray-50`}>
+          <div className={`flex-1 ml-0 lg:ml-[280px] transition-all duration-300 ${isAiAssistantOpen ? 'lg:mr-[400px]' : 'mr-0'} overflow-hidden h-full flex flex-col bg-gray-50 dark:bg-slate-950`}>
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
               <Routes>
                 <Route
@@ -1177,6 +1196,9 @@ function App() {
                       calendarRows={calendarRows}
                       getStatusValue={getStatusValue}
                       activeCompanyId={activeCompanyId}
+                      authedFetch={authedFetch}
+                      backendBaseUrl={backendBaseUrl}
+                      connectedAccounts={connectedAccounts}
                     />
                   }
                 />

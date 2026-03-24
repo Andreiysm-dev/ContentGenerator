@@ -79,17 +79,24 @@ export function StudioEditorPage({
     const [activePlatformTab, setActivePlatformTab] = useState('master');
     const [showPostConfirmation, setShowPostConfirmation] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const lastIngestedUrlRef = useRef<string | null>(null);
     const [row, setRow] = useState<any | null>(null);
 
     // Sync mediaUrl when global selectedRow updates (e.g. from Image Generation Modal)
     useEffect(() => {
         if (globalSelectedRow && globalSelectedRow.contentCalendarId === contentId) {
             const newUrl = getImageGeneratedUrl ? getImageGeneratedUrl(globalSelectedRow) : (globalSelectedRow.imageGenerated || globalSelectedRow.imageGeneratedUrl);
-            if (newUrl && !mediaUrls.includes(newUrl)) {
-                setMediaUrls(prev => [...prev, newUrl]);
+            
+            // Only add if it's a NEW URL we haven't ingested in this session yet
+            if (newUrl && newUrl !== lastIngestedUrlRef.current) {
+                lastIngestedUrlRef.current = newUrl;
+                setMediaUrls(prev => {
+                    if (prev.includes(newUrl)) return prev;
+                    return [...prev, newUrl];
+                });
             }
         }
-    }, [globalSelectedRow, contentId, mediaUrls, getImageGeneratedUrl]);
+    }, [globalSelectedRow, contentId, getImageGeneratedUrl]);
 
     // Keep global selectedRow in sync for modals to work
     useEffect(() => {
@@ -128,7 +135,10 @@ export function StudioEditorPage({
                     initialMedia.push(...rowData.media_urls);
                 } else {
                     const singleUrl = getImageGeneratedUrl ? getImageGeneratedUrl(rowData) : (rowData.imageGenerated || rowData.imageGeneratedUrl || null);
-                    if (singleUrl) initialMedia.push(singleUrl);
+                    if (singleUrl) {
+                    initialMedia.push(singleUrl);
+                    lastIngestedUrlRef.current = singleUrl;
+                }
                 }
                 setMediaUrls(initialMedia);
 
@@ -918,7 +928,15 @@ export function StudioEditorPage({
                                                         />
                                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
                                                             <button
-                                                                onClick={() => setMediaUrls(prev => prev.filter((_, i) => i !== idx))}
+                                                                onClick={() => {
+                                                                    setMediaUrls(prev => {
+                                                                        const next = prev.filter((_, i) => i !== idx);
+                                                                        if (activeImageIndex >= next.length) {
+                                                                            setActiveImageIndex(Math.max(0, next.length - 1));
+                                                                        }
+                                                                        return next;
+                                                                    });
+                                                                }}
                                                                 className="p-2 bg-white rounded-xl text-rose-600 hover:bg-rose-50 transition-all shadow-lg"
                                                                 title="Remove Image"
                                                             >

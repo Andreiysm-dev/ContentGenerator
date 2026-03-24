@@ -58,13 +58,43 @@ export function ContentPlannerPage({
     const [newIdea, setNewIdea] = useState('');
     const [isCreatingIdea, setIsCreatingIdea] = useState(false);
     const [isRefining, setIsRefining] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
+    const allSelected = items.length > 0 && selectedIds.size === items.length;
+    const toggleSelectAll = () => {
+        setSelectedIds(allSelected ? new Set() : new Set(items.map(i => i.id)));
+    };
+
+    // Auto-select all items when a new plan is loaded
+    React.useEffect(() => {
+        if (items.length > 0) setSelectedIds(new Set(items.map(i => i.id)));
+    }, [items.length]);
+
+    const hasAppliedInitialItems = React.useRef(false);
 
     React.useEffect(() => {
-        if (initialItems && initialItems.length > 0) {
-            setItems(initialItems.map((item, idx) => ({
-                ...item,
-                id: item.id || (Date.now().toString() + idx)
-            })));
+        if (!initialItems || initialItems.length === 0) return;
+        // Guard: only apply once per plan injection (avoids re-applying on unrelated re-renders)
+        if (hasAppliedInitialItems.current) return;
+        hasAppliedInitialItems.current = true;
+        setItems(initialItems.map((item, idx) => ({
+            ...item,
+            id: item.id || (Date.now().toString() + idx)
+        })));
+    }, [initialItems]);
+
+    // Reset the guard if the plan is cleared (so a fresh plan can be applied later)
+    React.useEffect(() => {
+        if (!initialItems || initialItems.length === 0) {
+            hasAppliedInitialItems.current = false;
         }
     }, [initialItems]);
 
@@ -134,9 +164,16 @@ export function ContentPlannerPage({
 
     const handleSaveToCalendar = async () => {
         if (!activeCompanyId) return;
+        const toSave = selectedIds.size > 0
+            ? items.filter(i => selectedIds.has(i.id))
+            : items;
+        if (!toSave.length) {
+            notify('Select at least one item to save.', 'error');
+            return;
+        }
         setIsSaving(true);
         if (onAddToCalendar) {
-            await onAddToCalendar(items);
+            await onAddToCalendar(toSave);
             navigate(`/company/${activeCompanyId}/calendar`);
         } else {
             setTimeout(() => {
@@ -228,7 +265,7 @@ export function ContentPlannerPage({
                     {items.length > 0 && userPermissions?.canCreate && (
                         <button
                             onClick={handleSaveToCalendar}
-                            disabled={isSaving}
+                            disabled={isSaving || selectedIds.size === 0}
                             className="relative z-10 flex items-center gap-2 bg-white text-slate-900 px-6 py-3 rounded-xl font-bold shadow-lg transition hover:bg-slate-100 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                         >
                             {isSaving ? (
@@ -236,7 +273,7 @@ export function ContentPlannerPage({
                             ) : (
                                 <>
                                     <Save size={18} />
-                                    Save {items.length} to Calendar
+                                    Save {selectedIds.size > 0 ? selectedIds.size : items.length} to Calendar
                                 </>
                             )}
                         </button>
@@ -457,6 +494,15 @@ export function ContentPlannerPage({
                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
                                     {/* Table Header */}
                                     <div className="grid grid-cols-12 gap-4 px-8 py-5 bg-slate-50/50 border-b border-slate-100 items-center">
+                                        <div className="col-span-1 flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={allSelected}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                                                title="Select all"
+                                            />
+                                        </div>
                                         <div className="col-span-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 flex items-center gap-2">
                                             <CalendarIcon size={12} /> Date
                                         </div>
@@ -466,7 +512,7 @@ export function ContentPlannerPage({
                                         <div className="col-span-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 flex items-center gap-2">
                                             <Target size={12} /> Brand / Promo
                                         </div>
-                                        <div className="col-span-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                        <div className="col-span-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 flex items-center gap-2">
                                             <Megaphone size={12} /> Channel / Target
                                         </div>
                                         <div className="col-span-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 flex items-center gap-2">
@@ -477,13 +523,28 @@ export function ContentPlannerPage({
                                     {/* Table Body */}
                                     <div className="divide-y divide-slate-100">
                                         {items.map((item) => (
-                                            <div key={item.id} className="grid grid-cols-12 gap-6 px-8 py-6 hover:bg-slate-50/50 transition relative group items-start">
+                                            <div
+                                                key={item.id}
+                                                className={`grid grid-cols-12 gap-6 px-8 py-6 transition relative group items-start ${
+                                                    selectedIds.has(item.id) ? 'bg-indigo-50/40' : 'hover:bg-slate-50/50'
+                                                }`}
+                                            >
                                                 <button
                                                     onClick={() => handleRemoveItem(item.id)}
                                                     className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-rose-500 rounded-full hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
+
+                                                {/* Checkbox */}
+                                                <div className="col-span-1 flex items-center pt-1">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.has(item.id)}
+                                                        onChange={() => toggleSelect(item.id)}
+                                                        className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                                                    />
+                                                </div>
 
                                                 {/* Date */}
                                                 <div className="col-span-2 pt-1">
@@ -516,7 +577,7 @@ export function ContentPlannerPage({
                                                 </div>
 
                                                 {/* Channel / Target */}
-                                                <div className="col-span-3 flex flex-col gap-1">
+                                                <div className="col-span-2 flex flex-col gap-1">
                                                     <span className="font-bold text-slate-800 text-sm">
                                                         {item.channels}
                                                     </span>

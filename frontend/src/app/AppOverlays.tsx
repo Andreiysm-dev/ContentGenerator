@@ -406,8 +406,11 @@ export function AppOverlays({
         onApplyPlan={(plan: any[]) => {
           setPreDefinedPlan(plan);
           if (activeCompanyId) {
-            navigate(`/company/${activeCompanyId}/plan`);
-            notify('Strategy applied to planner. Review and push to calendar!', 'success');
+            // Small delay to allow setPreDefinedPlan to flush before ContentPlannerPage mounts
+            setTimeout(() => {
+              navigate(`/company/${activeCompanyId}/plan`);
+              notify('Strategy applied to planner. Review and push to calendar!', 'success');
+            }, 50);
           }
         }}
         backendBaseUrl={backendBaseUrl}

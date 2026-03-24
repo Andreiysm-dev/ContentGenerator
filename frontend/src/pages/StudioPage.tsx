@@ -410,7 +410,7 @@ export function StudioPage({
   };
 
   return (
-    <main className="flex-1 overflow-y-auto bg-gray-50/50 p-2.5 md:p-6 min-w-0 relative">
+    <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-950/50 p-2.5 md:p-6 min-w-0 relative">
       {/* Background Ambience */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] bg-gradient-to-br from-[#3fa9f5]/15 to-transparent rounded-full blur-[100px] animate-pulse" />
@@ -420,20 +420,20 @@ export function StudioPage({
       <div className="max-w-[1600px] mx-auto flex gap-6 items-start relative z-20">
 
 
-        <section className="flex-1 bg-white border border-slate-200/60 rounded-3xl shadow-sm overflow-hidden flex flex-row h-full relative z-10 min-w-0">
+        <section className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/60 rounded-3xl shadow-sm overflow-hidden flex flex-row h-full relative z-10 min-w-0">
           {/* CHANNEL RAIL (INTERNAL) */}
-          <aside className="hidden lg:flex flex-col gap-4 py-8 px-4 bg-slate-50 border-r border-slate-100 sticky top-0 h-full overflow-y-auto">
+          <aside className="hidden lg:flex flex-col gap-4 py-8 px-4 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-100 dark:border-slate-800 sticky top-0 h-full overflow-y-auto">
             {/* All Channels */}
             <button
               onClick={() => setSelectedChannelId(null)}
               className={`group relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 border-2 ${!selectedChannelId
                 ? 'bg-slate-900 border-slate-900 text-white shadow-lg'
-                : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200 hover:text-blue-500 hover:scale-105 shadow-sm'
+                : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-blue-200 hover:text-blue-500 hover:scale-105 shadow-sm'
                 }`}
             >
               <Globe className="w-5 h-5" />
               {getChannelCount(null) > 0 && (
-                <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 rounded-full flex items-center justify-center text-[9px] font-black px-1 ${!selectedChannelId ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'
+                <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 rounded-full flex items-center justify-center text-[9px] font-black px-1 ${!selectedChannelId ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500 dark:text-slate-400 dark:text-slate-500'
                   }`}>
                   {getChannelCount(null)}
                 </span>
@@ -453,11 +453,11 @@ export function StudioPage({
                   key={acc.id}
                   onClick={() => setSelectedChannelId(acc.id)}
                   className={`group relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 border-2 ${isActive
-                    ? 'bg-white border-slate-900 shadow-lg shadow-slate-900/10'
-                    : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300 hover:scale-105 shadow-sm'
+                    ? 'bg-white dark:bg-slate-900 border-slate-900 shadow-lg shadow-slate-900/10'
+                    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-slate-300 hover:scale-105 shadow-sm'
                     }`}
                 >
-                  <div className={`w-full h-full flex items-center justify-center transition-colors overflow-hidden rounded-xl ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>
+                  <div className={`w-full h-full flex items-center justify-center transition-colors overflow-hidden rounded-xl ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
                     {acc.profile_picture ? (
                       <img src={acc.profile_picture} alt={acc.provider} className="w-full h-full object-cover" />
                     ) : (
@@ -489,7 +489,7 @@ export function StudioPage({
             {/* Connect Button */}
             <button
               onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/settings/integrations`)}
-              className="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-50 border-2 border-dashed border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all duration-300 group relative"
+              className="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-50 dark:bg-slate-800/50 border-2 border-dashed border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all duration-300 group relative"
             >
               <PlusCircle className="w-5 h-5" />
               <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap shadow-xl z-[100]">
@@ -510,30 +510,30 @@ export function StudioPage({
                 <h2 className="text-2xl font-black text-white tracking-tight">
                   Content Studio
                 </h2>
-                <p className="mt-1 text-sm font-medium text-slate-400 max-w-lg">
+                <p className="mt-1 text-sm font-medium text-slate-400 dark:text-slate-500 max-w-lg">
                   Refine, schedule, and track your brand's footprint across all social ecosystems.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-center gap-3 relative z-10">
-                <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 backdrop-blur-sm">
+                <div className="flex bg-white dark:bg-slate-900/5 p-1 rounded-xl border border-white/10 backdrop-blur-sm">
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 hover:text-white'}`}
                     title="Grid View"
                   >
                     <LayoutGrid className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 hover:text-white'}`}
                     title="Timeline View"
                   >
                     <List className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 backdrop-blur-sm">
+                <div className="flex bg-white dark:bg-slate-900/5 p-1 rounded-xl border border-white/10 backdrop-blur-sm">
                   <select
                     value={selectedStatusFilter}
                     onChange={(e) => setSelectedStatusFilter(e.target.value)}
@@ -551,13 +551,13 @@ export function StudioPage({
                 </div>
 
                 <div className="relative group w-full sm:w-64">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500 transition-colors" />
                   <input
                     type="text"
                     placeholder="Search your library..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-11 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm font-medium text-white placeholder:text-slate-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all backdrop-blur-sm"
+                    className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900/5 border border-white/10 rounded-xl text-sm font-medium text-white placeholder:text-slate-500 dark:text-slate-400 dark:text-slate-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all backdrop-blur-sm"
                   />
                 </div>
                 <button
@@ -576,7 +576,7 @@ export function StudioPage({
 
 
               {/* Tab Navigation */}
-              <div className="flex items-center gap-2 p-1.5 bg-white border border-slate-200 rounded-[2rem] w-fit shadow-sm">
+              <div className="flex items-center gap-2 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] w-fit shadow-sm">
                 {tabConfigs.map((tab: any) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -589,13 +589,13 @@ export function StudioPage({
                       }}
                       className={`relative flex items-center gap-3 px-6 py-3 rounded-[1.5rem] text-sm font-black transition-all duration-300 ${isActive
                         ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/10'
-                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                        : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800/50'
                         }`}
                     >
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`} />
                       {tab.label}
                       {tab.count > 0 && (
-                        <span className={`flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                        <span className={`flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] ${isActive ? 'bg-white dark:bg-slate-900/20 text-white' : 'bg-slate-100 text-slate-500 dark:text-slate-400 dark:text-slate-500'
                           }`}>
                           {tab.count}
                         </span>
@@ -608,7 +608,7 @@ export function StudioPage({
 
                 <button
                   onClick={handleOpenConfig}
-                  className="p-3 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-[1.2rem] transition-all transform hover:rotate-90 duration-500"
+                  className="p-3 text-slate-400 dark:text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-[1.2rem] transition-all transform hover:rotate-90 duration-500"
                   title="Configure Studio View"
                 >
                   <Settings2 size={18} />
@@ -617,16 +617,16 @@ export function StudioPage({
 
               {
                 filteredRows.length === 0 ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-20 text-center shadow-sm">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-20 text-center shadow-sm">
                     <div className="max-w-md mx-auto space-y-6">
-                      <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mx-auto text-slate-200">
+                      <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800/50 rounded-[2.5rem] flex items-center justify-center mx-auto text-slate-200">
                         <LayoutGrid className="w-10 h-10" />
                       </div>
                       <div className="space-y-2">
-                        <h3 className="text-xl font-bold text-slate-900">
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                           {searchQuery ? 'No matches found' : `Your ${activeTab} is empty`}
                         </h3>
-                        <p className="text-slate-500 text-sm font-medium">
+                        <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 text-sm font-medium">
                           {activeTab === 'drafts'
                             ? 'Generate new content plans or designs in the calendar to see them here.'
                             : activeTab === 'scheduled'
@@ -655,7 +655,7 @@ export function StudioPage({
                       return (
                         <div
                           key={row.contentCalendarId}
-                          className="group bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-slate-200/50 hover:-translate-y-1 transition-all duration-500"
+                          className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-slate-200/50 hover:-translate-y-1 transition-all duration-500"
                         >
                           {/* Visual Preview */}
                           <div
@@ -679,7 +679,7 @@ export function StudioPage({
                               {imageUrl && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); window.open(imageUrl, '_blank'); }}
-                                  className="p-4 bg-white rounded-2xl text-slate-900 hover:bg-blue-50 hover:text-blue-600 transition-all transform translate-y-4 group-hover:translate-y-0 duration-300 delay-[50ms]"
+                                  className="p-4 bg-white dark:bg-slate-900 rounded-2xl text-slate-900 dark:text-white hover:bg-blue-50 hover:text-blue-600 transition-all transform translate-y-4 group-hover:translate-y-0 duration-300 delay-[50ms]"
                                   title="Download Asset"
                                 >
                                   <Download className="w-5 h-5" />
@@ -690,7 +690,7 @@ export function StudioPage({
                             {/* Channel Badges */}
                             <div className="absolute bottom-4 left-4 flex flex-wrap gap-1.5 pointer-events-none">
                               {channels.map((chan: string, i: number) => (
-                                <span key={i} className="px-2.5 py-1 bg-white/95 backdrop-blur-sm text-slate-900 text-[9px] font-black uppercase tracking-wider rounded-lg shadow-sm border border-white/20">
+                                <span key={i} className="px-2.5 py-1 bg-white dark:bg-slate-900/95 backdrop-blur-sm text-slate-900 dark:text-white text-[9px] font-black uppercase tracking-wider rounded-lg shadow-sm border border-white/20">
                                   {chan}
                                 </span>
                               ))}
@@ -700,7 +700,7 @@ export function StudioPage({
                           {/* Body Content */}
                           <div className="p-6 space-y-4">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                                 {activeTab === 'scheduled' && row.scheduled_at
                                   ? new Date(row.scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
                                   : (row.date || 'TBD')}
@@ -714,12 +714,12 @@ export function StudioPage({
                             </div>
 
                             {row.theme && (
-                              <h4 className="text-sm font-black text-slate-900 line-clamp-1 mb-1" title={row.theme}>
+                              <h4 className="text-sm font-black text-slate-900 dark:text-white line-clamp-1 mb-1" title={row.theme}>
                                 {row.theme}
                               </h4>
                             )}
 
-                            <p className="text-sm font-medium text-slate-700 leading-relaxed line-clamp-3 h-[4.5rem]">
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 leading-relaxed line-clamp-3 h-[4.5rem]">
                               {caption || <span className="text-slate-300 italic">No caption generated yet.</span>}
                             </p>
 
@@ -739,7 +739,7 @@ export function StudioPage({
                               {userPermissions.canCreate && (
                                 <button
                                   onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
-                                  className="w-full py-3 px-4 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all duration-300 uppercase tracking-widest"
+                                  className="w-full py-3 px-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl text-[10px] font-black text-slate-600 dark:text-slate-300 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all duration-300 uppercase tracking-widest"
                                 >
                                   Edit Details
                                 </button>
@@ -787,10 +787,10 @@ export function StudioPage({
                       return (
                         <div key={date} className="relative space-y-6">
                           <div className="flex items-center gap-4">
-                            <div className="w-[3.75rem] h-[3.75rem] rounded-2xl bg-white border-2 border-slate-100 flex items-center justify-center z-10 shadow-sm">
+                            <div className="w-[3.75rem] h-[3.75rem] rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 flex items-center justify-center z-10 shadow-sm">
                               <CalendarDays className="w-6 h-6 text-blue-500" />
                             </div>
-                            <h3 className="text-lg font-black text-slate-900 tracking-tight">{dateLabel}</h3>
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{dateLabel}</h3>
                           </div>
 
                           <div className="ml-[3.75rem] space-y-4">
@@ -802,16 +802,16 @@ export function StudioPage({
                               return (
                                 <div
                                   key={row.contentCalendarId}
-                                  className="group flex flex-col md:flex-row gap-6 bg-white border border-slate-200 p-6 rounded-2xl hover:shadow-xl hover:border-blue-100 transition-all duration-300"
+                                  className="group flex flex-col md:flex-row gap-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl hover:shadow-xl hover:border-blue-100 transition-all duration-300"
                                 >
                                   <div
-                                    className="w-full md:w-32 h-32 rounded-xl bg-slate-50 overflow-hidden flex-shrink-0 relative group/thumb cursor-pointer"
+                                    className="w-full md:w-32 h-32 rounded-xl bg-slate-50 dark:bg-slate-800/50 overflow-hidden flex-shrink-0 relative group/thumb cursor-pointer"
                                     onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
                                   >
                                     {imageUrl ? (
                                       <img src={imageUrl} alt="" className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-500" />
                                     ) : (
-                                      <div className={`w-full h-full flex items-center justify-center text-slate-200 bg-slate-50`}>
+                                      <div className={`w-full h-full flex items-center justify-center text-slate-200 bg-slate-50 dark:bg-slate-800/50`}>
                                         <FileText className="w-8 h-8" />
                                       </div>
                                     )}
@@ -825,14 +825,14 @@ export function StudioPage({
                                             <span key={i} className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{chan}</span>
                                           ))}
                                           <span className="text-slate-300">•</span>
-                                          <span className="text-[10px] font-bold text-slate-400 capitalize">{getStatusLabel(row)}</span>
+                                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 capitalize">{getStatusLabel(row)}</span>
                                         </div>
                                         {row.theme && (
-                                          <h4 className="text-sm font-black text-slate-900 line-clamp-1 mb-1" title={row.theme}>
+                                          <h4 className="text-sm font-black text-slate-900 dark:text-white line-clamp-1 mb-1" title={row.theme}>
                                             {row.theme}
                                           </h4>
                                         )}
-                                        <p className="text-slate-700 font-medium leading-relaxed line-clamp-2">
+                                        <p className="text-slate-700 dark:text-slate-200 font-medium leading-relaxed line-clamp-2">
                                           {caption || <span className="text-slate-300 italic text-sm">No caption drafting yet.</span>}
                                         </p>
                                         {row.supervisor_comments && (
@@ -847,7 +847,7 @@ export function StudioPage({
                                       <div className="flex gap-2 shrink-0">
                                         <button
                                           onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
-                                          className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                          className="p-2.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                                         >
                                           <PlusCircle className="w-4 h-4" />
                                         </button>
@@ -858,7 +858,7 @@ export function StudioPage({
 
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4">
-                                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                                             <Clock className="w-3.5 h-3.5" />
                                             {activeTab === 'scheduled' && row.scheduled_at
                                               ? format(parseISO(row.scheduled_at), 'hh:mm a')
@@ -888,7 +888,7 @@ export function StudioPage({
                                           {userPermissions.canCreate && (
                                             <button
                                               onClick={() => activeCompanyId && navigate(`/company/${encodeURIComponent(activeCompanyId)}/studio/${row.contentCalendarId}`)}
-                                              className="text-[11px] font-black text-slate-400 uppercase tracking-widest hover:underline"
+                                              className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hover:underline"
                                             >
                                               Edit
                                             </button>
@@ -914,20 +914,20 @@ export function StudioPage({
           {isConfiguring && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsConfiguring(false)} />
-              <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-                <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-black text-slate-900 flex items-center gap-3">
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
                       <Settings2 className="text-blue-500" />
                       Studio Configuration
                     </h2>
-                    <p className="text-xs font-medium text-slate-400 mt-1">Configure layout, tabs, and automatic status transitions.</p>
+                    <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-1">Configure layout, tabs, and automatic status transitions.</p>
                   </div>
                   <button
                     onClick={() => setIsConfiguring(false)}
                     className="p-2 hover:bg-slate-100 rounded-xl transition-all"
                   >
-                    <XCircle className="text-slate-400 font-black cursor-pointer" />
+                    <XCircle className="text-slate-400 dark:text-slate-500 font-black cursor-pointer" />
                   </button>
                 </div>
 
@@ -936,11 +936,11 @@ export function StudioPage({
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
                           <LayoutGrid size={14} className="text-blue-500" />
                           Section 1: Dashboard Tabs
                         </h3>
-                        <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">Define the horizontal tabs shown on your Studio dashboard.</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-1 uppercase tracking-wider">Define the horizontal tabs shown on your Studio dashboard.</p>
                       </div>
                       <button
                         onClick={() => setLocalStudioSettings({
@@ -962,7 +962,7 @@ export function StudioPage({
 
                     <div className="space-y-3">
                       {localStudioSettings.studioTabs.map((tab: any, tIdx: number) => (
-                        <div key={tab.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                        <div key={tab.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex-1 relative">
                               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300">
@@ -975,7 +975,7 @@ export function StudioPage({
                                   nt[tIdx].label = e.target.value;
                                   setLocalStudioSettings({ ...localStudioSettings, studioTabs: nt });
                                 }}
-                                className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-300 transition-all"
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-2 text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-300 transition-all"
                                 placeholder="e.g. In Progress, Final Review..."
                               />
                             </div>
@@ -1015,7 +1015,7 @@ export function StudioPage({
                                   }}
                                   className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${isSel
                                     ? 'bg-slate-900 border-slate-900 text-white shadow-md'
-                                    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 transition-colors'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:border-slate-300 transition-colors'
                                     }`}
                                 >
                                   {c.title}
@@ -1028,14 +1028,14 @@ export function StudioPage({
                     </div>
                   </div>
 
-                  <div className="space-y-4 pt-6 border-t border-slate-100">
+                  <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
                           <Wand2 size={14} className="text-indigo-500" />
                           Section 2: Triggers & Automations
                         </h3>
-                        <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase tracking-wider">Automate status changes and restrict access based on events.</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-1 uppercase tracking-wider">Automate status changes and restrict access based on events.</p>
                       </div>
                       <div className="relative">
                         <button
@@ -1045,18 +1045,18 @@ export function StudioPage({
                           <PlusIcon size={12} /> Add Trigger
                         </button>
                         {isAddMenuOpen && (
-                          <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[110] flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+                          <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-[110] flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
                             <button onClick={() => { addEventTrigger(); setIsAddMenuOpen(false); }} className="p-2 text-left hover:bg-indigo-50 rounded-xl transition-all">
                               <div className="text-[10px] font-black uppercase text-indigo-600">Event Trigger</div>
-                              <div className="text-[9px] text-slate-400 font-medium tracking-tight">On content change</div>
+                              <div className="text-[9px] text-slate-400 dark:text-slate-500 font-medium tracking-tight">On content change</div>
                             </button>
                             <button onClick={() => { addMoveTrigger(); setIsAddMenuOpen(false); }} className="p-2 text-left hover:bg-blue-50 rounded-xl transition-all border-t border-slate-50">
                               <div className="text-[10px] font-black uppercase text-blue-600">Move Trigger</div>
-                              <div className="text-[9px] text-slate-400 font-medium tracking-tight">On status move</div>
+                              <div className="text-[9px] text-slate-400 dark:text-slate-500 font-medium tracking-tight">On status move</div>
                             </button>
                             <button onClick={() => { addLockRule(); setIsAddMenuOpen(false); }} className="p-2 text-left hover:bg-amber-50 rounded-xl transition-all border-t border-slate-50">
                               <div className="text-[10px] font-black uppercase text-amber-600">Lock Rule</div>
-                              <div className="text-[9px] text-slate-400 font-medium tracking-tight">Restrict access</div>
+                              <div className="text-[9px] text-slate-400 dark:text-slate-500 font-medium tracking-tight">Restrict access</div>
                             </button>
                           </div>
                         )}
@@ -1065,7 +1065,7 @@ export function StudioPage({
 
                     <div className="space-y-3">
                       {localAutomations.map((rule: any) => (
-                        <div key={rule.id} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-200 flex flex-col gap-3 group/rule">
+                        <div key={rule.id} className="p-4 bg-slate-50 dark:bg-slate-800/50/50 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-3 group/rule">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               {rule.type === 'access_rule' ? (
@@ -1092,19 +1092,19 @@ export function StudioPage({
 
                           {rule.type === 'access_rule' ? (
                             <div className="flex items-center gap-3">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">Lock</span>
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest shrink-0">Lock</span>
                               <select
                                 value={rule.columnId}
                                 onChange={(e) => updateAutomation(rule.id, { columnId: e.target.value })}
-                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                               >
                                 {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
                               </select>
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0 text-[8px]">to</span>
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest shrink-0 text-[8px]">to</span>
                               <select
                                 value={rule.roleName}
                                 onChange={(e) => updateAutomation(rule.id, { roleName: e.target.value })}
-                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                               >
                                 <option value="">Select Role</option>
                                 {activeCompany?.custom_roles?.map((r: any) => (
@@ -1114,11 +1114,11 @@ export function StudioPage({
                             </div>
                           ) : rule.type === 'move_to' ? (
                             <div className="flex items-center gap-3">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">In</span>
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest shrink-0">In</span>
                               <select
                                 value={rule.targetColumn}
                                 onChange={(e) => updateAutomation(rule.id, { targetColumn: e.target.value })}
-                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                               >
                                 {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
                               </select>
@@ -1126,7 +1126,7 @@ export function StudioPage({
                               <select
                                 value={rule.action}
                                 onChange={(e) => updateAutomation(rule.id, { action: e.target.value })}
-                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                               >
                                 <option value="generate_caption">AI: Write Caption</option>
                                 <option value="generate_image">AI: Design Image</option>
@@ -1137,7 +1137,7 @@ export function StudioPage({
                               <select
                                 value={rule.event}
                                 onChange={(e) => updateAutomation(rule.id, { event: e.target.value })}
-                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                               >
                                 <option value="caption_generated">AI Caption Generated</option>
                                 <option value="image_generated">AI Image Generated</option>
@@ -1152,7 +1152,7 @@ export function StudioPage({
                               <select
                                 value={rule.targetStatus}
                                 onChange={(e) => updateAutomation(rule.id, { targetStatus: e.target.value })}
-                                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold outline-none"
                               >
                                 {columns.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
                               </select>
@@ -1162,7 +1162,7 @@ export function StudioPage({
                       ))}
 
                       {localAutomations.length === 0 && (
-                        <div className="py-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
+                        <div className="py-8 text-center bg-slate-50 dark:bg-slate-800/50 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
                           <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">No custom triggers active</p>
                         </div>
                       )}
@@ -1170,7 +1170,7 @@ export function StudioPage({
                   </div>
                 </div>
 
-                <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                <div className="px-8 py-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[10px] font-black text-rose-400 uppercase tracking-widest">
                     <AlertCircle size={14} />
                     Unsaved Changes
@@ -1178,7 +1178,7 @@ export function StudioPage({
                   <div className="flex gap-3">
                     <button
                       onClick={() => setIsConfiguring(false)}
-                      className="px-6 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all font-bold"
+                      className="px-6 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800/50 transition-all font-bold"
                     >
                       Cancel
                     </button>

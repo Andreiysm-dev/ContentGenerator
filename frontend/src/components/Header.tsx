@@ -128,16 +128,15 @@ export function Header({
           </div>
         </button>
 
-        {/* Minimal Breadcrumb - Left aligned next to sidebar */}
         <div className="hidden lg:flex items-center gap-2">
-          {breadcrumbs.map((crumb, index) => (
-            <div key={index} className="flex items-center gap-2">
-              {index > 0 && <ChevronRight size={10} className="text-slate-300" />}
-              <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${index === breadcrumbs.length - 1 ? 'text-[#0B2641]' : 'text-slate-400/80'}`}>
-                {crumb}
-              </span>
-            </div>
-          ))}
+            {breadcrumbs.map((crumb, index) => (
+              <div key={index} className="flex items-center gap-2">
+                {index > 0 && <ChevronRight size={10} className="text-slate-300" />}
+                <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${index === breadcrumbs.length - 1 ? 'text-[#0B2641]' : 'text-slate-400/80'}`}>
+                  {crumb}
+                </span>
+              </div>
+            ))}
         </div>
       </div>
 

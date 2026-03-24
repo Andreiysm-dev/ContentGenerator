@@ -72,6 +72,8 @@ interface ImageHubPageProps {
         isOwner: boolean;
     };
     activeCompany?: any;
+    imagePreviewNonce?: number;
+    setImagePreviewNonce?: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export function ImageHubPage({
@@ -96,7 +98,9 @@ export function ImageHubPage({
         canDelete: false,
         isOwner: false
     },
-    activeCompany
+    activeCompany,
+    imagePreviewNonce: propImagePreviewNonce,
+    setImagePreviewNonce: propSetImagePreviewNonce
 }: ImageHubPageProps) {
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
     const [dmpDraft, setDmpDraft] = useState('');
@@ -105,9 +109,12 @@ export function ImageHubPage({
     const [brandRulesDraft, setBrandRulesDraft] = useState(systemInstruction);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [provider, setProvider] = useState<'google' | 'replicate' | 'fal'>('fal');
+    const [provider, setProvider] = useState<'google' | 'replicate' | 'fal' | 'openai'>('fal');
     const [selectedModel, setSelectedModel] = useState('fal-ai/nano-banana-pro');
-    const [imagePreviewNonce, setImagePreviewNonce] = useState(0);
+
+    const [localImagePreviewNonce, setLocalImagePreviewNonce] = useState(0);
+    const imagePreviewNonce = propImagePreviewNonce !== undefined ? propImagePreviewNonce : localImagePreviewNonce;
+    const setImagePreviewNonce = propSetImagePreviewNonce || setLocalImagePreviewNonce;
     const [searchQuery, setSearchQuery] = useState('');
     const [isZoomModalOpen, setIsZoomModalOpen] = useState(false);
     const [selectedAspectRatio, setSelectedAspectRatio] = useState('1:1');
@@ -174,6 +181,7 @@ export function ImageHubPage({
         { id: 'fal-ai/nano-banana-pro', name: 'Google Nano Banana Pro', provider: 'fal', group: 'Fal.ai' },
         { id: 'google-imagen', name: 'Google Imagen', provider: 'google', group: 'Google' },
         { id: 'imagineart/imagineart-1.5-preview/text-to-image', name: 'Imagine Art', provider: 'fal', group: 'Fal.ai' },
+        { id: 'dall-e-3', name: 'OpenAI DALL-E 3', provider: 'openai', group: 'OpenAI' },
     ];
 
     const MOOD_OPTIONS = ['Brand Default', 'Minimalist', 'Professional', 'Energetic', 'Cinematic', 'Whimsical', 'Corporate', 'Luxurious'];
@@ -421,7 +429,7 @@ export function ImageHubPage({
                 body: JSON.stringify({
                     dmp: trimmedDmp,
                     provider,
-                    model: (provider === 'replicate' || provider === 'fal') ? selectedModel : undefined,
+                    model: (provider === 'replicate' || provider === 'fal' || provider === 'openai') ? selectedModel : undefined,
                     aspectRatio: selectedAspectRatio
                 }),
             });
@@ -617,7 +625,7 @@ export function ImageHubPage({
                         brandKbId,
                         systemInstruction: systemInstruction ?? '',
                         provider,
-                        model: (provider === 'replicate' || provider === 'fal') ? selectedModel : undefined,
+                        model: (provider === 'replicate' || provider === 'fal' || provider === 'openai') ? selectedModel : undefined,
                         aspectRatio: selectedAspectRatio
                     }),
                 }
@@ -626,7 +634,21 @@ export function ImageHubPage({
                 const data = await response.json().catch(() => ({}));
                 notify(`Image generation failed. ${data.error || ''}`, 'error');
             } else {
-                notify('Image generation started! This may take a few moments.', 'success');
+                const data = await response.json().catch(() => ({}));
+                const updatedRows = data.updatedRows || [];
+                
+                if (updatedRows.length > 0) {
+                    setCalendarRows(prev => {
+                        return prev.map(existingRow => {
+                            const found = updatedRows.find((ur: any) => ur.contentCalendarId === existingRow.contentCalendarId);
+                            return found ? { ...existingRow, ...found } : existingRow;
+                        });
+                    });
+                    setImagePreviewNonce(n => n + 1);
+                    notify('Image generation completed!', 'success');
+                } else {
+                    notify('Image generation finished, but no results were returned.', 'info');
+                }
             }
         } catch (err) {
             notify('Network error triggering image generation.', 'error');

@@ -377,7 +377,10 @@ export function SchedulerPage({
                 <header className="px-8 py-4 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
                     <div>
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-bold uppercase tracking-widest border border-blue-500/20 mb-3">Content Strategy</div>
-                        <h2 className="text-2xl font-black text-white tracking-tight leading-none uppercase">Content Scheduler</h2>
+                        <h2 className="text-2xl font-black text-white tracking-tight leading-none">Calendar</h2>
+                        <p className="mt-2 max-w-2xl text-sm font-medium text-slate-300 normal-case">
+                            Plan content dates and timeline visibility here. Actual social publishing is still handled in Studio.
+                        </p>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -452,6 +455,13 @@ export function SchedulerPage({
                                 Week
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                <div className="border-b border-slate-100 bg-slate-50 px-8 py-3">
+                    <div className="flex flex-col gap-2 text-sm font-medium text-slate-600 lg:flex-row lg:items-center lg:justify-between">
+                        <span>Drag posts to plan dates and review your timeline at a glance.</span>
+                        <span>Need to actually publish? Open the post in <span className="font-bold text-blue-600">Studio</span>.</span>
                     </div>
                 </div>
 
