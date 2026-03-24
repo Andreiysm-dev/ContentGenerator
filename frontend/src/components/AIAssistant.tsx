@@ -406,7 +406,7 @@ export function AIAssistant({
                             }
                         }}
                         placeholder="Enter command..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 pr-20 text-sm font-medium focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/40 outline-none transition-all resize-none min-h-[56px] max-h-48 scrollbar-hide"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 pr-20 text-sm text-slate-900 font-medium focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/40 outline-none transition-all resize-none min-h-[56px] max-h-48 scrollbar-hide placeholder:text-slate-400"
                         rows={1}
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
