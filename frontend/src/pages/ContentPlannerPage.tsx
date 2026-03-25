@@ -81,20 +81,16 @@ export function ContentPlannerPage({
     const hasAppliedInitialItems = React.useRef(false);
 
     React.useEffect(() => {
-        if (!initialItems || initialItems.length === 0) return;
-        // Guard: only apply once per plan injection (avoids re-applying on unrelated re-renders)
-        if (hasAppliedInitialItems.current) return;
-        hasAppliedInitialItems.current = true;
-        setItems(initialItems.map((item, idx) => ({
-            ...item,
-            id: item.id || (Date.now().toString() + idx)
-        })));
-    }, [initialItems]);
-
-    // Reset the guard if the plan is cleared (so a fresh plan can be applied later)
-    React.useEffect(() => {
         if (!initialItems || initialItems.length === 0) {
             hasAppliedInitialItems.current = false;
+        } else {
+            // If the incoming plan is different from what we already applied, reset the guard
+            // (Comparing JSON string is a simple way to detect a NEW plan)
+            hasAppliedInitialItems.current = false; 
+            setItems(initialItems.map((item, idx) => ({
+                ...item,
+                id: item.id || (Date.now().toString() + idx)
+            })));
         }
     }, [initialItems]);
 

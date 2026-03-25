@@ -204,21 +204,21 @@ export function AIAssistant({
     }
 
     return (
-        <div className="fixed top-[64px] right-0 bottom-0 w-[400px] bg-white border-l border-slate-200 flex flex-col z-[100] shadow-2xl animate-in slide-in-from-right duration-300">
+        <div className="fixed top-[64px] right-0 bottom-0 w-[400px] bg-white bg-gray-50 border-l border-slate-200 border-slate-200 flex flex-col z-[100] shadow-2xl animate-in slide-in-from-right duration-300">
             {/* Header */}
-            <header className="px-5 py-4 flex items-center justify-between bg-slate-50 border-b border-slate-200">
+            <header className="px-5 py-4 flex items-center justify-between bg-slate-50 bg-white border-b border-slate-200 border-slate-200">
                 <button
                     type="button"
                     data-tour="profile-settings"
                     className="flex items-center gap-3 p-1 -ml-1 rounded-lg hover:bg-slate-100 transition-colors"
                     onClick={() => navigate("/profile")}
                 >
-                    <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center shadow-lg">
-                        <Terminal size={16} className="text-blue-400" />
+                    <div className="w-8 h-8 bg-slate-900 dark:bg-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+                        <Terminal size={16} className="text-blue-400 dark:text-blue-100" />
                     </div>
                     <div>
-                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Command Center</h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight -mt-0.5">Autonomous Agent</p>
+                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 text-slate-800">Command Center</h3>
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tight -mt-0.5">Autonomous Agent</p>
                     </div>
                 </button>
 
@@ -236,7 +236,7 @@ export function AIAssistant({
             {/* Chat Body */}
             <div
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto p-5 space-y-5 bg-white custom-scrollbar"
+                className="flex-1 overflow-y-auto p-5 space-y-5 bg-white bg-gray-50 custom-scrollbar"
             >
                 {
                     messages.length === 0 && (
@@ -406,7 +406,7 @@ export function AIAssistant({
                             }
                         }}
                         placeholder="Enter command..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 pr-20 text-sm text-slate-900 font-medium focus:bg-white focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/40 outline-none transition-all resize-none min-h-[56px] max-h-48 scrollbar-hide placeholder:text-slate-400"
+                        className="w-full bg-slate-50 bg-white border border-slate-200 border-slate-200 rounded-xl px-4 py-3.5 pr-20 text-sm text-slate-900 text-slate-900 font-medium focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/40 outline-none transition-all resize-none min-h-[56px] max-h-48 scrollbar-hide placeholder:text-slate-400"
                         rows={1}
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
